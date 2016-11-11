@@ -50,37 +50,15 @@ public class Neo4jConnector implements IConnectorDb {
 		}
 	}
 
-	/**
-	 * Generate Cypher Request to create new node and get his ID
-	 * 
-	 * @param object
-	 * @return
-	 */
-	private String generateCreationRequest(ObjectToDbDto object) {
-		String request = "CREATE (a:" + convertObjectForDb(object) + ") RETURN ID(a)";
-		System.out.println(request);
-		return request;
-	}
-
 	@Override
 	public int writeObject(ObjectToDbDto object) {
 		if (object != null) {
-			Session session = null;
-			try {
-				// Create Sessions
-				session = createSession();
-				// Generate request for DB
-				String request = generateCreationRequest(object);
-				// Launch request
-				StatementResult result = session.run(request);
-				Record record = result.single();
-				Value value = record.values().get(0);
-				int id = value.asInt();
-				object.setId(id);
-				return id;
-			} finally {
-				closeSession(session);
-			}
+			// Generate request for DB
+			String request = "CREATE (a:" + convertObjectForDb(object) + ") RETURN ID(a)";
+			System.out.println(request);
+			int newId = launchCreationRequest(request, true);
+			object.setId(newId);
+			return newId;
 		}
 		System.err.println("Object is null");
 		return -1;
@@ -115,7 +93,11 @@ public class Neo4jConnector implements IConnectorDb {
 
 	@Override
 	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented) {
-		return -1;
+		String request = "MATCH (a:" + objectA.getType().toString() + ") WHERE ID(a)=" + objectA.getId() + " "
+				+ "MATCH (b:" + objectB.getType().toString() + ") WHERE ID(b)=" + objectB.getId() + " "
+				+ "CREATE (a)-[:KNOWS]->(b)";
+		System.out.println(request);
+		return launchCreationRequest(request, false);
 	}
 
 	/**
