@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -17,50 +18,101 @@ import org.apache.commons.lang3.StringUtils;
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.util.CypherUtils;
 
-public class Neo4jConnector implements IConnectorDb {
+public class Neo4jConnector extends IConnectorDb {
 
 	private Connection conn = null;
 
-	public Neo4jConnector() {
-		super();
-		try {
-			conn = DriverManager.getConnection("jdbc:neo4j:http://localhost:7474", "neo4j", "expand");
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
+	// ############################# Start/Close Connection to DB methods
+
+	@Override
+	protected void connectToDb() {
+		if (conn == null) {
+			try {
+				conn = DriverManager.getConnection("jdbc:neo4j:http://localhost:7474", "neo4j", "expand");
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 
 	@Override
-	protected void finalize() throws Throwable {
-		try {
-			if (conn != null && !conn.isClosed()) {
-				conn.close();
+	protected void closeConnection() {
+		if (conn != null) {
+			try {
+				if (!conn.isClosed()) {
+					conn.close();
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
 			}
-		} catch (SQLException e) {
-			e.printStackTrace();
 		}
-		super.finalize();
 	}
+
+	// ############################# Request methods
 
 	@Override
 	public int writeObject(ObjectToDbDto object) {
+		connectToDb();
+
+		// Create query
+		String request = "CREATE (a:" + CypherUtils.convertObjectForDbSubtitution(object) + ") RETURN ID(a) AS ID";
+		System.out.println(request);
+
+		// Create parameters
+		Map<String, Object> params = new HashMap<>();
+		int i = 1;
+		for (Entry<String, Object> attribute : object.getAttributes().entrySet()) {
+			params.put(Integer.toString(i), attribute.getValue());
+			i++;
+		}
+
+		// Launch request
+		List<ObjectToDbDto> results = query(request, params);
+
+		if (!CollectionUtils.isEmpty(results)) {
+			return results.get(0).getId();
+		}
 		return -1;
 	}
 
 	@Override
 	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented) {
-		return 0;
+		connectToDb();
+
+		// Create query
+		String request = "MATCH (a:" + objectA.getType().toString() + ") WHERE ID(a)={1} " + "MATCH (b:"
+				+ objectB.getType().toString() + ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
+		System.out.println(request);
+
+		// Create parameters
+		Map<String, Object> params = new HashMap<>();
+		params.put("1", objectA.getId());
+		params.put("2", objectB.getId());
+
+		// Launch request
+		List<ObjectToDbDto> results = query(request, params);
+
+		if (!CollectionUtils.isEmpty(results)) {
+			return results.get(0).getId();
+		}
+		return -1;
 	}
 
 	@Override
 	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
+		connectToDb();
 
+		// Create query
 		String request = "MATCH (n:HUMAIN) WHERE ID(n)={1} RETURN n, ID(n) AS ID LIMIT 5";
 		System.out.println(request);
 
+		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		params.put("1", idObject);
+
+		// Launch request
 		List<ObjectToDbDto> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
@@ -69,6 +121,15 @@ public class Neo4jConnector implements IConnectorDb {
 		return null;
 	}
 
+	// ############################# Utils methods
+
+	/**
+	 * Get columns keys list
+	 * 
+	 * @param result
+	 * @return
+	 * @throws SQLException
+	 */
 	private List<String> getColumns(ResultSet result) throws SQLException {
 		ResultSetMetaData metaData = result.getMetaData();
 		int count = metaData.getColumnCount();
@@ -79,6 +140,13 @@ public class Neo4jConnector implements IConnectorDb {
 		return cols;
 	}
 
+	/**
+	 * Launch Query and get result list
+	 * 
+	 * @param query
+	 * @param params
+	 * @return
+	 */
 	private List<ObjectToDbDto> query(String query, Map<String, Object> params) {
 		List<ObjectToDbDto> results = new ArrayList<>();
 		try {
@@ -112,4 +180,5 @@ public class Neo4jConnector implements IConnectorDb {
 			statement.setObject(index, entry.getValue());
 		}
 	}
+
 }
