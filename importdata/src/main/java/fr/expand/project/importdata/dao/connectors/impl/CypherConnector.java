@@ -11,10 +11,10 @@ import org.neo4j.driver.v1.Session;
 import org.neo4j.driver.v1.StatementResult;
 import org.neo4j.driver.v1.Value;
 
-import fr.expand.project.commons.IConstantUtils;
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.util.CypherUtils;
 
 /**
  * Connector use to interact with Neo4J DB
@@ -22,26 +22,21 @@ import fr.expand.project.importdata.dto.ObjectToDbDto;
  * @author Maxime
  *
  */
-public class CypherConnector implements IConnectorDb {
+public class CypherConnector extends IConnectorDb {
 
 	private Driver driver;
+	private Session session;
 
-	/**
-	 * Create Graph DB session
-	 * 
-	 * @return
-	 */
-	private Session createSession() {
+	// ############################# Start/Close Connection to DB methods
+
+	@Override
+	protected void connectToDb() {
 		driver = GraphDatabase.driver("bolt://localhost", AuthTokens.basic("neo4j", "expand"));
-		return driver.session();
+		session = driver.session();
 	}
 
-	/**
-	 * Close Graph DB session
-	 * 
-	 * @param session
-	 */
-	private void closeSession(Session session) {
+	@Override
+	public void closeConnection() {
 		if (session != null && session.isOpen()) {
 			session.close();
 		}
@@ -50,11 +45,13 @@ public class CypherConnector implements IConnectorDb {
 		}
 	}
 
+	// ############################# Request methods
+
 	@Override
 	public int writeObject(ObjectToDbDto object) {
 		if (object != null) {
 			// Generate request for DB
-			String request = "CREATE (a:" + convertObjectForDb(object) + ") RETURN ID(a)";
+			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object) + ") RETURN ID(a)";
 			System.out.println(request);
 			int newId = launchCreationRequest(request, true);
 			object.setId(newId);
@@ -62,33 +59,6 @@ public class CypherConnector implements IConnectorDb {
 		}
 		System.err.println("Object is null");
 		return -1;
-	}
-
-	/**
-	 * Launch Cypher Request
-	 * 
-	 * @param request
-	 * @param resultAttempted
-	 *            : true if we try to get a returned ID
-	 * @return ID or -1
-	 */
-	private int launchCreationRequest(String request, boolean resultAttempted) {
-		Session session = null;
-		try {
-			// Create Sessions
-			session = createSession();
-			// Launch request
-			StatementResult result = session.run(request);
-			if (!resultAttempted) {
-				return -1;
-			}
-			Record record = result.single();
-			Value value = record.values().get(0);
-			int id = value.asInt();
-			return id;
-		} finally {
-			closeSession(session);
-		}
 	}
 
 	@Override
@@ -100,44 +70,35 @@ public class CypherConnector implements IConnectorDb {
 		return launchCreationRequest(request, false);
 	}
 
-	/**
-	 * Convert Object to string representation use by Cypher request
-	 * 
-	 * @param object
-	 * @return
-	 */
-	private String convertObjectForDb(ObjectToDbDto object) {
-		StringBuilder result = new StringBuilder();
-		result.append(object.getType()).append(IConstantUtils.SPACE);
-		if (!object.getAttributes().isEmpty()) {
-			boolean isFirst = true;
-			result.append("{");
-			for (Entry<String, Object> entry : object.getAttributes().entrySet()) {
-				if (!isFirst) {
-					result.append(",");
-				} else {
-					isFirst = false;
-				}
-				result.append(entry.getKey()).append(":'").append(entry.getValue()).append("'");
-			}
-			result.append("}");
-		}
-		return result.toString();
-	}
-
 	@Override
 	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
-		Session session = null;
-		try {
-			session = createSession();
-			String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
-					+ " RETURN n AS TAILLE LIMIT 5";
-			System.out.println(request);
-			StatementResult result = session.run(request);
-			return convertResultToObjectToDb(typeObject, result.single());
-		} finally {
-			closeSession(session);
+		String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
+				+ " RETURN n AS TAILLE LIMIT 5";
+		System.out.println(request);
+		StatementResult result = session.run(request);
+		return convertResultToObjectToDb(typeObject, result.single());
+	}
+
+	// ############################# Utils methods
+
+	/**
+	 * Launch Cypher Request
+	 * 
+	 * @param request
+	 * @param resultAttempted
+	 *            : true if we try to get a returned ID
+	 * @return ID or -1
+	 */
+	private int launchCreationRequest(String request, boolean resultAttempted) {
+		// Launch request
+		StatementResult result = session.run(request);
+		if (!resultAttempted) {
+			return -1;
 		}
+		Record record = result.single();
+		Value value = record.values().get(0);
+		int id = value.asInt();
+		return id;
 	}
 
 	/**
