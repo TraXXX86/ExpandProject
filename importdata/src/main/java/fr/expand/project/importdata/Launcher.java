@@ -1,5 +1,6 @@
 package fr.expand.project.importdata;
 
+import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.connectors.impl.Neo4jConnector;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
 

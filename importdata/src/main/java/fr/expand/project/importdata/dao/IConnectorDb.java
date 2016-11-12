@@ -1,6 +1,6 @@
 package fr.expand.project.importdata.dao;
 
-import fr.expand.project.importdata.ObjectTypeEnum;
+import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
 
 public interface IConnectorDb {
