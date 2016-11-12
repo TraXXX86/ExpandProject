@@ -22,7 +22,7 @@ import fr.expand.project.importdata.dto.ObjectToDbDto;
  * @author Maxime
  *
  */
-public class Neo4jConnector implements IConnectorDb {
+public class CypherConnector implements IConnectorDb {
 
 	private Driver driver;
 
