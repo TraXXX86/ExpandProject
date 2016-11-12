@@ -3,7 +3,34 @@ package fr.expand.project.importdata.dao;
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
 
-public interface IConnectorDb {
+public abstract class IConnectorDb {
+
+	/**
+	 * Constructor
+	 */
+	public IConnectorDb() {
+		super();
+		this.connectToDb();
+	}
+
+	/**
+	 * Override finalize to always close connection
+	 */
+	@Override
+	protected void finalize() throws Throwable {
+		this.closeConnection();
+		super.finalize();
+	}
+
+	/**
+	 * Create connection to DB
+	 */
+	protected abstract void connectToDb();
+
+	/**
+	 * Close connection to DB
+	 */
+	protected abstract void closeConnection();
 
 	/**
 	 * Create a simple object
@@ -11,7 +38,7 @@ public interface IConnectorDb {
 	 * @param object
 	 * @return ID of new object
 	 */
-	public int writeObject(ObjectToDbDto object);
+	public abstract int writeObject(ObjectToDbDto object);
 
 	/**
 	 * Create a simple link between 2 objects
@@ -22,7 +49,7 @@ public interface IConnectorDb {
 	 *            : true if link is oriented objectA to objectB
 	 * @return
 	 */
-	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented);
+	public abstract int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented);
 
 	/**
 	 * Get object from DB
@@ -31,5 +58,5 @@ public interface IConnectorDb {
 	 * @param idObject
 	 * @return
 	 */
-	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject);
+	public abstract ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject);
 }
