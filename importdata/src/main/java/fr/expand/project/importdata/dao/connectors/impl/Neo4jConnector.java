@@ -11,8 +11,8 @@ import org.neo4j.driver.v1.Session;
 import org.neo4j.driver.v1.StatementResult;
 import org.neo4j.driver.v1.Value;
 
-import fr.expand.project.importdata.IConstantUtils;
-import fr.expand.project.importdata.ObjectTypeEnum;
+import fr.expand.project.commons.IConstantUtils;
+import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
 

@@ -9,6 +9,13 @@
   </parent>
   
   <dependencies>
+  
+  	<dependency>
+        <groupId>${parent.groupId}</groupId>
+        <artifactId>commonspackage</artifactId>
+        <version>${parent.version}</version>
+    </dependency>
+  
     <dependency>
         <groupId>org.neo4j.driver</groupId>
         <artifactId>neo4j-java-driver</artifactId>
