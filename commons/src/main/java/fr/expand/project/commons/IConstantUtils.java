@@ -1,4 +1,4 @@
-package fr.expand.project.importdata;
+package fr.expand.project.commons;
 
 public interface IConstantUtils {
 

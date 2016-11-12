@@ -3,7 +3,7 @@ package fr.expand.project.importdata.dto;
 import java.util.HashMap;
 import java.util.Map;
 
-import fr.expand.project.importdata.ObjectTypeEnum;
+import fr.expand.project.commons.ObjectTypeEnum;
 
 public class ObjectToDbDto {
 
