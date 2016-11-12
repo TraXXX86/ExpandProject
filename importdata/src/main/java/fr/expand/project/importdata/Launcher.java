@@ -2,11 +2,18 @@ package fr.expand.project.importdata;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
+import fr.expand.project.importdata.dao.connectors.impl.Neo4jConnector;
 import fr.expand.project.importdata.dto.ObjectToDbDto;
 
 public class Launcher {
 	public static void main(String[] args) {
 		System.out.println("Connexion to graph db");
+
+		Neo4jConnector connector = new Neo4jConnector();
+		connector.getObjectToDbDto(ObjectTypeEnum.HUMAIN, 25);
+	}
+
+	private void testCypherConnector() {
 		CypherConnector connector = new CypherConnector();
 
 		// Create a new Node
