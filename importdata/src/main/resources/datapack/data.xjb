@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bindings xmlns="http://java.sun.com/xml/ns/jaxb"
+          xmlns:xsi="http://www.w3.org/2000/10/XMLSchema-instance"
+          xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          version="2.1">
+    <bindings schemaLocation="data.xsd" version="1.0">
+
+        <schemaBindings>
+            <package name="fr.expand.project.importdata.dto.generated"/>
+        </schemaBindings>    
+        <bindings node="//xs:element[@name='DATAS']">
+            <bindings node="//xs:attribute[@name='VALUE']">
+                <property name="valueAttribute"/>
+            </bindings>
+        </bindings>
+    </bindings>
+</bindings>
