@@ -1,7 +1,7 @@
 package fr.expand.project.importdata.dao;
 
 import fr.expand.project.commons.ObjectTypeEnum;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 
 public abstract class IConnectorDb {
 
@@ -38,7 +38,7 @@ public abstract class IConnectorDb {
 	 * @param object
 	 * @return ID of new object
 	 */
-	public abstract int writeObject(ObjectToDbDto object);
+	public abstract int writeObject(DataPackObject object);
 
 	/**
 	 * Create a simple link between 2 objects
@@ -49,7 +49,7 @@ public abstract class IConnectorDb {
 	 *            : true if link is oriented objectA to objectB
 	 * @return
 	 */
-	public abstract int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented);
+	public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented);
 
 	/**
 	 * Get object from DB
@@ -58,5 +58,5 @@ public abstract class IConnectorDb {
 	 * @param idObject
 	 * @return
 	 */
-	public abstract ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject);
+	public abstract DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject);
 }

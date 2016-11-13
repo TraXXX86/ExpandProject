@@ -13,7 +13,8 @@ import org.neo4j.driver.v1.Value;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.generated.DataPackAttribute;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
 
 /**
@@ -48,13 +49,13 @@ public class CypherConnector extends IConnectorDb {
 	// ############################# Request methods
 
 	@Override
-	public int writeObject(ObjectToDbDto object) {
+	public int writeObject(DataPackObject object) {
 		if (object != null) {
 			// Generate request for DB
 			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object) + ") RETURN ID(a)";
 			System.out.println(request);
 			int newId = launchCreationRequest(request, true);
-			object.setId(newId);
+			object.setID(newId);
 			return newId;
 		}
 		System.err.println("Object is null");
@@ -62,16 +63,15 @@ public class CypherConnector extends IConnectorDb {
 	}
 
 	@Override
-	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented) {
-		String request = "MATCH (a:" + objectA.getType().toString() + ") WHERE ID(a)=" + objectA.getId() + " "
-				+ "MATCH (b:" + objectB.getType().toString() + ") WHERE ID(b)=" + objectB.getId() + " "
-				+ "CREATE (a)-[:KNOWS]->(b)";
+	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
+		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
+				+ objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:KNOWS]->(b)";
 		System.out.println(request);
 		return launchCreationRequest(request, false);
 	}
 
 	@Override
-	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
+	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
 		String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
 				+ " RETURN n AS TAILLE LIMIT 5";
 		System.out.println(request);
@@ -109,17 +109,28 @@ public class CypherConnector extends IConnectorDb {
 	 * @param object
 	 * @return
 	 */
-	private ObjectToDbDto convertResultToObjectToDb(ObjectTypeEnum typeObject, Record record) {
-		ObjectToDbDto result = new ObjectToDbDto(typeObject);
+	private DataPackObject convertResultToObjectToDb(ObjectTypeEnum typeObject, Record record) {
+		DataPackObject result = new DataPackObject();
+		result.setTYPE(typeObject.toString());
 		for (Entry<String, Object> entry : record.asMap().entrySet()) {
 			if (entry.getValue() instanceof InternalNode) {
 				for (Entry<String, Object> entryInternalNode : ((InternalNode) entry.getValue()).asMap().entrySet()) {
 					System.out.println(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
-					result.getAttributes().put(entryInternalNode.getKey(), entryInternalNode.getValue());
+					if (entryInternalNode.getValue() instanceof String) {
+						DataPackAttribute attribute = new DataPackAttribute();
+						attribute.setKEY(entryInternalNode.getKey());
+						attribute.setVALUE((String) entryInternalNode.getValue());
+						result.getATTRIBUTES().add(attribute);
+					}
 				}
 			} else {
 				System.out.println(entry.getKey() + " " + entry.getValue());
-				result.getAttributes().put(entry.getKey(), entry.getValue());
+				if (entry.getValue() instanceof String) {
+					DataPackAttribute attribute = new DataPackAttribute();
+					attribute.setKEY(entry.getKey());
+					attribute.setVALUE((String) entry.getValue());
+					result.getATTRIBUTES().add(attribute);
+				}
 			}
 		}
 		return result;

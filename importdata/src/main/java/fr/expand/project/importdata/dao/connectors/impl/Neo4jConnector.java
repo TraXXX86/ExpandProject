@@ -17,7 +17,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.generated.DataPackAttribute;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
 
 public class Neo4jConnector extends IConnectorDb {
@@ -53,7 +54,7 @@ public class Neo4jConnector extends IConnectorDb {
 	// ############################# Request methods
 
 	@Override
-	public int writeObject(ObjectToDbDto object) {
+	public int writeObject(DataPackObject object) {
 		connectToDb();
 
 		// Create query
@@ -63,45 +64,45 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		int i = 1;
-		for (Entry<String, Object> attribute : object.getAttributes().entrySet()) {
-			params.put(Integer.toString(i), attribute.getValue());
+		for (DataPackAttribute attribute : object.getATTRIBUTES()) {
+			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
 		}
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
-			return results.get(0).getId();
+			return results.get(0).getID();
 		}
 		return -1;
 	}
 
 	@Override
-	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented) {
+	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (a:" + objectA.getType().toString() + ") WHERE ID(a)={1} " + "MATCH (b:"
-				+ objectB.getType().toString() + ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
+		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)={1} " + "MATCH (b:" + objectB.getTYPE()
+				+ ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
 		System.out.println(request);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
-		params.put("1", objectA.getId());
-		params.put("2", objectB.getId());
+		params.put("1", objectA.getID());
+		params.put("2", objectB.getID());
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
-			return results.get(0).getId();
+			return results.get(0).getID();
 		}
 		return -1;
 	}
 
 	@Override
-	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
+	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
 		connectToDb();
 
 		// Create query
@@ -113,7 +114,7 @@ public class Neo4jConnector extends IConnectorDb {
 		params.put("1", idObject);
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0);
@@ -147,8 +148,8 @@ public class Neo4jConnector extends IConnectorDb {
 	 * @param params
 	 * @return
 	 */
-	private List<ObjectToDbDto> query(String query, Map<String, Object> params) {
-		List<ObjectToDbDto> results = new ArrayList<>();
+	private List<DataPackObject> query(String query, Map<String, Object> params) {
+		List<DataPackObject> results = new ArrayList<>();
 		try {
 			final PreparedStatement statement = conn.prepareStatement(query);
 			setParameters(statement, params);
@@ -156,13 +157,22 @@ public class Neo4jConnector extends IConnectorDb {
 
 			List<String> columnsList = getColumns(result);
 			while (result.next()) {
-				ObjectToDbDto rowObject = new ObjectToDbDto(ObjectTypeEnum.HUMAIN);
+				DataPackObject rowObject = new DataPackObject();
+				rowObject.setTYPE(ObjectTypeEnum.HUMAIN.toString());
 				for (String column : columnsList) {
 					if (StringUtils.equals(column, "ID")) {
-						rowObject.setId(result.getInt(column));
+						rowObject.setID(result.getInt(column));
 					} else {
 						Map<String, Object> row = (Map<String, Object>) result.getObject(column);
-						rowObject.getAttributes().putAll(row);
+
+						for (Entry<String, Object> content : row.entrySet()) {
+							if (content.getValue() instanceof String) {
+								DataPackAttribute attribute = new DataPackAttribute();
+								attribute.setKEY(content.getKey());
+								attribute.setVALUE((String) content.getValue());
+								rowObject.getATTRIBUTES().add(attribute);
+							}
+						}
 					}
 				}
 				results.add(rowObject);

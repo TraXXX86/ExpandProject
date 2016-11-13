@@ -9,11 +9,10 @@
   </parent>
   
   <dependencies>
-  
   	<dependency>
         <groupId>fr.expand.project</groupId>
         <artifactId>commonspackage</artifactId>
-        <version>${parent.version}</version>
+        <version>${project.parent.version}</version>
     </dependency>
   
     <dependency>
@@ -48,9 +47,39 @@
 	    <groupId>org.apache.commons</groupId>
 	    <artifactId>commons-collections4</artifactId>
 	    <version>4.0</version>
-	</dependency>
-	
-    
-  </dependencies>
-  
+	</dependency> 
+ </dependencies>
+ <build>
+    <pluginManagement>
+	    <plugins>
+	    	<!-- Plugin use to generate JAXB DTO from xsd -->
+	        <plugin>
+	            <groupId>org.codehaus.mojo</groupId>
+		        <artifactId>jaxb2-maven-plugin</artifactId>
+		        <version>2.3</version>
+	            <executions>
+	            	<execution>
+	            		<phase>generate-sources</phase>
+		            	<goals>
+		            		<goal>xjc</goal>
+		            	</goals>
+	            	</execution>
+	            </executions>
+	            <configuration>
+	                <packageName>fr.expand.project.importdata.dto.generated</packageName>
+	                <outputDirectory>src/main/java</outputDirectory>
+				    <sources>
+				         <source>src/main/resources/datapack/data.xsd</source>
+				    </sources>
+				    <xjbSources>
+				         <xjbSource>src/main/resources/datapack/data.xjb</xjbSource>
+				    </xjbSources>
+				    <clearOutputDir>false</clearOutputDir>
+				    <failOnNoSchemas>false</failOnNoSchemas>
+				    <generateEpisode>false</generateEpisode>
+	            </configuration>
+	        </plugin>
+		</plugins>
+    </pluginManagement>
+</build>
 </project>
