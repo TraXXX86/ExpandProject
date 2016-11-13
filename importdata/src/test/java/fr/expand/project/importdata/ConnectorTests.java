@@ -38,26 +38,16 @@ public class ConnectorTests {
 		// Create a new Node
 		DataPackObject objectA = new DataPackObject();
 		objectA.setTYPE(ObjectTypeEnum.HUMAIN.toString());
-		DataPackAttribute attribute = new DataPackAttribute();
-		attribute.setKEY("TAILLE");
-		attribute.setVALUE("1m77");
-		objectA.getATTRIBUTES().add(attribute);
-		attribute = new DataPackAttribute();
-		attribute.setKEY("POIDS");
-		attribute.setVALUE("71kg");
-		objectA.getATTRIBUTES().add(attribute);
+		objectA.getATTRIBUTES().add(new DataPackAttribute("TAILLE", "1m77"));
+		objectA.getATTRIBUTES().add(new DataPackAttribute("POIDS", "71kg"));
 		int idObjA = connector.writeObject(objectA);
 		LOGGER.info("Create new Node with id " + idObjA);
 
 		// Create a new Node
 		DataPackObject objectB = new DataPackObject();
 		objectB.setTYPE(ObjectTypeEnum.HUMAIN.toString());
-		attribute.setKEY("TAILLE");
-		attribute.setVALUE("1m60");
-		objectB.getATTRIBUTES().add(attribute);
-		attribute.setKEY("POIDS");
-		attribute.setVALUE("54");
-		objectB.getATTRIBUTES().add(attribute);
+		objectB.getATTRIBUTES().add(new DataPackAttribute("TAILLE", "1m60"));
+		objectB.getATTRIBUTES().add(new DataPackAttribute("POIDS", "54"));
 
 		int idObjB = connector.writeObject(objectB);
 		LOGGER.info("Create new Node with id " + idObjB);

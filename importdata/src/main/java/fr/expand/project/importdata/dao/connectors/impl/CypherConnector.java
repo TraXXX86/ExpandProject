@@ -117,18 +117,15 @@ public class CypherConnector extends IConnectorDb {
 				for (Entry<String, Object> entryInternalNode : ((InternalNode) entry.getValue()).asMap().entrySet()) {
 					System.out.println(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
 					if (entryInternalNode.getValue() instanceof String) {
-						DataPackAttribute attribute = new DataPackAttribute();
-						attribute.setKEY(entryInternalNode.getKey());
-						attribute.setVALUE((String) entryInternalNode.getValue());
+						DataPackAttribute attribute = new DataPackAttribute(entryInternalNode.getKey(),
+								(String) entryInternalNode.getValue());
 						result.getATTRIBUTES().add(attribute);
 					}
 				}
 			} else {
 				System.out.println(entry.getKey() + " " + entry.getValue());
 				if (entry.getValue() instanceof String) {
-					DataPackAttribute attribute = new DataPackAttribute();
-					attribute.setKEY(entry.getKey());
-					attribute.setVALUE((String) entry.getValue());
+					DataPackAttribute attribute = new DataPackAttribute(entry.getKey(), (String) entry.getValue());
 					result.getATTRIBUTES().add(attribute);
 				}
 			}

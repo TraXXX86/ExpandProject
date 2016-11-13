@@ -2,7 +2,7 @@
 // Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.11 
 // Voir <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
 // Toute modification apportée à ce fichier sera perdue lors de la recompilation du schéma source. 
-// Généré le : 2016.11.13 à 08:33:41 PM CET 
+// Généré le : 2016.11.13 à 09:27:38 PM CET 
 //
 
 
@@ -40,8 +40,7 @@ import javax.xml.bind.annotation.XmlType;
     "key",
     "value"
 })
-public class DataPackAttribute
-    implements Serializable
+public class DataPackAttribute implements Serializable
 {
 
     private final static long serialVersionUID = 2L;
@@ -49,6 +48,23 @@ public class DataPackAttribute
     protected String key;
     @XmlElement(name = "VALUE", required = true, nillable = true)
     protected String value;
+
+    /**
+     * Default no-arg constructor
+     * 
+     */
+    public DataPackAttribute() {
+        super();
+    }
+
+    /**
+     * Fully-initialising value constructor
+     * 
+     */
+    public DataPackAttribute(final String key, final String value) {
+        this.key = key;
+        this.value = value;
+    }
 
     /**
      * Obtient la valeur de la propriété key.
