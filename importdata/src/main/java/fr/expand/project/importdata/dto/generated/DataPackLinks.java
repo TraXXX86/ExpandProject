@@ -2,7 +2,7 @@
 // Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.11 
 // Voir <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
 // Toute modification apportée à ce fichier sera perdue lors de la recompilation du schéma source. 
-// Généré le : 2016.11.13 à 08:33:41 PM CET 
+// Généré le : 2016.11.13 à 09:27:38 PM CET 
 //
 
 
@@ -40,13 +40,28 @@ import javax.xml.bind.annotation.XmlType;
 @XmlType(name = "LINKS", propOrder = {
     "link"
 })
-public class DataPackLinks
-    implements Serializable
+public class DataPackLinks implements Serializable
 {
 
     private final static long serialVersionUID = 2L;
     @XmlElement(name = "LINK")
     protected List<DataPackLink> link;
+
+    /**
+     * Default no-arg constructor
+     * 
+     */
+    public DataPackLinks() {
+        super();
+    }
+
+    /**
+     * Fully-initialising value constructor
+     * 
+     */
+    public DataPackLinks(final List<DataPackLink> link) {
+        this.link = link;
+    }
 
     /**
      * Gets the value of the link property.

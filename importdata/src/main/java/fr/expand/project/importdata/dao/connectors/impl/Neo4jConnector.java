@@ -167,9 +167,8 @@ public class Neo4jConnector extends IConnectorDb {
 
 						for (Entry<String, Object> content : row.entrySet()) {
 							if (content.getValue() instanceof String) {
-								DataPackAttribute attribute = new DataPackAttribute();
-								attribute.setKEY(content.getKey());
-								attribute.setVALUE((String) content.getValue());
+								DataPackAttribute attribute = new DataPackAttribute(content.getKey(),
+										(String) content.getValue());
 								rowObject.getATTRIBUTES().add(attribute);
 							}
 						}
