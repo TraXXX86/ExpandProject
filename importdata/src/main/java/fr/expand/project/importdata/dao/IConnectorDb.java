@@ -1,7 +1,7 @@
 package fr.expand.project.importdata.dao;
 
 import fr.expand.project.commons.ObjectTypeEnum;
-import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 
 public abstract class IConnectorDb {
 

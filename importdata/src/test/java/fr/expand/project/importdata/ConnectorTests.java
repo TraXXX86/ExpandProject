@@ -9,7 +9,8 @@ import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
 import fr.expand.project.importdata.dao.connectors.impl.Neo4jConnector;
-import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.DataPackAttribute;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 
 public class ConnectorTests {
 
@@ -35,16 +36,29 @@ public class ConnectorTests {
 		LOGGER.info("TEST for CONNECTOR : " + connector.getClass().toString());
 
 		// Create a new Node
-		DataPackObject objectA = new DataPackObject(ObjectTypeEnum.HUMAIN);
-		objectA.getAttributes().put("TAILLE", "1m77");
-		objectA.getAttributes().put("POIDS", "71");
+		DataPackObject objectA = new DataPackObject();
+		objectA.setTYPE(ObjectTypeEnum.HUMAIN.toString());
+		DataPackAttribute attribute = new DataPackAttribute();
+		attribute.setKEY("TAILLE");
+		attribute.setVALUE("1m77");
+		objectA.getATTRIBUTES().add(attribute);
+		attribute = new DataPackAttribute();
+		attribute.setKEY("POIDS");
+		attribute.setVALUE("71kg");
+		objectA.getATTRIBUTES().add(attribute);
 		int idObjA = connector.writeObject(objectA);
 		LOGGER.info("Create new Node with id " + idObjA);
 
 		// Create a new Node
-		DataPackObject objectB = new DataPackObject(ObjectTypeEnum.HUMAIN);
-		objectB.getAttributes().put("TAILLE", "1m60");
-		objectB.getAttributes().put("POIDS", "54");
+		DataPackObject objectB = new DataPackObject();
+		objectB.setTYPE(ObjectTypeEnum.HUMAIN.toString());
+		attribute.setKEY("TAILLE");
+		attribute.setVALUE("1m60");
+		objectB.getATTRIBUTES().add(attribute);
+		attribute.setKEY("POIDS");
+		attribute.setVALUE("54");
+		objectB.getATTRIBUTES().add(attribute);
+
 		int idObjB = connector.writeObject(objectB);
 		LOGGER.info("Create new Node with id " + idObjB);
 

@@ -17,7 +17,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
-import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.DataPackAttribute;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
 
 public class Neo4jConnector extends IConnectorDb {
@@ -63,8 +64,8 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		int i = 1;
-		for (Entry<String, Object> attribute : object.getAttributes().entrySet()) {
-			params.put(Integer.toString(i), attribute.getValue());
+		for (DataPackAttribute attribute : object.getATTRIBUTES()) {
+			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
 		}
 
@@ -72,7 +73,7 @@ public class Neo4jConnector extends IConnectorDb {
 		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
-			return results.get(0).getId();
+			return results.get(0).getID();
 		}
 		return -1;
 	}
@@ -82,20 +83,20 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (a:" + objectA.getType().toString() + ") WHERE ID(a)={1} " + "MATCH (b:"
-				+ objectB.getType().toString() + ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
+		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)={1} " + "MATCH (b:" + objectB.getTYPE()
+				+ ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
 		System.out.println(request);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
-		params.put("1", objectA.getId());
-		params.put("2", objectB.getId());
+		params.put("1", objectA.getID());
+		params.put("2", objectB.getID());
 
 		// Launch request
 		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
-			return results.get(0).getId();
+			return results.get(0).getID();
 		}
 		return -1;
 	}
@@ -156,13 +157,22 @@ public class Neo4jConnector extends IConnectorDb {
 
 			List<String> columnsList = getColumns(result);
 			while (result.next()) {
-				DataPackObject rowObject = new DataPackObject(ObjectTypeEnum.HUMAIN);
+				DataPackObject rowObject = new DataPackObject();
+				rowObject.setTYPE(ObjectTypeEnum.HUMAIN.toString());
 				for (String column : columnsList) {
 					if (StringUtils.equals(column, "ID")) {
-						rowObject.setId(result.getInt(column));
+						rowObject.setID(result.getInt(column));
 					} else {
 						Map<String, Object> row = (Map<String, Object>) result.getObject(column);
-						rowObject.getAttributes().putAll(row);
+
+						for (Entry<String, Object> content : row.entrySet()) {
+							if (content.getValue() instanceof String) {
+								DataPackAttribute attribute = new DataPackAttribute();
+								attribute.setKEY(content.getKey());
+								attribute.setVALUE((String) content.getValue());
+								rowObject.getATTRIBUTES().add(attribute);
+							}
+						}
 					}
 				}
 				results.add(rowObject);

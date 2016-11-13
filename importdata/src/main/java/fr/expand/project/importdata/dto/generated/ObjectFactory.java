@@ -1,8 +1,8 @@
 //
-// Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.8-b130911.1802 
+// Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.11 
 // Voir <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
 // Toute modification apportée à ce fichier sera perdue lors de la recompilation du schéma source. 
-// Généré le : 2016.11.13 à 07:00:13 PM CET 
+// Généré le : 2016.11.13 à 08:33:41 PM CET 
 //
 
 
@@ -45,6 +45,22 @@ public class ObjectFactory {
     }
 
     /**
+     * Create an instance of {@link DataPackObjects }
+     * 
+     */
+    public DataPackObjects createDataPackObjects() {
+        return new DataPackObjects();
+    }
+
+    /**
+     * Create an instance of {@link DataPackObject }
+     * 
+     */
+    public DataPackObject createDataPackObject() {
+        return new DataPackObject();
+    }
+
+    /**
      * Create an instance of {@link DataPackAttribute }
      * 
      */
@@ -66,22 +82,6 @@ public class ObjectFactory {
      */
     public DataPackLink createDataPackLink() {
         return new DataPackLink();
-    }
-
-    /**
-     * Create an instance of {@link DataPackObjects }
-     * 
-     */
-    public DataPackObjects createDataPackObjects() {
-        return new DataPackObjects();
-    }
-
-    /**
-     * Create an instance of {@link DataPackObject }
-     * 
-     */
-    public DataPackObject createDataPackObject() {
-        return new DataPackObject();
     }
 
     /**

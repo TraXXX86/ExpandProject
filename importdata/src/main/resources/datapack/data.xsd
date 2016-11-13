@@ -17,13 +17,14 @@ xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" >
     <xs:complexType name="OBJECT">
         <xs:sequence>
             <xs:element name="TYPE" type="xs:string"/>
-            <xs:element name="ID" type="xs:integer"/>
-            <xs:element name="ATTRIBUTE" type="ATTRIBUTE" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="ID" type="xs:int"/>
+            <xs:element name="ATTRIBUTES" type="ATTRIBUTE" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="ATTRIBUTE" id="ATTRIBUTE">
         <xs:sequence>
-            <xs:element name="KEY" type="xs:string"/>
+            <xs:element name="KEY" type="xs:string" minOccurs="1" maxOccurs="1" nillable="false"/>
+            <xs:element name="VALUE" type="xs:string" minOccurs="1" maxOccurs="1" nillable="true"/>
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="LINKS">
@@ -41,7 +42,7 @@ xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" >
     </xs:complexType>
     <xs:complexType name="OBJ_LINK">
         <xs:sequence>
-            <xs:element name="ID" type="xs:integer"/>
+            <xs:element name="ID" type="xs:int"/>
         </xs:sequence>
     </xs:complexType>
 

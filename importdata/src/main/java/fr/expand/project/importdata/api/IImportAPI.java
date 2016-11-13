@@ -2,7 +2,7 @@ package fr.expand.project.importdata.api;
 
 import java.nio.file.Path;
 
-import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.DataPackObject;
 
 public interface IImportAPI {
 
