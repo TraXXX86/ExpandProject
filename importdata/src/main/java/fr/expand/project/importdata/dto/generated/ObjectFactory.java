@@ -2,7 +2,7 @@
 // Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.8-b130911.1802 
 // Voir <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
 // Toute modification apportée à ce fichier sera perdue lors de la recompilation du schéma source. 
-// Généré le : 2016.11.13 à 03:06:38 PM CET 
+// Généré le : 2016.11.13 à 07:00:13 PM CET 
 //
 
 
@@ -37,75 +37,59 @@ public class ObjectFactory {
     }
 
     /**
-     * Create an instance of {@link DATAS }
+     * Create an instance of {@link DataPack }
      * 
      */
-    public DATAS createDATAS() {
-        return new DATAS();
+    public DataPack createDataPack() {
+        return new DataPack();
     }
 
     /**
-     * Create an instance of {@link DATAS.LINKS }
+     * Create an instance of {@link DataPackAttribute }
      * 
      */
-    public DATAS.LINKS createDATASLINKS() {
-        return new DATAS.LINKS();
+    public DataPackAttribute createDataPackAttribute() {
+        return new DataPackAttribute();
     }
 
     /**
-     * Create an instance of {@link DATAS.LINKS.LINK }
+     * Create an instance of {@link DataPackLinks }
      * 
      */
-    public DATAS.LINKS.LINK createDATASLINKSLINK() {
-        return new DATAS.LINKS.LINK();
+    public DataPackLinks createDataPackLinks() {
+        return new DataPackLinks();
     }
 
     /**
-     * Create an instance of {@link DATAS.OBJECTS }
+     * Create an instance of {@link DataPackLink }
      * 
      */
-    public DATAS.OBJECTS createDATASOBJECTS() {
-        return new DATAS.OBJECTS();
+    public DataPackLink createDataPackLink() {
+        return new DataPackLink();
     }
 
     /**
-     * Create an instance of {@link DATAS.OBJECTS.OBJECT }
+     * Create an instance of {@link DataPackObjects }
      * 
      */
-    public DATAS.OBJECTS.OBJECT createDATASOBJECTSOBJECT() {
-        return new DATAS.OBJECTS.OBJECT();
+    public DataPackObjects createDataPackObjects() {
+        return new DataPackObjects();
     }
 
     /**
-     * Create an instance of {@link DATAS.OBJECTS.OBJECT.ATTRIBUTES }
+     * Create an instance of {@link DataPackObject }
      * 
      */
-    public DATAS.OBJECTS.OBJECT.ATTRIBUTES createDATASOBJECTSOBJECTATTRIBUTES() {
-        return new DATAS.OBJECTS.OBJECT.ATTRIBUTES();
+    public DataPackObject createDataPackObject() {
+        return new DataPackObject();
     }
 
     /**
-     * Create an instance of {@link DATAS.LINKS.LINK.OBJECTA }
+     * Create an instance of {@link DataPackObjectLink }
      * 
      */
-    public DATAS.LINKS.LINK.OBJECTA createDATASLINKSLINKOBJECTA() {
-        return new DATAS.LINKS.LINK.OBJECTA();
-    }
-
-    /**
-     * Create an instance of {@link DATAS.LINKS.LINK.OBJECTB }
-     * 
-     */
-    public DATAS.LINKS.LINK.OBJECTB createDATASLINKSLINKOBJECTB() {
-        return new DATAS.LINKS.LINK.OBJECTB();
-    }
-
-    /**
-     * Create an instance of {@link DATAS.OBJECTS.OBJECT.ATTRIBUTES.ATTRIBUTE }
-     * 
-     */
-    public DATAS.OBJECTS.OBJECT.ATTRIBUTES.ATTRIBUTE createDATASOBJECTSOBJECTATTRIBUTESATTRIBUTE() {
-        return new DATAS.OBJECTS.OBJECT.ATTRIBUTES.ATTRIBUTE();
+    public DataPackObjectLink createDataPackObjectLink() {
+        return new DataPackObjectLink();
     }
 
 }

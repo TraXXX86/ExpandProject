@@ -9,7 +9,7 @@ import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
 import fr.expand.project.importdata.dao.connectors.impl.Neo4jConnector;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public class ConnectorTests {
 
@@ -35,14 +35,14 @@ public class ConnectorTests {
 		LOGGER.info("TEST for CONNECTOR : " + connector.getClass().toString());
 
 		// Create a new Node
-		ObjectToDbDto objectA = new ObjectToDbDto(ObjectTypeEnum.HUMAIN);
+		DataPackObject objectA = new DataPackObject(ObjectTypeEnum.HUMAIN);
 		objectA.getAttributes().put("TAILLE", "1m77");
 		objectA.getAttributes().put("POIDS", "71");
 		int idObjA = connector.writeObject(objectA);
 		LOGGER.info("Create new Node with id " + idObjA);
 
 		// Create a new Node
-		ObjectToDbDto objectB = new ObjectToDbDto(ObjectTypeEnum.HUMAIN);
+		DataPackObject objectB = new DataPackObject(ObjectTypeEnum.HUMAIN);
 		objectB.getAttributes().put("TAILLE", "1m60");
 		objectB.getAttributes().put("POIDS", "54");
 		int idObjB = connector.writeObject(objectB);
@@ -53,6 +53,6 @@ public class ConnectorTests {
 		LOGGER.info("Create new link with id " + idObjB);
 
 		// Get a node from DB
-		ObjectToDbDto objectFromDb = connector.getObjectToDbDto(ObjectTypeEnum.HUMAIN, idObjA);
+		DataPackObject objectFromDb = connector.getObjectToDbDto(ObjectTypeEnum.HUMAIN, idObjA);
 	}
 }

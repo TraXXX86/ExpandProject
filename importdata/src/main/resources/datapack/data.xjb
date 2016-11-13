@@ -4,14 +4,37 @@
           xmlns:xs="http://www.w3.org/2001/XMLSchema"
           version="2.1">
     <bindings schemaLocation="data.xsd" version="1.0">
-
+		<globalBindings 
+         collectionType="java.util.ArrayList"
+         generateValueClass="true">
+        	 <serializable uid="2" />
+     	 </globalBindings>
         <schemaBindings>
             <package name="fr.expand.project.importdata.dto.generated"/>
         </schemaBindings>    
         <bindings node="//xs:element[@name='DATAS']">
-            <bindings node="//xs:attribute[@name='VALUE']">
+        	<class name="DataPack"/>
+            <!-- <bindings node="//xs:attribute[@name='VALUE']">
                 <property name="valueAttribute"/>
-            </bindings>
+            </bindings> -->
+        </bindings>
+        <bindings node="//xs:complexType[@name='OBJECTS']">
+        	<class name="DataPackObjects"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='OBJECT']">
+        	<class name="DataPackObject"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='LINKS']">
+        	<class name="DataPackLinks"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='LINK']">
+        	<class name="DataPackLink"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='OBJ_LINK']">
+        	<class name="DataPackObjectLink"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='ATTRIBUTE']">
+        	<class name="DataPackAttribute"/>
         </bindings>
     </bindings>
 </bindings>

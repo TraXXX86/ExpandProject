@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
 
 public class Neo4jConnector extends IConnectorDb {
@@ -53,7 +53,7 @@ public class Neo4jConnector extends IConnectorDb {
 	// ############################# Request methods
 
 	@Override
-	public int writeObject(ObjectToDbDto object) {
+	public int writeObject(DataPackObject object) {
 		connectToDb();
 
 		// Create query
@@ -69,7 +69,7 @@ public class Neo4jConnector extends IConnectorDb {
 		}
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0).getId();
@@ -78,7 +78,7 @@ public class Neo4jConnector extends IConnectorDb {
 	}
 
 	@Override
-	public int writeLink(ObjectToDbDto objectA, ObjectToDbDto objectB, boolean isOriented) {
+	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
 		connectToDb();
 
 		// Create query
@@ -92,7 +92,7 @@ public class Neo4jConnector extends IConnectorDb {
 		params.put("2", objectB.getId());
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0).getId();
@@ -101,7 +101,7 @@ public class Neo4jConnector extends IConnectorDb {
 	}
 
 	@Override
-	public ObjectToDbDto getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
+	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
 		connectToDb();
 
 		// Create query
@@ -113,7 +113,7 @@ public class Neo4jConnector extends IConnectorDb {
 		params.put("1", idObject);
 
 		// Launch request
-		List<ObjectToDbDto> results = query(request, params);
+		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0);
@@ -147,8 +147,8 @@ public class Neo4jConnector extends IConnectorDb {
 	 * @param params
 	 * @return
 	 */
-	private List<ObjectToDbDto> query(String query, Map<String, Object> params) {
-		List<ObjectToDbDto> results = new ArrayList<>();
+	private List<DataPackObject> query(String query, Map<String, Object> params) {
+		List<DataPackObject> results = new ArrayList<>();
 		try {
 			final PreparedStatement statement = conn.prepareStatement(query);
 			setParameters(statement, params);
@@ -156,7 +156,7 @@ public class Neo4jConnector extends IConnectorDb {
 
 			List<String> columnsList = getColumns(result);
 			while (result.next()) {
-				ObjectToDbDto rowObject = new ObjectToDbDto(ObjectTypeEnum.HUMAIN);
+				DataPackObject rowObject = new DataPackObject(ObjectTypeEnum.HUMAIN);
 				for (String column : columnsList) {
 					if (StringUtils.equals(column, "ID")) {
 						rowObject.setId(result.getInt(column));

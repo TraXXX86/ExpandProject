@@ -5,7 +5,7 @@ import java.util.Map;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 
-public class ObjectToDbDto {
+public class DataPackObject {
 
 	private int id = -1;
 
@@ -15,7 +15,7 @@ public class ObjectToDbDto {
 
 	// ################################# Constructors
 
-	public ObjectToDbDto(ObjectTypeEnum type) {
+	public DataPackObject(ObjectTypeEnum type) {
 		super();
 		this.type = type;
 	}

@@ -3,7 +3,7 @@ package fr.expand.project.importdata.util;
 import java.util.Map.Entry;
 
 import fr.expand.project.commons.IConstantUtils;
-import fr.expand.project.importdata.dto.ObjectToDbDto;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public class CypherUtils {
 
@@ -13,7 +13,7 @@ public class CypherUtils {
 	 * @param object
 	 * @return
 	 */
-	public static String convertObjectForDb(ObjectToDbDto object) {
+	public static String convertObjectForDb(DataPackObject object) {
 		StringBuilder result = new StringBuilder();
 		result.append(object.getType()).append(IConstantUtils.SPACE);
 		if (!object.getAttributes().isEmpty()) {
@@ -32,7 +32,7 @@ public class CypherUtils {
 		return result.toString();
 	}
 
-	public static String convertObjectForDbSubtitution(ObjectToDbDto object) {
+	public static String convertObjectForDbSubtitution(DataPackObject object) {
 		StringBuilder result = new StringBuilder();
 		result.append(object.getType()).append(IConstantUtils.SPACE);
 		if (!object.getAttributes().isEmpty()) {
