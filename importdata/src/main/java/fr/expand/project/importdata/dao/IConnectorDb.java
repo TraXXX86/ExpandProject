@@ -1,9 +1,14 @@
 package fr.expand.project.importdata.dao;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dto.generated.DataPackObject;
 
 public abstract class IConnectorDb {
+
+	protected static final Logger LOGGER = LogManager.getLogger(IConnectorDb.class.toString());
 
 	/**
 	 * Constructor
@@ -59,4 +64,11 @@ public abstract class IConnectorDb {
 	 * @return
 	 */
 	public abstract DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject);
+
+	/**
+	 * Delete all data from DB
+	 * 
+	 * @return
+	 */
+	public abstract void deleteAll();
 }

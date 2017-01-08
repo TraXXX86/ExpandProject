@@ -59,7 +59,7 @@ public class Neo4jConnector extends IConnectorDb {
 
 		// Create query
 		String request = "CREATE (a:" + CypherUtils.convertObjectForDbSubtitution(object) + ") RETURN ID(a) AS ID";
-		System.out.println(request);
+		LOGGER.info(request);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
@@ -73,6 +73,7 @@ public class Neo4jConnector extends IConnectorDb {
 		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
+			object.setID(results.get(0).getID());
 			return results.get(0).getID();
 		}
 		return -1;
@@ -85,7 +86,7 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create query
 		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)={1} " + "MATCH (b:" + objectB.getTYPE()
 				+ ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
-		System.out.println(request);
+		LOGGER.info(request);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
@@ -106,8 +107,8 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (n:HUMAIN) WHERE ID(n)={1} RETURN n, ID(n) AS ID LIMIT 5";
-		System.out.println(request);
+		String request = "MATCH (n:" + typeObject.name() + ") WHERE ID(n)={1} RETURN n, ID(n) AS ID LIMIT 5";
+		LOGGER.info(request);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
@@ -120,6 +121,19 @@ public class Neo4jConnector extends IConnectorDb {
 			return results.get(0);
 		}
 		return null;
+	}
+
+	@Override
+	public void deleteAll() {
+		closeConnection();
+		connectToDb();
+
+		// Create query
+		String request = "MATCH (n) DETACH DELETE n";
+		LOGGER.info(request);
+
+		// Launch request
+		query(request, new HashMap<>());
 	}
 
 	// ############################# Utils methods
@@ -163,6 +177,7 @@ public class Neo4jConnector extends IConnectorDb {
 					if (StringUtils.equals(column, "ID")) {
 						rowObject.setID(result.getInt(column));
 					} else {
+						@SuppressWarnings("unchecked")
 						Map<String, Object> row = (Map<String, Object>) result.getObject(column);
 
 						for (Entry<String, Object> content : row.entrySet()) {
@@ -189,5 +204,4 @@ public class Neo4jConnector extends IConnectorDb {
 			statement.setObject(index, entry.getValue());
 		}
 	}
-
 }

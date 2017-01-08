@@ -15,7 +15,7 @@ import fr.expand.project.importdata.dto.generated.DataPackObjects;
 public class DataPackTests {
 
 	@Test
-	public void test() {
+	public void test_createXML() {
 		DataPack datapack = new DataPack();
 		datapack.setOBJECTS(new DataPackObjects());
 
@@ -28,7 +28,6 @@ public class DataPackTests {
 		datapack.getOBJECTS().getOBJECT().add(object2);
 
 		createXML(datapack);
-
 	}
 
 	private void createXML(DataPack datapack) {
