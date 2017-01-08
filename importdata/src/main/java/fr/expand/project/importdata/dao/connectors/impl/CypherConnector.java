@@ -53,12 +53,12 @@ public class CypherConnector extends IConnectorDb {
 		if (object != null) {
 			// Generate request for DB
 			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object) + ") RETURN ID(a)";
-			System.out.println(request);
+			LOGGER.info(request);
 			int newId = launchCreationRequest(request, true);
 			object.setID(newId);
 			return newId;
 		}
-		System.err.println("Object is null");
+		LOGGER.error("Object is null");
 		return -1;
 	}
 
@@ -66,7 +66,7 @@ public class CypherConnector extends IConnectorDb {
 	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
 		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
 				+ objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:KNOWS]->(b)";
-		System.out.println(request);
+		LOGGER.info(request);
 		return launchCreationRequest(request, false);
 	}
 
@@ -74,9 +74,22 @@ public class CypherConnector extends IConnectorDb {
 	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
 		String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
 				+ " RETURN n AS TAILLE LIMIT 5";
-		System.out.println(request);
+		LOGGER.info(request);
 		StatementResult result = session.run(request);
 		return convertResultToObjectToDb(typeObject, result.single());
+	}
+
+	@Override
+	public void deleteAll() {
+		closeConnection();
+		connectToDb();
+
+		// Create query
+		String request = "MATCH (n) DETACH DELETE n";
+		LOGGER.info(request);
+
+		// Launch request
+		session.run(request);
 	}
 
 	// ############################# Utils methods
@@ -115,7 +128,7 @@ public class CypherConnector extends IConnectorDb {
 		for (Entry<String, Object> entry : record.asMap().entrySet()) {
 			if (entry.getValue() instanceof InternalNode) {
 				for (Entry<String, Object> entryInternalNode : ((InternalNode) entry.getValue()).asMap().entrySet()) {
-					System.out.println(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
+					LOGGER.info(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
 					if (entryInternalNode.getValue() instanceof String) {
 						DataPackAttribute attribute = new DataPackAttribute(entryInternalNode.getKey(),
 								(String) entryInternalNode.getValue());
@@ -123,7 +136,7 @@ public class CypherConnector extends IConnectorDb {
 					}
 				}
 			} else {
-				System.out.println(entry.getKey() + " " + entry.getValue());
+				LOGGER.info(entry.getKey() + " " + entry.getValue());
 				if (entry.getValue() instanceof String) {
 					DataPackAttribute attribute = new DataPackAttribute(entry.getKey(), (String) entry.getValue());
 					result.getATTRIBUTES().add(attribute);
