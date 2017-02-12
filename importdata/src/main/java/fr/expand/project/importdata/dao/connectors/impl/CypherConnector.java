@@ -132,14 +132,14 @@ public class CypherConnector extends IConnectorDb {
 					if (entryInternalNode.getValue() instanceof String) {
 						DataPackAttribute attribute = new DataPackAttribute(entryInternalNode.getKey(),
 								(String) entryInternalNode.getValue());
-						result.getATTRIBUTES().add(attribute);
+						result.getATTRIBUTE().add(attribute);
 					}
 				}
 			} else {
 				LOGGER.info(entry.getKey() + " " + entry.getValue());
 				if (entry.getValue() instanceof String) {
 					DataPackAttribute attribute = new DataPackAttribute(entry.getKey(), (String) entry.getValue());
-					result.getATTRIBUTES().add(attribute);
+					result.getATTRIBUTE().add(attribute);
 				}
 			}
 		}

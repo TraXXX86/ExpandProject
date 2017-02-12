@@ -1,8 +1,8 @@
 //
-// Ce fichier a Ã©tÃ© gÃ©nÃ©rÃ© par l'implÃ©mentation de rÃ©fÃ©rence JavaTM Architecture for XML Binding (JAXB), v2.2.11 
+// Ce fichier a été généré par l'implémentation de référence JavaTM Architecture for XML Binding (JAXB), v2.2.11 
 // Voir <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
-// Toute modification apportÃ©e Ã  ce fichier sera perdue lors de la recompilation du schÃ©ma source. 
-// GÃ©nÃ©rÃ© le : 2016.11.13 Ã  09:27:38 PM CET 
+// Toute modification apportée à ce fichier sera perdue lors de la recompilation du schéma source. 
+// Généré le : 2017.02.12 à 09:54:21 PM CET 
 //
 
 
@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -20,18 +21,18 @@ import javax.xml.bind.annotation.XmlType;
 /**
  * <p>Classe Java pour LINK complex type.
  * 
- * <p>Le fragment de schÃ©ma suivant indique le contenu attendu figurant dans cette classe.
+ * <p>Le fragment de schéma suivant indique le contenu attendu figurant dans cette classe.
  * 
  * <pre>
  * &lt;complexType name="LINK"&gt;
  *   &lt;complexContent&gt;
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType"&gt;
  *       &lt;sequence&gt;
- *         &lt;element name="TYPE" type="{http://www.w3.org/2001/XMLSchema}string"/&gt;
  *         &lt;element name="ATTRIBUTE" type="{}ATTRIBUTE" maxOccurs="unbounded" minOccurs="0"/&gt;
  *         &lt;element name="OBJ_LINK_A" type="{}OBJ_LINK"/&gt;
  *         &lt;element name="OBJ_LINK_B" type="{}OBJ_LINK"/&gt;
  *       &lt;/sequence&gt;
+ *       &lt;attribute name="TYPE" type="{http://www.w3.org/2001/XMLSchema}string" /&gt;
  *     &lt;/restriction&gt;
  *   &lt;/complexContent&gt;
  * &lt;/complexType&gt;
@@ -41,7 +42,6 @@ import javax.xml.bind.annotation.XmlType;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "LINK", propOrder = {
-    "type",
     "attribute",
     "objlinka",
     "objlinkb"
@@ -50,14 +50,14 @@ public class DataPackLink implements Serializable
 {
 
     private final static long serialVersionUID = 2L;
-    @XmlElement(name = "TYPE", required = true)
-    protected String type;
     @XmlElement(name = "ATTRIBUTE")
     protected List<DataPackAttribute> attribute;
     @XmlElement(name = "OBJ_LINK_A", required = true)
     protected DataPackObjectLink objlinka;
     @XmlElement(name = "OBJ_LINK_B", required = true)
     protected DataPackObjectLink objlinkb;
+    @XmlAttribute(name = "TYPE")
+    protected String type;
 
     /**
      * Default no-arg constructor
@@ -71,35 +71,11 @@ public class DataPackLink implements Serializable
      * Fully-initialising value constructor
      * 
      */
-    public DataPackLink(final String type, final List<DataPackAttribute> attribute, final DataPackObjectLink objlinka, final DataPackObjectLink objlinkb) {
-        this.type = type;
+    public DataPackLink(final List<DataPackAttribute> attribute, final DataPackObjectLink objlinka, final DataPackObjectLink objlinkb, final String type) {
         this.attribute = attribute;
         this.objlinka = objlinka;
         this.objlinkb = objlinkb;
-    }
-
-    /**
-     * Obtient la valeur de la propriÃ©tÃ© type.
-     * 
-     * @return
-     *     possible object is
-     *     {@link String }
-     *     
-     */
-    public String getTYPE() {
-        return type;
-    }
-
-    /**
-     * DÃ©finit la valeur de la propriÃ©tÃ© type.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link String }
-     *     
-     */
-    public void setTYPE(String value) {
-        this.type = value;
+        this.type = type;
     }
 
     /**
@@ -132,7 +108,7 @@ public class DataPackLink implements Serializable
     }
 
     /**
-     * Obtient la valeur de la propriÃ©tÃ© objlinka.
+     * Obtient la valeur de la propriété objlinka.
      * 
      * @return
      *     possible object is
@@ -144,7 +120,7 @@ public class DataPackLink implements Serializable
     }
 
     /**
-     * DÃ©finit la valeur de la propriÃ©tÃ© objlinka.
+     * Définit la valeur de la propriété objlinka.
      * 
      * @param value
      *     allowed object is
@@ -156,7 +132,7 @@ public class DataPackLink implements Serializable
     }
 
     /**
-     * Obtient la valeur de la propriÃ©tÃ© objlinkb.
+     * Obtient la valeur de la propriété objlinkb.
      * 
      * @return
      *     possible object is
@@ -168,7 +144,7 @@ public class DataPackLink implements Serializable
     }
 
     /**
-     * DÃ©finit la valeur de la propriÃ©tÃ© objlinkb.
+     * Définit la valeur de la propriété objlinkb.
      * 
      * @param value
      *     allowed object is
@@ -177,6 +153,30 @@ public class DataPackLink implements Serializable
      */
     public void setOBJLINKB(DataPackObjectLink value) {
         this.objlinkb = value;
+    }
+
+    /**
+     * Obtient la valeur de la propriété type.
+     * 
+     * @return
+     *     possible object is
+     *     {@link String }
+     *     
+     */
+    public String getTYPE() {
+        return type;
+    }
+
+    /**
+     * Définit la valeur de la propriété type.
+     * 
+     * @param value
+     *     allowed object is
+     *     {@link String }
+     *     
+     */
+    public void setTYPE(String value) {
+        this.type = value;
     }
 
 }

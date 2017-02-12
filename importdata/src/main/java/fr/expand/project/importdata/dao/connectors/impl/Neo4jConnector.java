@@ -64,7 +64,7 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		int i = 1;
-		for (DataPackAttribute attribute : object.getATTRIBUTES()) {
+		for (DataPackAttribute attribute : object.getATTRIBUTE()) {
 			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
 		}
@@ -184,7 +184,7 @@ public class Neo4jConnector extends IConnectorDb {
 							if (content.getValue() instanceof String) {
 								DataPackAttribute attribute = new DataPackAttribute(content.getKey(),
 										(String) content.getValue());
-								rowObject.getATTRIBUTES().add(attribute);
+								rowObject.getATTRIBUTE().add(attribute);
 							}
 						}
 					}
