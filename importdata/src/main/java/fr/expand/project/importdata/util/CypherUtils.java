@@ -15,10 +15,10 @@ public class CypherUtils {
 	public static String convertObjectForDb(DataPackObject object) {
 		StringBuilder result = new StringBuilder();
 		result.append(object.getTYPE()).append(IConstantUtils.SPACE);
-		if (!object.getATTRIBUTES().isEmpty()) {
+		if (!object.getATTRIBUTE().isEmpty()) {
 			boolean isFirst = true;
 			result.append("{");
-			for (DataPackAttribute attribute : object.getATTRIBUTES()) {
+			for (DataPackAttribute attribute : object.getATTRIBUTE()) {
 				if (!isFirst) {
 					result.append(",");
 				} else {
@@ -34,11 +34,11 @@ public class CypherUtils {
 	public static String convertObjectForDbSubtitution(DataPackObject object) {
 		StringBuilder result = new StringBuilder();
 		result.append(object.getTYPE()).append(IConstantUtils.SPACE);
-		if (!object.getATTRIBUTES().isEmpty()) {
+		if (!object.getATTRIBUTE().isEmpty()) {
 			boolean isFirst = true;
 			result.append("{");
 			int i = 1;
-			for (DataPackAttribute attribute : object.getATTRIBUTES()) {
+			for (DataPackAttribute attribute : object.getATTRIBUTE()) {
 				if (!isFirst) {
 					result.append(",");
 				} else {

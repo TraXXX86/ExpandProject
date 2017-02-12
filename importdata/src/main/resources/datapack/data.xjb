@@ -5,8 +5,8 @@
           version="2.1">
     <bindings schemaLocation="data.xsd" version="1.0">
 		<globalBindings 
-         collectionType="java.util.ArrayList"
-         generateValueClass="true">
+         	collectionType="java.util.ArrayList"
+         	generateValueClass="true">
         	 <serializable uid="2" />
      	 </globalBindings>
         <schemaBindings>
@@ -35,6 +35,9 @@
         </bindings>
         <bindings node="//xs:complexType[@name='ATTRIBUTE']">
         	<class name="DataPackAttribute"/>
+        </bindings>
+        <bindings node="//xs:complexType[@name='NODE']">
+        	<class name="AbstractDataPackObject"/>
         </bindings>
     </bindings>
 </bindings>

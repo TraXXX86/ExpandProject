@@ -15,35 +15,45 @@ xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" >
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="OBJECT">
-        <xs:sequence>
-            <xs:element name="TYPE" type="xs:string"/>
-            <xs:element name="ID" type="xs:int"/>
-            <xs:element name="ATTRIBUTES" type="ATTRIBUTE" minOccurs="0" maxOccurs="unbounded"/>
-        </xs:sequence>
+        <xs:complexContent>
+	        <xs:extension base="NODE">
+	        	<xs:sequence>
+	        		<xs:element name="ATTRIBUTE" type="ATTRIBUTE" minOccurs="0" maxOccurs="unbounded"/>
+	        	</xs:sequence>
+	        	<xs:attribute name="ID" type="xs:int" use="required"/>
+        		<xs:attribute name="TYPE" type="xs:string" use="optional"/>
+	        </xs:extension>
+	    </xs:complexContent>
     </xs:complexType>
     <xs:complexType name="ATTRIBUTE" id="ATTRIBUTE">
-        <xs:sequence>
-            <xs:element name="KEY" type="xs:string" minOccurs="1" maxOccurs="1" nillable="false"/>
-            <xs:element name="VALUE" type="xs:string" minOccurs="1" maxOccurs="1" nillable="true"/>
-        </xs:sequence>
+        <xs:attribute name="KEY" type="xs:string" use="required"/>
+        <xs:attribute name="VALUE" type="xs:string" use="optional"/>
     </xs:complexType>
     <xs:complexType name="LINKS">
         <xs:sequence>
-            <xs:element name="LINK" type="LINK" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="LINK" type="LINK" minOccurs="2" maxOccurs="unbounded"/>
         </xs:sequence>
     </xs:complexType>
+    
     <xs:complexType name="LINK">
         <xs:sequence>
-            <xs:element name="TYPE" type="xs:string"/>
             <xs:element name="ATTRIBUTE" type="ATTRIBUTE" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="OBJ_LINK_A" type="OBJ_LINK"/>
             <xs:element name="OBJ_LINK_B" type="OBJ_LINK"/>
         </xs:sequence>
+        <xs:attribute name="TYPE" type="xs:string"/> 
     </xs:complexType>
+    
     <xs:complexType name="OBJ_LINK">
-        <xs:sequence>
-            <xs:element name="ID" type="xs:int"/>
-        </xs:sequence>
+    	<xs:complexContent>
+	        <xs:extension base="NODE">
+		    	<xs:attribute name="ID" type="xs:int" use="required"/>
+		        <xs:attribute name="TYPE" type="xs:string" use="optional"/>
+        	 </xs:extension>
+	    </xs:complexContent>
+    </xs:complexType>
+
+    <xs:complexType name="NODE" abstract="true">
     </xs:complexType>
 
 </xs:schema>
