@@ -2,7 +2,7 @@ package fr.expand.project.importdata.api;
 
 import java.nio.file.Path;
 
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.generated.DataPack;
 
 public interface IImportAPI {
 
@@ -12,13 +12,13 @@ public interface IImportAPI {
 	 * @param inputFile
 	 * @return
 	 */
-	public DataPackObject readDataPack(Path inputFile);
+	public DataPack readDataPack(Path inputFile);
 
 	/**
 	 * Import DataPack Java object to DB
 	 * 
 	 * @param inputDataPack
 	 */
-	public void importDataPack(DataPackObject inputDataPack);
+	public void importDataPack(DataPack inputDataPack);
 
 }

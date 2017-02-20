@@ -1,10 +1,17 @@
 package fr.expand.project.importdata;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
 import fr.expand.project.commons.LinkTypeEnum;
@@ -18,9 +25,13 @@ import fr.expand.project.importdata.dto.generated.DataPackObjects;
 import fr.expand.project.importdata.dto.util.DataPackDtoUtils;
 
 public class DataPackTests {
+	
+	protected static final Logger LOGGER = LogManager.getLogger(DataPackTests.class.toString());
 
 	@Test
 	public void test_createXML() {
+		LOGGER.info("######## test_createXML");
+		
 		DataPack datapack = new DataPack();
 		datapack.setOBJECTS(new DataPackObjects());
 		datapack.setLINKS(new DataPackLinks());
@@ -48,16 +59,27 @@ public class DataPackTests {
 		
 		datapack.getLINKS().getLINK().add(link);
 
-		createXML(datapack);
+		createXML(datapack, "test.xml");
 	}
 
-	private void createXML(DataPack datapack) {
+	private void createXML(DataPack datapack, String fileName) {
 		try {
 			JAXBContext jaxbContext = JAXBContext.newInstance("fr.expand.project.importdata.dto.generated");
 			Marshaller marshaller = jaxbContext.createMarshaller();
 			marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, new Boolean(true));
-			marshaller.marshal(datapack, System.out);
+			
+			// Get output file path
+			Path tmpFolder = Paths.get("tmp");
+			if(!Files.exists(tmpFolder)){
+				Files.createDirectory(Paths.get("tmp"));
+			}
+			Path tmpFilePath = tmpFolder.resolve(fileName);  
+	
+			// Create file content
+			marshaller.marshal(datapack, tmpFilePath.toFile());
 		} catch (JAXBException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
 
@@ -66,19 +88,32 @@ public class DataPackTests {
 	
 	@Test
 	public void test_readXML() {
-		
+		LOGGER.info("######## test_readXML");
+		DataPack datapack  = readXML("test.xml");
+		createXML(datapack, "outputfile.xml");
 	}
 
-	private void readXML() {
-
+	private DataPack readXML(String fileName) {
 		try {
 			JAXBContext jc = JAXBContext.newInstance("fr.expand.project.importdata.dto.generated");
 			Unmarshaller u = jc.createUnmarshaller();
+			
+			// Get output file path
+			Path tmpFolder = Paths.get("tmp");
+			if(!Files.exists(tmpFolder)){
+				Files.createDirectory(Paths.get("tmp"));
+			}
+			Path tmpFilePath = tmpFolder.resolve(fileName);  
+			
+			return (DataPack) u.unmarshal(tmpFilePath.toFile());
 		} catch (JAXBException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
 
 		}
+		return null;
 	}
 
 }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<DATAS>
+    <OBJECTS>
+        <OBJECT ID="1" TYPE="HUMAIN">
+            <ATTRIBUTE KEY="ATTR_1" VALUE="Valeur 1"/>
+            <ATTRIBUTE KEY="ATTR_2" VALUE="Valeur 2"/>
+        </OBJECT>
+        <OBJECT ID="2" TYPE="HUMAIN"/>
+    </OBJECTS>
+    <LINKS>
+        <LINK TYPE="CONNAISSANCE">
+            <ATTRIBUTE KEY="ATTR_1" VALUE="Valeur 1"/>
+            <ATTRIBUTE KEY="ATTR_2" VALUE="Valeur 2"/>
+            <OBJ_LINK_A ID="1" TYPE="HUMAIN"/>
+            <OBJ_LINK_B ID="2" TYPE="HUMAIN"/>
+        </LINK>
+    </LINKS>
+</DATAS>
