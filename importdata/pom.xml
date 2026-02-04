@@ -77,6 +77,44 @@
 	        <artifactId>jaxb2-maven-plugin</artifactId>
 	        <version>3.1.0</version>
         </plugin>
+        
+        <!-- Maven JAR Plugin to create executable JAR -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.3.0</version>
+            <configuration>
+                <archive>
+                    <manifest>
+                        <mainClass>fr.expand.project.importdata.Launcher</mainClass>
+                        <addClasspath>true</addClasspath>
+                    </manifest>
+                </archive>
+            </configuration>
+        </plugin>
+        
+        <!-- Maven Shade Plugin to create fat JAR with dependencies -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.5.1</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                    <configuration>
+                        <transformers>
+                            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <mainClass>fr.expand.project.importdata.Launcher</mainClass>
+                            </transformer>
+                        </transformers>
+                        <finalName>expandproject-importdata</finalName>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
     </plugins>
     <pluginManagement>
 	    <plugins>
