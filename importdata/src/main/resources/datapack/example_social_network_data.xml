@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exemple de données conformes au modèle SocialNetworkModel -->
+<DATAS>
+    <OBJECTS>
+        <!-- Personnes -->
+        <OBJECT TYPE="PERSONNE" ID="1">
+            <ATTRIBUTE KEY="NOM" VALUE="Dupont"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Jean"/>
+            <ATTRIBUTE KEY="AGE" VALUE="35"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="jean.dupont@email.com"/>
+            <ATTRIBUTE KEY="DATE_INSCRIPTION" VALUE="2020-01-15"/>
+        </OBJECT>
+        
+        <OBJECT TYPE="PERSONNE" ID="2">
+            <ATTRIBUTE KEY="NOM" VALUE="Martin"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Marie"/>
+            <ATTRIBUTE KEY="AGE" VALUE="28"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="marie.martin@email.com"/>
+            <ATTRIBUTE KEY="DATE_INSCRIPTION" VALUE="2021-03-20"/>
+        </OBJECT>
+        
+        <OBJECT TYPE="PERSONNE" ID="3">
+            <ATTRIBUTE KEY="NOM" VALUE="Durand"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Pierre"/>
+            <ATTRIBUTE KEY="AGE" VALUE="42"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="pierre.durand@email.com"/>
+        </OBJECT>
+        
+        <!-- Entreprises -->
+        <OBJECT TYPE="ENTREPRISE" ID="10">
+            <ATTRIBUTE KEY="NOM" VALUE="TechCorp"/>
+            <ATTRIBUTE KEY="SECTEUR" VALUE="Informatique"/>
+            <ATTRIBUTE KEY="EFFECTIF" VALUE="250"/>
+        </OBJECT>
+        
+        <OBJECT TYPE="ENTREPRISE" ID="11">
+            <ATTRIBUTE KEY="NOM" VALUE="DataSolutions"/>
+            <ATTRIBUTE KEY="SECTEUR" VALUE="Conseil"/>
+            <ATTRIBUTE KEY="EFFECTIF" VALUE="150"/>
+        </OBJECT>
+        
+        <!-- Compétences -->
+        <OBJECT TYPE="COMPETENCE" ID="20">
+            <ATTRIBUTE KEY="NOM" VALUE="Java"/>
+            <ATTRIBUTE KEY="CATEGORIE" VALUE="Programmation"/>
+        </OBJECT>
+        
+        <OBJECT TYPE="COMPETENCE" ID="21">
+            <ATTRIBUTE KEY="NOM" VALUE="Python"/>
+            <ATTRIBUTE KEY="CATEGORIE" VALUE="Programmation"/>
+        </OBJECT>
+        
+        <OBJECT TYPE="COMPETENCE" ID="22">
+            <ATTRIBUTE KEY="NOM" VALUE="Neo4j"/>
+            <ATTRIBUTE KEY="CATEGORIE" VALUE="Base de données"/>
+        </OBJECT>
+    </OBJECTS>
+    
+    <LINKS>
+        <!-- Jean connait Marie -->
+        <LINK TYPE="CONNAIT">
+            <ATTRIBUTE KEY="DEPUIS" VALUE="2019-06-10"/>
+            <ATTRIBUTE KEY="TYPE_RELATION" VALUE="AMI"/>
+            <OBJ_LINK_A ID="1" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="2" TYPE="PERSONNE"/>
+        </LINK>
+        
+        <!-- Marie connait Pierre -->
+        <LINK TYPE="CONNAIT">
+            <ATTRIBUTE KEY="DEPUIS" VALUE="2021-01-15"/>
+            <ATTRIBUTE KEY="TYPE_RELATION" VALUE="COLLEGUE"/>
+            <OBJ_LINK_A ID="2" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="3" TYPE="PERSONNE"/>
+        </LINK>
+        
+        <!-- Jean travaille pour TechCorp -->
+        <LINK TYPE="TRAVAILLE_POUR">
+            <ATTRIBUTE KEY="POSTE" VALUE="Développeur Senior"/>
+            <ATTRIBUTE KEY="DATE_DEBUT" VALUE="2018-09-01"/>
+            <OBJ_LINK_A ID="1" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="10" TYPE="ENTREPRISE"/>
+        </LINK>
+        
+        <!-- Marie travaille pour TechCorp -->
+        <LINK TYPE="TRAVAILLE_POUR">
+            <ATTRIBUTE KEY="POSTE" VALUE="Chef de projet"/>
+            <ATTRIBUTE KEY="DATE_DEBUT" VALUE="2021-03-25"/>
+            <OBJ_LINK_A ID="2" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="10" TYPE="ENTREPRISE"/>
+        </LINK>
+        
+        <!-- Pierre travaille pour DataSolutions -->
+        <LINK TYPE="TRAVAILLE_POUR">
+            <ATTRIBUTE KEY="POSTE" VALUE="Consultant"/>
+            <ATTRIBUTE KEY="DATE_DEBUT" VALUE="2015-01-10"/>
+            <OBJ_LINK_A ID="3" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="11" TYPE="ENTREPRISE"/>
+        </LINK>
+        
+        <!-- Jean possède la compétence Java -->
+        <LINK TYPE="POSSEDE_COMPETENCE">
+            <ATTRIBUTE KEY="NIVEAU" VALUE="EXPERT"/>
+            <ATTRIBUTE KEY="ANNEES_EXPERIENCE" VALUE="10"/>
+            <OBJ_LINK_A ID="1" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="20" TYPE="COMPETENCE"/>
+        </LINK>
+        
+        <!-- Jean possède la compétence Neo4j -->
+        <LINK TYPE="POSSEDE_COMPETENCE">
+            <ATTRIBUTE KEY="NIVEAU" VALUE="INTERMEDIAIRE"/>
+            <ATTRIBUTE KEY="ANNEES_EXPERIENCE" VALUE="3"/>
+            <OBJ_LINK_A ID="1" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="22" TYPE="COMPETENCE"/>
+        </LINK>
+        
+        <!-- Marie possède la compétence Python -->
+        <LINK TYPE="POSSEDE_COMPETENCE">
+            <ATTRIBUTE KEY="NIVEAU" VALUE="EXPERT"/>
+            <ATTRIBUTE KEY="ANNEES_EXPERIENCE" VALUE="5"/>
+            <OBJ_LINK_A ID="2" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="21" TYPE="COMPETENCE"/>
+        </LINK>
+        
+        <!-- Pierre possède la compétence Java -->
+        <LINK TYPE="POSSEDE_COMPETENCE">
+            <ATTRIBUTE KEY="NIVEAU" VALUE="EXPERT"/>
+            <ATTRIBUTE KEY="ANNEES_EXPERIENCE" VALUE="15"/>
+            <OBJ_LINK_A ID="3" TYPE="PERSONNE"/>
+            <OBJ_LINK_B ID="20" TYPE="COMPETENCE"/>
+        </LINK>
+    </LINKS>
+</DATAS>

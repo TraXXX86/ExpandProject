@@ -18,13 +18,25 @@
     <dependency>
         <groupId>org.neo4j.driver</groupId>
         <artifactId>neo4j-java-driver</artifactId>
-        <version>1.0.6</version>
+        <version>5.17.0</version>
     </dependency>
     
     <dependency>
 	    <groupId>org.neo4j</groupId>
 	    <artifactId>neo4j-jdbc-driver</artifactId>
+	    <version>4.0.9</version>
+	</dependency>
+	
+	<!-- Jakarta JAXB API for Java 11+ (JAXB 3.x) -->
+	<dependency>
+	    <groupId>jakarta.xml.bind</groupId>
+	    <artifactId>jakarta.xml.bind-api</artifactId>
 	    <version>3.0.1</version>
+	</dependency>
+	<dependency>
+	    <groupId>com.sun.xml.bind</groupId>
+	    <artifactId>jaxb-impl</artifactId>
+	    <version>3.0.2</version>
 	</dependency>
 
 
@@ -32,21 +44,21 @@
 	<dependency>
 	    <groupId>commons-io</groupId>
 	    <artifactId>commons-io</artifactId>
-	    <version>2.5</version>
+	    <version>2.15.1</version>
 	</dependency>
 	
 	<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
 	<dependency>
 	    <groupId>org.apache.commons</groupId>
 	    <artifactId>commons-lang3</artifactId>
-	    <version>3.0</version>
+	    <version>3.14.0</version>
 	</dependency>
 	
 	<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-collections4 -->
 	<dependency>
 	    <groupId>org.apache.commons</groupId>
 	    <artifactId>commons-collections4</artifactId>
-	    <version>4.0</version>
+	    <version>4.4</version>
 	</dependency> 
 	
 	<!-- https://mvnrepository.com/artifact/org.jvnet.jaxb2_commons/jaxb2-value-constructor -->
@@ -58,13 +70,59 @@
 	
  </dependencies>
  <build>
+    <plugins>
+    	<!-- Plugin use to generate JAXB DTO from xsd -->
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+	        <artifactId>jaxb2-maven-plugin</artifactId>
+	        <version>3.1.0</version>
+        </plugin>
+        
+        <!-- Maven JAR Plugin to create executable JAR -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.3.0</version>
+            <configuration>
+                <archive>
+                    <manifest>
+                        <mainClass>fr.expand.project.importdata.Launcher</mainClass>
+                        <addClasspath>true</addClasspath>
+                    </manifest>
+                </archive>
+            </configuration>
+        </plugin>
+        
+        <!-- Maven Shade Plugin to create fat JAR with dependencies -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.5.1</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                    <configuration>
+                        <transformers>
+                            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <mainClass>fr.expand.project.importdata.Launcher</mainClass>
+                            </transformer>
+                        </transformers>
+                        <finalName>expandproject-importdata</finalName>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
     <pluginManagement>
 	    <plugins>
 	    	<!-- Plugin use to generate JAXB DTO from xsd -->
 	        <plugin>
 	            <groupId>org.codehaus.mojo</groupId>
 		        <artifactId>jaxb2-maven-plugin</artifactId>
-		        <version>2.3</version>
+		        <version>3.1.0</version>
 		        <dependencies>
 		        	<dependency>
 					    <groupId>org.jvnet.jaxb2_commons</groupId>
@@ -73,29 +131,39 @@
 					</dependency>
 		        </dependencies>
 	            <executions>
+	            	<!-- Generation for DataPack DTOs -->
 	            	<execution>
+	            		<id>generate-datapack</id>
 	            		<phase>generate-sources</phase>
 		            	<goals>
 		            		<goal>xjc</goal>
 		            	</goals>
+		            	<configuration>
+		                	<packageName>fr.expand.project.importdata.dto.generated</packageName>
+		                	<outputDirectory>src/main/java</outputDirectory>
+						    <sources>
+						         <source>src/main/resources/datapack/data.xsd</source>
+						    </sources>
+						    <clearOutputDir>false</clearOutputDir>
+		            	</configuration>
+	            	</execution>
+	            	<!-- Generation for Model DTOs -->
+	            	<execution>
+	            		<id>generate-model</id>
+	            		<phase>generate-sources</phase>
+		            	<goals>
+		            		<goal>xjc</goal>
+		            	</goals>
+		            	<configuration>
+		                	<packageName>fr.expand.project.importdata.model.generated</packageName>
+		                	<outputDirectory>src/main/java</outputDirectory>
+						    <sources>
+						         <source>src/main/resources/model/model.xsd</source>
+						    </sources>
+						    <clearOutputDir>false</clearOutputDir>
+		            	</configuration>
 	            	</execution>
 	            </executions>
-	            <configuration>
-	                <packageName>fr.expand.project.importdata.dto.generated</packageName>
-	                <outputDirectory>src/main/java</outputDirectory>
-				    <sources>
-				         <source>src/main/resources/datapack/data.xsd</source>
-				    </sources>
-				    <xjbSources>
-				         <xjbSource>src/main/resources/datapack/data.xjb</xjbSource>
-				    </xjbSources>
-				    <clearOutputDir>false</clearOutputDir>
-				    <failOnNoSchemas>false</failOnNoSchemas>
-				    <generateEpisode>false</generateEpisode>
-				    <arguments>
-				    	<argument>-Xvalue-constructor</argument>
-				    </arguments>
-	            </configuration>
 	        </plugin>
 		</plugins>
     </pluginManagement>
