@@ -1,6 +1,5 @@
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" 
-xmlns:xs="http://www.w3.org/2001/XMLSchema"
-xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" >
+xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:element name="DATAS">
         <xs:complexType>
         	<xs:sequence>
