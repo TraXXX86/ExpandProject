@@ -2,14 +2,14 @@ package fr.expand.project.importdata.dao.connectors.impl;
 
 import java.util.Map.Entry;
 
-import org.neo4j.driver.internal.InternalNode;
-import org.neo4j.driver.v1.AuthTokens;
-import org.neo4j.driver.v1.Driver;
-import org.neo4j.driver.v1.GraphDatabase;
-import org.neo4j.driver.v1.Record;
-import org.neo4j.driver.v1.Session;
-import org.neo4j.driver.v1.StatementResult;
-import org.neo4j.driver.v1.Value;
+import org.neo4j.driver.AuthTokens;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.GraphDatabase;
+import org.neo4j.driver.Record;
+import org.neo4j.driver.Result;
+import org.neo4j.driver.Session;
+import org.neo4j.driver.Value;
+import org.neo4j.driver.types.Node;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
@@ -38,7 +38,7 @@ public class CypherConnector extends IConnectorDb {
 
 	@Override
 	public void closeConnection() {
-		if (session != null && session.isOpen()) {
+		if (session != null) {
 			session.close();
 		}
 		if (driver != null) {
@@ -75,7 +75,7 @@ public class CypherConnector extends IConnectorDb {
 		String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
 				+ " RETURN n AS TAILLE LIMIT 5";
 		LOGGER.info(request);
-		StatementResult result = session.run(request);
+		Result result = session.run(request);
 		return convertResultToObjectToDb(typeObject, result.single());
 	}
 
@@ -104,7 +104,7 @@ public class CypherConnector extends IConnectorDb {
 	 */
 	private int launchCreationRequest(String request, boolean resultAttempted) {
 		// Launch request
-		StatementResult result = session.run(request);
+		Result result = session.run(request);
 		if (!resultAttempted) {
 			return -1;
 		}
@@ -126,8 +126,8 @@ public class CypherConnector extends IConnectorDb {
 		DataPackObject result = new DataPackObject();
 		result.setTYPE(typeObject.toString());
 		for (Entry<String, Object> entry : record.asMap().entrySet()) {
-			if (entry.getValue() instanceof InternalNode) {
-				for (Entry<String, Object> entryInternalNode : ((InternalNode) entry.getValue()).asMap().entrySet()) {
+			if (entry.getValue() instanceof Node) {
+				for (Entry<String, Object> entryInternalNode : ((Node) entry.getValue()).asMap().entrySet()) {
 					LOGGER.info(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
 					if (entryInternalNode.getValue() instanceof String) {
 						DataPackAttribute attribute = new DataPackAttribute(entryInternalNode.getKey(),

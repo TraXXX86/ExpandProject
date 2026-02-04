@@ -1,6 +1,7 @@
 package fr.expand.project.importdata.util;
 
 import fr.expand.project.commons.IConstantUtils;
+import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.dto.generated.DataPackAttribute;
 import fr.expand.project.importdata.dto.generated.DataPackObject;
 
@@ -18,7 +19,7 @@ public class CypherUtils {
 		if (!object.getATTRIBUTE().isEmpty()) {
 			boolean isFirst = true;
 			result.append("{");
-			for (DataPackAttribute attribute : object.getATTRIBUTE()) {
+			for (ATTRIBUTE attribute : object.getATTRIBUTE()) {
 				if (!isFirst) {
 					result.append(",");
 				} else {
@@ -38,7 +39,7 @@ public class CypherUtils {
 			boolean isFirst = true;
 			result.append("{");
 			int i = 1;
-			for (DataPackAttribute attribute : object.getATTRIBUTE()) {
+			for (ATTRIBUTE attribute : object.getATTRIBUTE()) {
 				if (!isFirst) {
 					result.append(",");
 				} else {

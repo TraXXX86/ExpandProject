@@ -17,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
+import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.dto.generated.DataPackAttribute;
 import fr.expand.project.importdata.dto.generated.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
@@ -64,7 +65,7 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		int i = 1;
-		for (DataPackAttribute attribute : object.getATTRIBUTE()) {
+		for (ATTRIBUTE attribute : object.getATTRIBUTE()) {
 			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
 		}

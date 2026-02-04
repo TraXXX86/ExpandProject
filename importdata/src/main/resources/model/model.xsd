@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" 
+xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    
+    <!-- Root element: DATA_MODEL -->
+    <xs:element name="DATA_MODEL">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="OBJECT_TYPES" type="OBJECT_TYPES" minOccurs="1" maxOccurs="1"/>
+                <xs:element name="LINK_TYPES" type="LINK_TYPES" minOccurs="1" maxOccurs="1"/>
+            </xs:sequence>
+            <xs:attribute name="NAME" type="xs:string" use="required"/>
+            <xs:attribute name="VERSION" type="xs:string" use="optional"/>
+        </xs:complexType>
+    </xs:element>
+    
+    <!-- Object Types Collection -->
+    <xs:complexType name="OBJECT_TYPES">
+        <xs:sequence>
+            <xs:element name="OBJECT_TYPE" type="OBJECT_TYPE" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    
+    <!-- Object Type Definition -->
+    <xs:complexType name="OBJECT_TYPE">
+        <xs:sequence>
+            <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="ATTRIBUTE_DEFINITIONS" type="ATTRIBUTE_DEFINITIONS" minOccurs="0" maxOccurs="1"/>
+        </xs:sequence>
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+    </xs:complexType>
+    
+    <!-- Attribute Definitions Collection -->
+    <xs:complexType name="ATTRIBUTE_DEFINITIONS">
+        <xs:sequence>
+            <xs:element name="ATTRIBUTE_DEFINITION" type="ATTRIBUTE_DEFINITION" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    
+    <!-- Attribute Definition -->
+    <xs:complexType name="ATTRIBUTE_DEFINITION">
+        <xs:sequence>
+            <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        </xs:sequence>
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+        <xs:attribute name="TYPE" type="ATTRIBUTE_TYPE" use="optional" default="STRING"/>
+        <xs:attribute name="REQUIRED" type="xs:boolean" use="optional" default="false"/>
+        <xs:attribute name="DEFAULT_VALUE" type="xs:string" use="optional"/>
+    </xs:complexType>
+    
+    <!-- Attribute Data Types -->
+    <xs:simpleType name="ATTRIBUTE_TYPE">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="STRING"/>
+            <xs:enumeration value="INTEGER"/>
+            <xs:enumeration value="DOUBLE"/>
+            <xs:enumeration value="BOOLEAN"/>
+            <xs:enumeration value="DATE"/>
+        </xs:restriction>
+    </xs:simpleType>
+    
+    <!-- Link Types Collection -->
+    <xs:complexType name="LINK_TYPES">
+        <xs:sequence>
+            <xs:element name="LINK_TYPE" type="LINK_TYPE" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    
+    <!-- Link Type Definition -->
+    <xs:complexType name="LINK_TYPE">
+        <xs:sequence>
+            <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="SOURCE_TYPES" type="ALLOWED_TYPES" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="TARGET_TYPES" type="ALLOWED_TYPES" minOccurs="1" maxOccurs="1"/>
+            <xs:element name="ATTRIBUTE_DEFINITIONS" type="ATTRIBUTE_DEFINITIONS" minOccurs="0" maxOccurs="1"/>
+        </xs:sequence>
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+        <xs:attribute name="DIRECTED" type="xs:boolean" use="optional" default="true"/>
+    </xs:complexType>
+    
+    <!-- Allowed Types for Links -->
+    <xs:complexType name="ALLOWED_TYPES">
+        <xs:sequence>
+            <xs:element name="TYPE_REF" type="TYPE_REF" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    
+    <!-- Type Reference -->
+    <xs:complexType name="TYPE_REF">
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+    </xs:complexType>
+    
+</xs:schema>
