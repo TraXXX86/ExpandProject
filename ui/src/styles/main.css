@@ -122,3 +122,9 @@ body {
 .model-graph__node:hover {
   transform: scale(1.03);
 }
+
+.model-graph__edge:hover line,
+.model-graph__edge:hover path {
+  stroke-width: 2.5;
+  opacity: 0.9;
+}

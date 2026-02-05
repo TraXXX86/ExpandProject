@@ -478,19 +478,31 @@
                           </marker>
                         </defs>
                         <g class="model-graph__edges">
-                          <line
-                            v-for="edge in graphEdges"
-                            :key="edge.key"
-                            :x1="edge.from.x"
-                            :y1="edge.from.y"
-                            :x2="edge.to.x"
-                            :y2="edge.to.y"
-                            :marker-end="edge.directed ? 'url(#arrow)' : undefined"
-                            stroke="#1C4E80"
-                            stroke-width="1.5"
-                            stroke-linecap="round"
-                            opacity="0.7"
-                          />
+                          <g v-for="edge in graphEdges" :key="edge.key" class="model-graph__edge">
+                            <title>{{ edge.label }}</title>
+                            <line
+                              v-if="!edge.self"
+                              :x1="edge.from.x"
+                              :y1="edge.from.y"
+                              :x2="edge.to.x"
+                              :y2="edge.to.y"
+                              :marker-end="edge.directed ? 'url(#arrow)' : undefined"
+                              stroke="#1C4E80"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              opacity="0.7"
+                            />
+                            <path
+                              v-else
+                              :d="edge.path"
+                              fill="none"
+                              :marker-end="edge.directed ? 'url(#arrow)' : undefined"
+                              stroke="#1C4E80"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              opacity="0.7"
+                            />
+                          </g>
                         </g>
                         <g class="model-graph__nodes">
                           <g
@@ -931,17 +943,36 @@ function buildGraphEdges() {
         if (!from || !to) {
           return;
         }
+        const self = source === target;
         edges.push({
           key: `${link.name}-${source}-${target}-${linkIndex}`,
+          name: link.name,
           from,
           to,
-          directed: link.directed
+          directed: link.directed,
+          self,
+          path: self ? buildSelfLoopPath(from) : '',
+          label: `${link.name} (${source}${link.directed ? ' → ' : ' ↔ '}${target})`
         });
       });
     });
   });
 
   return edges;
+}
+
+function buildSelfLoopPath(node) {
+  const radius = 22;
+  const loop = 36;
+  const startX = node.x + radius;
+  const startY = node.y - radius;
+  const c1X = node.x + loop;
+  const c1Y = node.y - loop * 1.4;
+  const c2X = node.x + loop * 1.8;
+  const c2Y = node.y + loop * 0.4;
+  const endX = node.x;
+  const endY = node.y + radius;
+  return `M ${startX} ${startY} C ${c1X} ${c1Y}, ${c2X} ${c2Y}, ${endX} ${endY}`;
 }
 
 function readFile(file) {
