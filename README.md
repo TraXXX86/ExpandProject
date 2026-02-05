@@ -75,6 +75,18 @@ Accès :
 
 Le mot de passe par défaut est `neo4j/expand123456`. Vous pouvez modifier cette valeur dans `docker-compose.yml`.
 
+### Vérifier rapidement l'import du modèle
+
+```bash
+./scripts/smoke-api.sh
+```
+
+Vous pouvez surcharger l'URL de l'API et le fichier modèle :
+
+```bash
+API_BASE=http://localhost:8080 MODEL_FILE=chemin/vers/model.xml ./scripts/smoke-api.sh
+```
+
 ### 3. Configurer Neo4j
 
 #### Installation de Neo4j (si nécessaire)
