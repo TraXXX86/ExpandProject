@@ -49,8 +49,9 @@ public class CypherUtils {
 
 	private static String buildPropertiesLiteral(DataPackObject object, String modelKey, boolean parameterized) {
 		boolean hasAttributes = !object.getATTRIBUTE().isEmpty();
+		boolean hasDataId = object.getID() > 0;
 		boolean hasModelKey = modelKey != null && !modelKey.isBlank();
-		if (!hasAttributes && !hasModelKey) {
+		if (!hasAttributes && !hasDataId && !hasModelKey) {
 			return "";
 		}
 
@@ -69,6 +70,18 @@ public class CypherUtils {
 			} else {
 				result.append("'").append(attribute.getVALUE()).append("'");
 			}
+		}
+		if (hasDataId) {
+			if (!isFirst) {
+				result.append(",");
+			}
+			result.append("dataId").append(":");
+			if (parameterized) {
+				result.append("?");
+			} else {
+				result.append(object.getID());
+			}
+			isFirst = false;
 		}
 		if (hasModelKey) {
 			if (!isFirst) {

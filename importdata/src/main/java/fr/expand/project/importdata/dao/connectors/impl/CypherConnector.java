@@ -61,7 +61,10 @@ public class CypherConnector extends IConnectorDb {
 			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object, modelKey) + ") RETURN ID(a)";
 			LOGGER.info(request);
 			int newId = launchCreationRequest(request, true);
-			object.setID(newId);
+			if (object.getID() <= 0) {
+				object.setID(newId);
+			}
+			object.setInternalId(newId);
 			return newId;
 		}
 		LOGGER.error("Object is null");
@@ -72,8 +75,9 @@ public class CypherConnector extends IConnectorDb {
     public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
         String relationType = normalizeRelationshipType(linkType);
         String relationProperties = buildRelationProperties(linkType);
-        String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
-                + objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:"
+        String matchA = buildNodeMatch(objectA, "a");
+        String matchB = buildNodeMatch(objectB, "b");
+        String request = matchA + " " + matchB + " CREATE (a)-[:"
                 + relationType + relationProperties + "]->(b)";
         LOGGER.info(request);
         return launchCreationRequest(request, false);
@@ -187,6 +191,31 @@ public class CypherConnector extends IConnectorDb {
             return "KNOWS";
         }
         return sanitized.toUpperCase();
+    }
+
+    private String buildNodeMatch(DataPackObject object, String alias) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("MATCH (").append(alias).append(":").append(object.getTYPE()).append(")");
+
+        Integer internalId = object.getInternalId();
+        boolean useInternal = internalId != null && internalId > 0 && object.getID() == internalId;
+        boolean hasDataId = object.getID() > 0 && !useInternal;
+
+        boolean hasWhere = false;
+        if (useInternal) {
+            builder.append(" WHERE ID(").append(alias).append(")=").append(internalId);
+            hasWhere = true;
+        } else if (hasDataId) {
+            builder.append(" WHERE ").append(alias).append(".dataId=").append(object.getID());
+            hasWhere = true;
+        }
+
+        if (modelKey != null && !modelKey.isBlank()) {
+            builder.append(hasWhere ? " AND " : " WHERE ");
+            builder.append(alias).append(".modelKey='").append(modelKey).append("'");
+        }
+
+        return builder.toString();
     }
 
 	private AuthToken buildAuthToken() {

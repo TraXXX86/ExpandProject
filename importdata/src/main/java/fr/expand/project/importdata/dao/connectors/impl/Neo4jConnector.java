@@ -91,6 +91,10 @@ public class Neo4jConnector extends IConnectorDb {
 			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
 		}
+		if (object.getID() > 0) {
+			params.put(Integer.toString(i), object.getID());
+			i++;
+		}
 		if (modelKey != null && !modelKey.isBlank()) {
 			params.put(Integer.toString(i), modelKey);
 		}
@@ -99,8 +103,12 @@ public class Neo4jConnector extends IConnectorDb {
 		List<DataPackObject> results = query(request, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
-			object.setID(results.get(0).getID());
-			return results.get(0).getID();
+			int internalId = results.get(0).getID();
+			if (object.getID() <= 0) {
+				object.setID(internalId);
+			}
+			object.setInternalId(internalId);
+			return internalId;
 		}
 		return -1;
 	}
@@ -112,11 +120,13 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create query
 		String relationType = normalizeRelationshipType(linkType);
 		StringBuilder request = new StringBuilder();
-		request.append("MATCH (a:").append(objectA.getTYPE()).append(") WHERE ID(a)=?");
+		request.append("MATCH (a:").append(objectA.getTYPE()).append(")");
+		buildMatchConditions(request, "a", objectA);
 		if (modelKey != null && !modelKey.isBlank()) {
 			request.append(" AND a.modelKey=?");
 		}
-		request.append(" MATCH (b:").append(objectB.getTYPE()).append(") WHERE ID(b)=?");
+		request.append(" MATCH (b:").append(objectB.getTYPE()).append(")");
+		buildMatchConditions(request, "b", objectB);
 		if (modelKey != null && !modelKey.isBlank()) {
 			request.append(" AND b.modelKey=?");
 		}
@@ -132,11 +142,11 @@ public class Neo4jConnector extends IConnectorDb {
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		int index = 1;
-		params.put(Integer.toString(index++), objectA.getID());
+		index = appendMatchParameters(params, index, objectA);
 		if (modelKey != null && !modelKey.isBlank()) {
 			params.put(Integer.toString(index++), modelKey);
 		}
-		params.put(Integer.toString(index++), objectB.getID());
+		index = appendMatchParameters(params, index, objectB);
 		if (modelKey != null && !modelKey.isBlank()) {
 			params.put(Integer.toString(index++), modelKey);
 		}
@@ -266,6 +276,35 @@ public class Neo4jConnector extends IConnectorDb {
 			throw new RuntimeException(e);
 		}
 		return results;
+	}
+
+	private void buildMatchConditions(StringBuilder request, String alias, DataPackObject object) {
+		Integer internalId = object.getInternalId();
+		boolean useInternal = internalId != null && internalId > 0 && object.getID() == internalId;
+		boolean hasDataId = object.getID() > 0 && !useInternal;
+		if (useInternal) {
+			request.append(" WHERE ID(").append(alias).append(")=?");
+		} else if (hasDataId) {
+			request.append(" WHERE ").append(alias).append(".dataId=?");
+		} else {
+			request.append(" WHERE ID(").append(alias).append(")=?");
+		}
+	}
+
+	private int appendMatchParameters(Map<String, Object> params, int index, DataPackObject object) {
+		Integer internalId = object.getInternalId();
+		boolean useInternal = internalId != null && internalId > 0 && object.getID() == internalId;
+		boolean hasDataId = object.getID() > 0 && !useInternal;
+		if (useInternal) {
+			params.put(Integer.toString(index++), internalId);
+		} else if (hasDataId) {
+			params.put(Integer.toString(index++), object.getID());
+		} else if (internalId != null && internalId > 0) {
+			params.put(Integer.toString(index++), internalId);
+		} else {
+			params.put(Integer.toString(index++), object.getID());
+		}
+		return index;
 	}
 
 	private void setParameters(PreparedStatement statement, Map<String, Object> params) throws SQLException {
