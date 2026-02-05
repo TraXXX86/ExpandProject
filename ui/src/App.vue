@@ -14,7 +14,9 @@
         <div class="d-flex align-center" style="gap: 8px;">
           <v-chip color="secondary" variant="tonal">XML</v-chip>
           <v-chip color="primary" variant="tonal">Validation</v-chip>
-          <v-chip color="accent" variant="tonal">Neo4j</v-chip>
+          <v-chip :color="neo4jChipColor" variant="tonal">
+            Neo4j {{ neo4jChipLabel }}
+          </v-chip>
         </div>
       </v-container>
     </v-app-bar>
@@ -847,6 +849,7 @@ const linkTypeInfo = ref({});
 const selectedObject = ref(null);
 const objectFilter = ref('');
 const status = ref(null);
+const healthStatus = ref({ api: 'unknown', neo4j: 'unknown', error: '' });
 
 const models = ref([]);
 const selectedModelKey = ref('');
@@ -879,6 +882,26 @@ const canUploadModel = computed(() => Boolean(getFirstFile(modelFile.value)));
 const canUploadData = computed(
   () => Boolean(getFirstFile(dataFile.value) && selectedModelKey.value)
 );
+
+const neo4jChipLabel = computed(() => {
+  if (healthStatus.value.neo4j === 'ok') {
+    return 'OK';
+  }
+  if (healthStatus.value.neo4j === 'ko') {
+    return 'KO';
+  }
+  return '—';
+});
+
+const neo4jChipColor = computed(() => {
+  if (healthStatus.value.neo4j === 'ok') {
+    return 'success';
+  }
+  if (healthStatus.value.neo4j === 'ko') {
+    return 'error';
+  }
+  return 'secondary';
+});
 
 const filteredModelObjects = computed(() => {
   const filter = modelObjectFilter.value.trim().toLowerCase();
@@ -974,6 +997,7 @@ const linkedObjects = computed(() => {
 });
 
 onMounted(() => {
+  refreshHealth();
   refreshModels();
 });
 
@@ -1015,6 +1039,7 @@ function handleDataFile(files) {
 async function refreshModels(preferredKey) {
   isLoadingModels.value = true;
   status.value = null;
+  refreshHealth();
   try {
     const response = await fetch(`${apiBase}/api/models`);
     const payload = await readJson(response);
@@ -1072,6 +1097,23 @@ async function refreshModelDetails(modelKey) {
     status.value = { type: 'error', message: error.message };
   } finally {
     isLoadingModel.value = false;
+  }
+}
+
+async function refreshHealth() {
+  try {
+    const response = await fetch(`${apiBase}/api/health?deep=true`);
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'API indisponible');
+    }
+    healthStatus.value = {
+      api: payload?.api || 'ok',
+      neo4j: payload?.neo4j || 'unknown',
+      error: payload?.neo4jError || ''
+    };
+  } catch (error) {
+    healthStatus.value = { api: 'ko', neo4j: 'ko', error: error.message };
   }
 }
 

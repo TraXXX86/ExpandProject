@@ -70,7 +70,23 @@ public class ImportApiServer {
     private static void registerRoutes() {
         get("/api/health", (request, response) -> {
             response.type("application/json");
-            return GSON.toJson(Map.of("status", "ok"));
+            boolean deep = "true".equalsIgnoreCase(request.queryParams("deep"));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("status", "ok");
+            payload.put("api", "ok");
+            payload.put("neo4j", "unknown");
+
+            if (deep) {
+                try (Neo4jModelStore store = new Neo4jModelStore()) {
+                    store.listModels();
+                    payload.put("neo4j", "ok");
+                } catch (Exception e) {
+                    payload.put("neo4j", "ko");
+                    payload.put("neo4jError", e.getMessage());
+                }
+            }
+
+            return GSON.toJson(payload);
         });
 
         get("/api/models", (request, response) -> {
