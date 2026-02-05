@@ -8,6 +8,7 @@ import org.apache.logging.log4j.Logger;
 import fr.expand.project.importdata.api.impl.ModelBasedImportAPI;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.validation.ValidationResult;
+import fr.expand.project.importdata.model.Neo4jModelStore;
 
 /**
  * Main application launcher
@@ -44,6 +45,14 @@ public class Launcher {
             // Run example mode
             if (args.length == 1 && args[0].equals("--example")) {
                 runExample();
+                return;
+            }
+
+            // Delete model and data
+            if (args.length >= 2 && args[0].equals("--delete-model")) {
+                String modelName = args[1];
+                String modelVersion = args.length >= 3 ? args[2] : "";
+                deleteModelAndData(modelName, modelVersion);
                 return;
             }
             
@@ -174,6 +183,7 @@ public class Launcher {
     private static void printUsage() {
         System.out.println("Usage:");
         System.out.println("  java -jar importpackage.jar <model.xml> <data.xml> [--validate-only]");
+        System.out.println("  java -jar importpackage.jar --delete-model <modelName> [modelVersion]");
         System.out.println("  java -jar importpackage.jar --example");
         System.out.println("  java -jar importpackage.jar --help");
         System.out.println("");
@@ -181,6 +191,7 @@ public class Launcher {
         System.out.println("  model.xml        Path to the data model XML file");
         System.out.println("  data.xml         Path to the data XML file to import");
         System.out.println("  --validate-only  Only validate, do not import to database");
+        System.out.println("  --delete-model   Delete a model and its associated data from the database");
         System.out.println("  --example        Run validation on bundled example files");
         System.out.println("  --help           Show this help message");
         System.out.println("");
@@ -191,7 +202,24 @@ public class Launcher {
         System.out.println("  # Validate only (no import)");
         System.out.println("  java -jar importpackage.jar model/my_model.xml data/my_data.xml --validate-only");
         System.out.println("");
+        System.out.println("  # Delete a model and its data");
+        System.out.println("  java -jar importpackage.jar --delete-model MonModele 1.0");
+        System.out.println("");
         System.out.println("  # Test with example data");
         System.out.println("  java -jar importpackage.jar --example");
+    }
+
+    private static void deleteModelAndData(String modelName, String modelVersion) {
+        LOGGER.info("Deleting model and data:");
+        LOGGER.info("  Model name: " + modelName);
+        LOGGER.info("  Model version: " + modelVersion);
+
+        try (Neo4jModelStore store = new Neo4jModelStore()) {
+            store.deleteModelAndData(modelName, modelVersion);
+            LOGGER.info("Model and associated data deleted successfully.");
+        } catch (Exception e) {
+            LOGGER.error("Error deleting model and data", e);
+            System.exit(1);
+        }
     }
 }

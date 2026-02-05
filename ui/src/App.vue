@@ -28,6 +28,7 @@
               <v-tab value="import">Import</v-tab>
               <v-tab value="model">Modèle</v-tab>
               <v-tab value="navigate">Navigation</v-tab>
+              <v-tab value="admin">Administration</v-tab>
             </v-tabs>
           </v-col>
         </v-row>
@@ -669,6 +670,104 @@
               </v-col>
             </v-row>
           </v-window-item>
+
+          <v-window-item value="admin">
+            <v-row class="mb-6">
+              <v-col cols="12">
+                <div class="kicker">Administration</div>
+                <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
+                  Supprimez un modèle et ses données associées.
+                </h2>
+                <p class="subhead">
+                  Cette action efface le modèle stocké et toutes les données importées liées à ce modèle.
+                </p>
+              </v-col>
+            </v-row>
+
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-card class="card-animate delay-1" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Suppression du modèle</v-card-title>
+                  <v-card-text>
+                    <v-text-field
+                      v-model="adminModelName"
+                      label="Nom du modèle"
+                      prepend-icon="mdi-database-outline"
+                      variant="outlined"
+                      density="comfortable"
+                    />
+                    <v-text-field
+                      v-model="adminModelVersion"
+                      label="Version (optionnelle)"
+                      prepend-icon="mdi-tag-outline"
+                      variant="outlined"
+                      density="comfortable"
+                    />
+
+                    <v-alert
+                      class="mt-4"
+                      type="warning"
+                      variant="tonal"
+                      density="comfortable"
+                      icon="mdi-alert-circle-outline"
+                      border="start"
+                    >
+                      La suppression du modèle entraîne la suppression de toutes les données associées.
+                    </v-alert>
+
+                    <div class="d-flex flex-wrap align-center mt-4" style="gap: 12px;">
+                      <v-btn
+                        color="error"
+                        variant="flat"
+                        :disabled="!adminModelName"
+                        @click="copyAdminCommand"
+                      >
+                        Copier la commande de suppression
+                      </v-btn>
+                      <v-btn
+                        color="primary"
+                        variant="tonal"
+                        :disabled="!adminModelName"
+                        @click="adminCommandVisible = !adminCommandVisible"
+                      >
+                        {{ adminCommandVisible ? 'Masquer la commande' : 'Voir la commande' }}
+                      </v-btn>
+                    </div>
+
+                    <v-alert
+                      v-if="adminStatus"
+                      class="mt-4"
+                      :type="adminStatus.type"
+                      variant="tonal"
+                      density="comfortable"
+                      border="start"
+                    >
+                      {{ adminStatus.message }}
+                    </v-alert>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-card class="card-animate delay-2" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Commande CLI</v-card-title>
+                  <v-card-text>
+                    <div v-if="adminCommandVisible" class="code-block">
+                      <pre><code>{{ adminCommand }}</code></pre>
+                    </div>
+                    <div v-else class="text-medium-emphasis">
+                      Cliquez sur “Voir la commande” pour afficher la suppression CLI.
+                    </div>
+                    <v-divider class="my-4" />
+                    <div class="text-caption text-medium-emphasis">
+                      Cette commande utilise le CLI Java pour supprimer le modèle et ses données dans Neo4j.
+                      Assurez-vous que les variables <code>NEO4J_*</code> sont correctement définies.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-window-item>
         </v-window>
       </v-container>
     </v-main>
@@ -693,6 +792,10 @@ const linkTypeInfo = ref({});
 const selectedObject = ref(null);
 const objectFilter = ref('');
 const status = ref(null);
+const adminModelName = ref('');
+const adminModelVersion = ref('');
+const adminCommandVisible = ref(false);
+const adminStatus = ref(null);
 
 const canValidate = computed(() => Boolean(modelSummary.value && dataSummary.value));
 
@@ -728,6 +831,18 @@ const filteredObjects = computed(() => {
       id.toLowerCase().includes(filter)
     );
   });
+});
+
+const adminCommand = computed(() => {
+  if (!adminModelName.value) {
+    return 'java -jar importpackage.jar --delete-model <modelName> [modelVersion]';
+  }
+  const name = adminModelName.value.trim();
+  const version = adminModelVersion.value.trim();
+  if (version) {
+    return `java -jar importpackage.jar --delete-model \"${name}\" \"${version}\"`;
+  }
+  return `java -jar importpackage.jar --delete-model \"${name}\"`;
 });
 
 const graphNodes = computed(() => buildGraphNodes());
@@ -885,6 +1000,18 @@ function selectModelLinkByName(name) {
   if (match) {
     selectedModelLink.value = match;
     modelLinkFilter.value = name;
+  }
+}
+
+async function copyAdminCommand() {
+  if (!adminModelName.value) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(adminCommand.value);
+    adminStatus.value = { type: 'success', message: 'Commande copiée dans le presse-papiers.' };
+  } catch (error) {
+    adminStatus.value = { type: 'error', message: 'Impossible de copier la commande.' };
   }
 }
 

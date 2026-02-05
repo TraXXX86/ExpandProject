@@ -58,7 +58,7 @@ public class CypherConnector extends IConnectorDb {
 	public int writeObject(DataPackObject object) {
 		if (object != null) {
 			// Generate request for DB
-			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object) + ") RETURN ID(a)";
+			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object, modelKey) + ") RETURN ID(a)";
 			LOGGER.info(request);
 			int newId = launchCreationRequest(request, true);
 			object.setID(newId);
@@ -70,8 +70,13 @@ public class CypherConnector extends IConnectorDb {
 
 	@Override
 	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
+		String relationProperties = "";
+		if (modelKey != null && !modelKey.isBlank()) {
+			relationProperties = " {modelKey:'" + modelKey + "'}";
+		}
 		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
-				+ objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:KNOWS]->(b)";
+				+ objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:KNOWS"
+				+ relationProperties + "]->(b)";
 		LOGGER.info(request);
 		return launchCreationRequest(request, false);
 	}

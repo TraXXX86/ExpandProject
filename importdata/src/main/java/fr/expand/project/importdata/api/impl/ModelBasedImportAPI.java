@@ -69,7 +69,8 @@ public class ModelBasedImportAPI {
         
         // Import data if validation passed
         LOGGER.info("Validation successful. Starting import...");
-        storeModelToNeo4j();
+        String modelKey = storeModelToNeo4j();
+        connector.setModelKey(modelKey);
         importToNeo4j(data);
         
         return result;
@@ -165,16 +166,17 @@ public class ModelBasedImportAPI {
     /**
      * Store the current model in Neo4j as a separate subgraph.
      */
-    private void storeModelToNeo4j() {
+    private String storeModelToNeo4j() {
         var model = modelManager.getCurrentModel();
         if (model == null) {
             LOGGER.warn("No model loaded, skipping model persistence");
-            return;
+            return null;
         }
 
         try (Neo4jModelStore store = new Neo4jModelStore()) {
-            store.storeModel(model);
+            String modelKey = store.storeModel(model);
             LOGGER.info("Model stored in Neo4j: " + model.getNAME());
+            return modelKey;
         } catch (Exception e) {
             LOGGER.error("Failed to store model in Neo4j", e);
             throw new RuntimeException("Model persistence failed", e);

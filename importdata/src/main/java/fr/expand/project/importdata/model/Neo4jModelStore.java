@@ -34,9 +34,9 @@ public class Neo4jModelStore implements AutoCloseable {
         this.driver = GraphDatabase.driver(uri, authToken);
     }
 
-    public void storeModel(DATAMODEL model) {
+    public String storeModel(DATAMODEL model) {
         if (model == null) {
-            return;
+            return null;
         }
 
         String modelName = model.getNAME();
@@ -240,6 +240,33 @@ public class Neo4jModelStore implements AutoCloseable {
                     }
                 }
 
+                return null;
+            });
+        }
+        return modelKey;
+    }
+
+    public void deleteModelAndData(String modelName, String modelVersion) {
+        String version = modelVersion == null ? "" : modelVersion;
+        String key = modelName + ":" + version;
+        deleteModelAndDataByKey(key);
+    }
+
+    public void deleteModelAndDataByKey(String modelKey) {
+        if (modelKey == null || modelKey.isBlank()) {
+            return;
+        }
+
+        try (Session session = driver.session()) {
+            session.executeWrite(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                tx.run("MATCH (n {modelKey:$modelKey}) DETACH DELETE n", params);
+                tx.run(
+                    "MATCH (m:DataModel {key:$modelKey})-[:HAS_OBJECT_TYPE|HAS_LINK_TYPE]->(n) DETACH DELETE n",
+                    params
+                );
+                tx.run("MATCH (m:DataModel {key:$modelKey}) DETACH DELETE m", params);
                 return null;
             });
         }

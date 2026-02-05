@@ -80,7 +80,8 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "CREATE (a:" + CypherUtils.convertObjectForDbSubtitution(object) + ") RETURN ID(a) AS ID";
+		String request = "CREATE (a:" + CypherUtils.convertObjectForDbSubtitution(object, modelKey)
+				+ ") RETURN ID(a) AS ID";
 		LOGGER.info(request);
 
 		// Create parameters
@@ -89,6 +90,9 @@ public class Neo4jConnector extends IConnectorDb {
 		for (ATTRIBUTE attribute : object.getATTRIBUTE()) {
 			params.put(Integer.toString(i), attribute.getVALUE());
 			i++;
+		}
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put(Integer.toString(i), modelKey);
 		}
 
 		// Launch request
@@ -106,17 +110,40 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=? " + "MATCH (b:" + objectB.getTYPE()
-				+ ") WHERE ID(b)=? " + "CREATE (a)-[:KNOWS]->(b)";
-		LOGGER.info(request);
+		StringBuilder request = new StringBuilder();
+		request.append("MATCH (a:").append(objectA.getTYPE()).append(") WHERE ID(a)=?");
+		if (modelKey != null && !modelKey.isBlank()) {
+			request.append(" AND a.modelKey=?");
+		}
+		request.append(" MATCH (b:").append(objectB.getTYPE()).append(") WHERE ID(b)=?");
+		if (modelKey != null && !modelKey.isBlank()) {
+			request.append(" AND b.modelKey=?");
+		}
+		request.append(" CREATE (a)-[:KNOWS");
+		if (modelKey != null && !modelKey.isBlank()) {
+			request.append(" {modelKey:?}");
+		}
+		request.append("]->(b)");
+		String requestString = request.toString();
+		LOGGER.info(requestString);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
-		params.put("1", objectA.getID());
-		params.put("2", objectB.getID());
+		int index = 1;
+		params.put(Integer.toString(index++), objectA.getID());
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put(Integer.toString(index++), modelKey);
+		}
+		params.put(Integer.toString(index++), objectB.getID());
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put(Integer.toString(index++), modelKey);
+		}
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put(Integer.toString(index), modelKey);
+		}
 
 		// Launch request
-		List<DataPackObject> results = query(request, params);
+		List<DataPackObject> results = query(requestString, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0).getID();
@@ -129,15 +156,24 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (n:" + typeObject.name() + ") WHERE ID(n)=? RETURN n, ID(n) AS ID LIMIT 5";
-		LOGGER.info(request);
+		StringBuilder request = new StringBuilder();
+		request.append("MATCH (n:").append(typeObject.name()).append(") WHERE ID(n)=?");
+		if (modelKey != null && !modelKey.isBlank()) {
+			request.append(" AND n.modelKey=?");
+		}
+		request.append(" RETURN n, ID(n) AS ID LIMIT 5");
+		String requestString = request.toString();
+		LOGGER.info(requestString);
 
 		// Create parameters
 		Map<String, Object> params = new HashMap<>();
 		params.put("1", idObject);
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put("2", modelKey);
+		}
 
 		// Launch request
-		List<DataPackObject> results = query(request, params);
+		List<DataPackObject> results = query(requestString, params);
 
 		if (!CollectionUtils.isEmpty(results)) {
 			return results.get(0);

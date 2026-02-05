@@ -9,6 +9,7 @@ import fr.expand.project.importdata.dto.DataPackObject;
 public abstract class IConnectorDb {
 
 	protected static final Logger LOGGER = LogManager.getLogger(IConnectorDb.class.toString());
+	protected String modelKey;
 
 	/**
 	 * Constructor
@@ -71,4 +72,15 @@ public abstract class IConnectorDb {
 	 * @return
 	 */
 	public abstract void deleteAll();
+
+	/**
+	 * Optional model key used to tag data imported to Neo4j.
+	 */
+	public void setModelKey(String modelKey) {
+		this.modelKey = modelKey;
+	}
+
+	public String getModelKey() {
+		return modelKey;
+	}
 }
