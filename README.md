@@ -60,6 +60,21 @@ java -jar importdata/target/expandproject-importdata.jar --api 8080
 
 Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
 
+## 🐳 Docker Compose
+
+Pour lancer Neo4j + API + IHM sans installer Java localement :
+
+```bash
+docker compose up --build
+```
+
+Accès :
+- IHM : http://localhost:5173
+- API : http://localhost:8080
+- Neo4j : http://localhost:7474 (bolt 7687)
+
+Le mot de passe par défaut est `neo4j/expand123456`. Vous pouvez modifier cette valeur dans `docker-compose.yml`.
+
 ### 3. Configurer Neo4j
 
 #### Installation de Neo4j (si nécessaire)
