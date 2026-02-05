@@ -1,4 +1,6 @@
-package fr.expand.project.importdata.dto.generated;
+package fr.expand.project.importdata.dto;
+
+import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 
 /**
  * Alias for ATTRIBUTE class for backward compatibility

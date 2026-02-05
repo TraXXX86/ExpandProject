@@ -18,13 +18,16 @@ import org.apache.commons.lang3.StringUtils;
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
-import fr.expand.project.importdata.dto.generated.DataPackAttribute;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackAttribute;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.util.CypherUtils;
 
 public class Neo4jConnector extends IConnectorDb {
 
 	private Connection conn = null;
+	private static final String DEFAULT_HTTP_URI = "jdbc:neo4j:http://localhost:7474";
+	private static final String DEFAULT_USER = "neo4j";
+	private static final String DEFAULT_PASSWORD = "expand";
 
 	// ############################# Start/Close Connection to DB methods
 
@@ -32,7 +35,25 @@ public class Neo4jConnector extends IConnectorDb {
 	protected void connectToDb() {
 		if (conn == null) {
 			try {
-				conn = DriverManager.getConnection("jdbc:neo4j:http://localhost:7474", "neo4j", "expand");
+				String uri = readSetting("NEO4J_HTTP_URI", "NEO4J_JDBC_URI", DEFAULT_HTTP_URI);
+				String auth = readSetting("NEO4J_AUTH", null, null);
+				if (auth != null && !auth.isBlank()) {
+					if ("none".equalsIgnoreCase(auth.trim())) {
+						conn = DriverManager.getConnection(uri);
+					} else {
+						int separatorIndex = auth.indexOf('/');
+						if (separatorIndex > 0 && separatorIndex < auth.length() - 1) {
+							String user = auth.substring(0, separatorIndex);
+							String password = auth.substring(separatorIndex + 1);
+							conn = DriverManager.getConnection(uri, user, password);
+						}
+					}
+				}
+				if (conn == null) {
+					String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
+					String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
+					conn = DriverManager.getConnection(uri, user, password);
+				}
 			} catch (SQLException e) {
 				throw new RuntimeException(e);
 			}
@@ -85,8 +106,8 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)={1} " + "MATCH (b:" + objectB.getTYPE()
-				+ ") WHERE ID(b)={2} " + "CREATE (a)-[:KNOWS]->(b)";
+		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=? " + "MATCH (b:" + objectB.getTYPE()
+				+ ") WHERE ID(b)=? " + "CREATE (a)-[:KNOWS]->(b)";
 		LOGGER.info(request);
 
 		// Create parameters
@@ -108,7 +129,7 @@ public class Neo4jConnector extends IConnectorDb {
 		connectToDb();
 
 		// Create query
-		String request = "MATCH (n:" + typeObject.name() + ") WHERE ID(n)={1} RETURN n, ID(n) AS ID LIMIT 5";
+		String request = "MATCH (n:" + typeObject.name() + ") WHERE ID(n)=? RETURN n, ID(n) AS ID LIMIT 5";
 		LOGGER.info(request);
 
 		// Create parameters
@@ -168,7 +189,14 @@ public class Neo4jConnector extends IConnectorDb {
 		try {
 			final PreparedStatement statement = conn.prepareStatement(query);
 			setParameters(statement, params);
-			final ResultSet result = statement.executeQuery();
+			boolean hasResultSet = statement.execute();
+			if (!hasResultSet) {
+				return results;
+			}
+			final ResultSet result = statement.getResultSet();
+			if (result == null) {
+				return results;
+			}
 
 			List<String> columnsList = getColumns(result);
 			while (result.next()) {
@@ -204,5 +232,19 @@ public class Neo4jConnector extends IConnectorDb {
 			int index = Integer.parseInt(entry.getKey());
 			statement.setObject(index, entry.getValue());
 		}
+	}
+
+	private String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
+		String value = System.getProperty(envKey);
+		if (value == null || value.isBlank()) {
+			value = System.getenv(envKey);
+		}
+		if ((value == null || value.isBlank()) && fallbackEnvKey != null) {
+			value = System.getProperty(fallbackEnvKey);
+			if (value == null || value.isBlank()) {
+				value = System.getenv(fallbackEnvKey);
+			}
+		}
+		return (value == null || value.isBlank()) ? defaultValue : value;
 	}
 }

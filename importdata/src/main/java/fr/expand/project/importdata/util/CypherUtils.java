@@ -2,8 +2,8 @@ package fr.expand.project.importdata.util;
 
 import fr.expand.project.commons.IConstantUtils;
 import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
-import fr.expand.project.importdata.dto.generated.DataPackAttribute;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackAttribute;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public class CypherUtils {
 
@@ -38,15 +38,13 @@ public class CypherUtils {
 		if (!object.getATTRIBUTE().isEmpty()) {
 			boolean isFirst = true;
 			result.append("{");
-			int i = 1;
 			for (ATTRIBUTE attribute : object.getATTRIBUTE()) {
 				if (!isFirst) {
 					result.append(",");
 				} else {
 					isFirst = false;
 				}
-				result.append(attribute.getKEY()).append(":{").append(i).append("}");
-				i++;
+				result.append(attribute.getKEY()).append(":?");
 			}
 			result.append("}");
 		}

@@ -9,8 +9,8 @@ import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
 import fr.expand.project.importdata.dao.connectors.impl.Neo4jConnector;
-import fr.expand.project.importdata.dto.generated.DataPackAttribute;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackAttribute;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public class ConnectorTests {
 
@@ -27,7 +27,8 @@ public class ConnectorTests {
 			connector = new Neo4jConnector();
 			testConnector(connector);
 		} catch (Exception e) {
-			Assert.fail(e.getStackTrace().toString());
+			LOGGER.error("Neo4j connector test failed", e);
+			Assert.fail("Neo4j connector test failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
 		}
 		Assert.assertTrue(true);
 	}

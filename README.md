@@ -39,6 +39,18 @@ Cette commande va :
 - Générer les DTOs à partir des schémas XSD
 - Créer les JARs dans les dossiers `target/`
 
+## 🖥️ IHM Vue + Vuetify
+
+Une interface locale Vue 3 + Vuetify est disponible dans le dossier `ui/`.
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+L'interface permet de charger un `model.xml` et un `data.xml` pour en afficher un résumé local. Le câblage avec l'import backend pourra être ajouté ensuite.
+
 ### 3. Configurer Neo4j
 
 #### Installation de Neo4j (si nécessaire)
@@ -87,6 +99,12 @@ Par défaut, l'application utilise :
 
 Pour modifier ces paramètres, éditez :
 - `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` (ligne 35)
+
+Vous pouvez aussi surcharger via variables d'environnement ou propriétés JVM :
+- `NEO4J_BOLT_URI` (ex: `bolt://localhost:7687`)
+- `NEO4J_HTTP_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
+- `NEO4J_USER` / `NEO4J_PASSWORD`
+- `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`)
 
 ## 📖 Utilisation
 

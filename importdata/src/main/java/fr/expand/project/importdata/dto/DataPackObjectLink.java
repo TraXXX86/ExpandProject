@@ -1,4 +1,6 @@
-package fr.expand.project.importdata.dto.generated;
+package fr.expand.project.importdata.dto;
+
+import fr.expand.project.importdata.dto.generated.OBJLINK;
 
 /**
  * Alias for OBJLINK class for backward compatibility

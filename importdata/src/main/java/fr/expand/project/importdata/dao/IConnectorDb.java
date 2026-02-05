@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.commons.ObjectTypeEnum;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public abstract class IConnectorDb {
 

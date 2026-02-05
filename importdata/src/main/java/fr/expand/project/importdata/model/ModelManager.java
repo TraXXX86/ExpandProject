@@ -1,8 +1,13 @@
 package fr.expand.project.importdata.model;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
@@ -12,6 +17,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.model.generated.DATAMODEL;
+import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
 
@@ -26,9 +32,13 @@ public class ModelManager {
     private static ModelManager instance;
     private Map<String, DATAMODEL> loadedModels;
     private DATAMODEL currentModel;
+    private Map<String, OBJECTTYPE> objectTypeIndex;
+    private Map<String, LINKTYPE> linkTypeIndex;
     
     private ModelManager() {
         loadedModels = new HashMap<>();
+        objectTypeIndex = new HashMap<>();
+        linkTypeIndex = new HashMap<>();
     }
     
     /**
@@ -57,6 +67,8 @@ public class ModelManager {
         // Cache the model
         loadedModels.put(model.getNAME(), model);
         currentModel = model;
+        indexCurrentModel();
+        validateInheritance(currentModel);
         
         LOGGER.info("Model loaded successfully: " + model.getNAME() + " (version " + model.getVERSION() + ")");
         LOGGER.info("  - Object types: " + model.getOBJECTTYPES().getOBJECTTYPE().size());
@@ -83,6 +95,8 @@ public class ModelManager {
         // Cache the model
         loadedModels.put(model.getNAME(), model);
         currentModel = model;
+        indexCurrentModel();
+        validateInheritance(currentModel);
         
         LOGGER.info("Model loaded successfully: " + model.getNAME());
         
@@ -106,6 +120,8 @@ public class ModelManager {
         DATAMODEL model = loadedModels.get(modelName);
         if (model != null) {
             currentModel = model;
+            indexCurrentModel();
+            validateInheritance(currentModel);
             LOGGER.info("Current model set to: " + modelName);
             return true;
         }
@@ -123,15 +139,12 @@ public class ModelManager {
             LOGGER.warn("No model loaded");
             return null;
         }
-        
-        for (OBJECTTYPE objType : currentModel.getOBJECTTYPES().getOBJECTTYPE()) {
-            if (objType.getNAME().equals(typeName)) {
-                return objType;
-            }
+
+        OBJECTTYPE objectType = objectTypeIndex.get(typeName);
+        if (objectType == null) {
+            LOGGER.warn("Object type not found: " + typeName);
         }
-        
-        LOGGER.warn("Object type not found: " + typeName);
-        return null;
+        return objectType;
     }
     
     /**
@@ -144,15 +157,12 @@ public class ModelManager {
             LOGGER.warn("No model loaded");
             return null;
         }
-        
-        for (LINKTYPE linkType : currentModel.getLINKTYPES().getLINKTYPE()) {
-            if (linkType.getNAME().equals(typeName)) {
-                return linkType;
-            }
+
+        LINKTYPE linkType = linkTypeIndex.get(typeName);
+        if (linkType == null) {
+            LOGGER.warn("Link type not found: " + typeName);
         }
-        
-        LOGGER.warn("Link type not found: " + typeName);
-        return null;
+        return linkType;
     }
     
     /**
@@ -179,6 +189,8 @@ public class ModelManager {
     public void clearModels() {
         loadedModels.clear();
         currentModel = null;
+        objectTypeIndex.clear();
+        linkTypeIndex.clear();
         LOGGER.info("All models cleared");
     }
     
@@ -188,5 +200,159 @@ public class ModelManager {
      */
     public Map<String, DATAMODEL> getLoadedModels() {
         return new HashMap<>(loadedModels);
+    }
+
+    /**
+     * Build indexes for object and link types for the current model.
+     */
+    private void indexCurrentModel() {
+        objectTypeIndex.clear();
+        linkTypeIndex.clear();
+
+        if (currentModel == null) {
+            return;
+        }
+
+        if (currentModel.getOBJECTTYPES() != null && currentModel.getOBJECTTYPES().getOBJECTTYPE() != null) {
+            for (OBJECTTYPE objType : currentModel.getOBJECTTYPES().getOBJECTTYPE()) {
+                objectTypeIndex.put(objType.getNAME(), objType);
+            }
+        }
+
+        if (currentModel.getLINKTYPES() != null && currentModel.getLINKTYPES().getLINKTYPE() != null) {
+            for (LINKTYPE linkType : currentModel.getLINKTYPES().getLINKTYPE()) {
+                linkTypeIndex.put(linkType.getNAME(), linkType);
+            }
+        }
+    }
+
+    /**
+     * Resolve attribute definitions for a type, including inherited ones.
+     */
+    public Map<String, ATTRIBUTEDEFINITION> getAttributeDefinitionMap(OBJECTTYPE objectType) {
+        Map<String, ATTRIBUTEDEFINITION> merged = new LinkedHashMap<>();
+        if (objectType == null) {
+            return merged;
+        }
+
+        for (OBJECTTYPE type : getHierarchyRootFirst(objectType)) {
+            if (type.getATTRIBUTEDEFINITIONS() == null || type.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION() == null) {
+                continue;
+            }
+            for (ATTRIBUTEDEFINITION def : type.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION()) {
+                if (def.getNAME() == null) {
+                    continue;
+                }
+                merged.put(def.getNAME(), def);
+            }
+        }
+
+        return merged;
+    }
+
+    /**
+     * Check if a candidate type is the same as, or inherits from, an allowed type.
+     */
+    public boolean isTypeOrSubtype(String candidateType, String allowedType) {
+        if (candidateType == null || allowedType == null) {
+            return false;
+        }
+
+        if (candidateType.equals(allowedType)) {
+            return true;
+        }
+
+        OBJECTTYPE current = objectTypeIndex.get(candidateType);
+        Set<String> visited = new HashSet<>();
+        while (current != null) {
+            String parentName = current.getPARENT();
+            if (parentName == null || parentName.trim().isEmpty()) {
+                return false;
+            }
+            if (!visited.add(parentName)) {
+                return false;
+            }
+            if (parentName.equals(allowedType)) {
+                return true;
+            }
+            current = objectTypeIndex.get(parentName);
+        }
+
+        return false;
+    }
+
+    private List<OBJECTTYPE> getHierarchyRootFirst(OBJECTTYPE objectType) {
+        List<OBJECTTYPE> chain = new ArrayList<>();
+        if (objectType == null) {
+            return chain;
+        }
+
+        Set<String> visited = new HashSet<>();
+        OBJECTTYPE current = objectType;
+        while (current != null) {
+            String name = current.getNAME();
+            if (name != null && !visited.add(name)) {
+                break;
+            }
+            chain.add(current);
+            String parentName = current.getPARENT();
+            if (parentName == null || parentName.trim().isEmpty()) {
+                break;
+            }
+            current = objectTypeIndex.get(parentName);
+        }
+
+        // Reverse to have root-first order
+        List<OBJECTTYPE> rootFirst = new ArrayList<>();
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            rootFirst.add(chain.get(i));
+        }
+
+        return rootFirst;
+    }
+
+    private void validateInheritance(DATAMODEL model) {
+        if (model == null || model.getOBJECTTYPES() == null || model.getOBJECTTYPES().getOBJECTTYPE() == null) {
+            return;
+        }
+
+        Set<String> visiting = new HashSet<>();
+        Set<String> visited = new HashSet<>();
+
+        for (OBJECTTYPE objType : model.getOBJECTTYPES().getOBJECTTYPE()) {
+            String parentName = objType.getPARENT();
+            if (parentName != null && !parentName.trim().isEmpty() && !objectTypeIndex.containsKey(parentName)) {
+                LOGGER.error("Invalid inheritance: object type '" + objType.getNAME()
+                    + "' references unknown parent '" + parentName + "'");
+            }
+
+            String typeName = objType.getNAME();
+            if (typeName != null && hasInheritanceCycle(typeName, visiting, visited)) {
+                LOGGER.error("Inheritance cycle detected involving type: " + typeName);
+            }
+        }
+    }
+
+    private boolean hasInheritanceCycle(String typeName, Set<String> visiting, Set<String> visited) {
+        if (visited.contains(typeName)) {
+            return false;
+        }
+        if (visiting.contains(typeName)) {
+            return true;
+        }
+
+        visiting.add(typeName);
+        OBJECTTYPE type = objectTypeIndex.get(typeName);
+        if (type != null) {
+            String parentName = type.getPARENT();
+            if (parentName != null && !parentName.trim().isEmpty() && objectTypeIndex.containsKey(parentName)) {
+                if (hasInheritanceCycle(parentName, visiting, visited)) {
+                    return true;
+                }
+            }
+        }
+        visiting.remove(typeName);
+        visited.add(typeName);
+        return false;
     }
 }

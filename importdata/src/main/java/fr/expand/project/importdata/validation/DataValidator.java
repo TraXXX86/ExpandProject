@@ -3,6 +3,7 @@ package fr.expand.project.importdata.validation;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
@@ -101,17 +102,18 @@ public class DataValidator {
      * Validate object attributes against type definition
      */
     private void validateObjectAttributes(OBJECT obj, OBJECTTYPE objectType) {
-        if (objectType.getATTRIBUTEDEFINITIONS() == null) {
+        Map<String, ATTRIBUTEDEFINITION> attrDefinitions = modelManager.getAttributeDefinitionMap(objectType);
+        if (attrDefinitions.isEmpty()) {
             return;
         }
-        
+
         Set<String> providedAttributes = new HashSet<>();
         for (ATTRIBUTE attr : obj.getATTRIBUTE()) {
             providedAttributes.add(attr.getKEY());
         }
         
         // Check required attributes
-        for (ATTRIBUTEDEFINITION attrDef : objectType.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION()) {
+        for (ATTRIBUTEDEFINITION attrDef : attrDefinitions.values()) {
             String attrName = attrDef.getNAME();
             
             if (attrDef.isREQUIRED() && !providedAttributes.contains(attrName)) {
@@ -122,27 +124,21 @@ public class DataValidator {
         
         // Validate attribute types
         for (ATTRIBUTE attr : obj.getATTRIBUTE()) {
-            validateAttributeType(obj, attr, objectType);
+            validateAttributeType(obj, attr, attrDefinitions);
         }
     }
     
     /**
      * Validate attribute value type
      */
-    private void validateAttributeType(OBJECT obj, ATTRIBUTE attr, OBJECTTYPE objectType) {
-        if (objectType.getATTRIBUTEDEFINITIONS() == null) {
+    private void validateAttributeType(OBJECT obj, ATTRIBUTE attr, Map<String, ATTRIBUTEDEFINITION> attrDefinitions) {
+        if (attrDefinitions == null || attrDefinitions.isEmpty()) {
             warnings.add(new ValidationWarning("OBJECT[" + obj.getID() + "]", 
                 "Attribute '" + attr.getKEY() + "' not defined in model (no attribute definitions)"));
             return;
         }
         
-        ATTRIBUTEDEFINITION attrDef = null;
-        for (ATTRIBUTEDEFINITION def : objectType.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION()) {
-            if (def.getNAME().equals(attr.getKEY())) {
-                attrDef = def;
-                break;
-            }
-        }
+        ATTRIBUTEDEFINITION attrDef = attrDefinitions.get(attr.getKEY());
         
         if (attrDef == null) {
             warnings.add(new ValidationWarning("OBJECT[" + obj.getID() + "]", 
@@ -239,7 +235,7 @@ public class DataValidator {
         boolean sourceAllowed = false;
         if (linkType.getSOURCETYPES() != null) {
             for (TYPEREF typeRef : linkType.getSOURCETYPES().getTYPEREF()) {
-                if (typeRef.getNAME().equals(sourceType)) {
+                if (modelManager.isTypeOrSubtype(sourceType, typeRef.getNAME())) {
                     sourceAllowed = true;
                     break;
                 }
@@ -255,7 +251,7 @@ public class DataValidator {
         boolean targetAllowed = false;
         if (linkType.getTARGETTYPES() != null) {
             for (TYPEREF typeRef : linkType.getTARGETTYPES().getTYPEREF()) {
-                if (typeRef.getNAME().equals(targetType)) {
+                if (modelManager.isTypeOrSubtype(targetType, typeRef.getNAME())) {
                     targetAllowed = true;
                     break;
                 }

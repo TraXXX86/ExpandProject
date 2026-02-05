@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.dto.generated.DATAS;
 import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.OBJECT;
@@ -109,8 +110,7 @@ public class ModelBasedImportAPI {
                 LOGGER.info("Importing objects...");
                 for (OBJECT obj : data.getOBJECTS().getOBJECT()) {
                     // Create wrapper for compatibility
-                    fr.expand.project.importdata.dto.generated.DataPackObject dpObj = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject dpObj = new DataPackObject();
                     dpObj.setID(obj.getID());
                     dpObj.setTYPE(obj.getTYPE());
                     dpObj.getATTRIBUTE().addAll(obj.getATTRIBUTE());
@@ -126,13 +126,11 @@ public class ModelBasedImportAPI {
                 LOGGER.info("Importing links...");
                 for (LINK link : data.getLINKS().getLINK()) {
                     // Create wrapper objects
-                    fr.expand.project.importdata.dto.generated.DataPackObject objA = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject objA = new DataPackObject();
                     objA.setID(link.getOBJLINKA().getID());
                     objA.setTYPE(link.getOBJLINKA().getTYPE());
                     
-                    fr.expand.project.importdata.dto.generated.DataPackObject objB = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject objB = new DataPackObject();
                     objB.setID(link.getOBJLINKB().getID());
                     objB.setTYPE(link.getOBJLINKB().getTYPE());
                     

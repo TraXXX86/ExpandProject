@@ -16,6 +16,7 @@ Définit la structure d'un modèle de données:
   - **OBJECT_TYPES**: Collection de types d'objets
     - **OBJECT_TYPE**: Définition d'un type d'objet
       - NAME: Nom du type
+      - PARENT: (optionnel) Nom du type parent pour l'héritage
       - DESCRIPTION: Description textuelle
       - **ATTRIBUTE_DEFINITIONS**: Attributs possibles
         - **ATTRIBUTE_DEFINITION**: Définition d'un attribut
@@ -61,7 +62,14 @@ Les DTOs sont générés automatiquement via JAXB 3.x (Jakarta) à partir des XS
 - **Package model**: `fr.expand.project.importdata.model.generated`
   - Classes générées: DATAMODEL, OBJECTTYPE, LINKTYPE, ATTRIBUTEDEFINITION, etc.
 
-### 3. Exemples
+### 3. Héritage entre types d'objets
+
+Un `OBJECT_TYPE` peut déclarer un parent via l'attribut `PARENT`. Le type enfant hérite de tous les attributs du parent et peut en ajouter de nouveaux.
+
+- La validation des attributs prend en compte l'ensemble des attributs hérités.
+- Pour les `LINK_TYPE`, si un `TYPE_REF` autorise un type parent, alors tous ses sous-types sont acceptés.
+
+### 4. Exemples
 
 #### Exemple de Modèle: Réseau Social
 
@@ -121,6 +129,11 @@ Créer un fichier XML basé sur `model.xsd`:
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true"/>
                 <ATTRIBUTE_DEFINITION NAME="AGE" TYPE="INTEGER" REQUIRED="false"/>
+            </ATTRIBUTE_DEFINITIONS>
+        </OBJECT_TYPE>
+        <OBJECT_TYPE NAME="EMPLOYE" PARENT="PERSONNE">
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="MATRICULE" TYPE="STRING" REQUIRED="true"/>
             </ATTRIBUTE_DEFINITIONS>
         </OBJECT_TYPE>
     </OBJECT_TYPES>
