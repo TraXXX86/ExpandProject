@@ -195,8 +195,82 @@
         </v-row>
 
         <v-row class="mt-8">
+          <v-col cols="12" md="5">
+            <v-card class="card-animate delay-2" elevation="4" rounded="xl">
+              <v-card-title class="section-title">Objets chargés</v-card-title>
+              <v-card-text>
+                <v-text-field
+                  v-model="objectFilter"
+                  label="Filtrer par type ou ID"
+                  prepend-icon="mdi-filter-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                />
+                <v-list v-if="filteredObjects.length" density="compact">
+                  <v-list-item
+                    v-for="object in filteredObjects"
+                    :key="object.key"
+                    :title="object.type"
+                    :subtitle="`ID: ${object.id ?? 'N/A'} • ${object.attributes.length} attributs`"
+                    :active="selectedObject && selectedObject.key === object.key"
+                    @click="selectObject(object)"
+                  >
+                    <template #prepend>
+                      <v-icon icon="mdi-cube-outline" />
+                    </template>
+                  </v-list-item>
+                </v-list>
+                <div v-else class="text-medium-emphasis">
+                  Aucun objet détecté dans le fichier de données.
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+
+          <v-col cols="12" md="7">
+            <v-card class="card-animate delay-3" elevation="4" rounded="xl">
+              <v-card-title class="section-title">Attributs de l'objet</v-card-title>
+              <v-card-text>
+                <div v-if="selectedObject">
+                  <div class="d-flex align-center" style="gap: 12px;">
+                    <v-chip color="primary" variant="tonal">
+                      {{ selectedObject.type }}
+                    </v-chip>
+                    <v-chip color="secondary" variant="tonal">
+                      ID: {{ selectedObject.id ?? 'N/A' }}
+                    </v-chip>
+                    <v-chip color="accent" variant="tonal">
+                      {{ selectedObject.attributes.length }} attributs
+                    </v-chip>
+                  </div>
+
+                  <v-table class="mt-4" density="compact">
+                    <thead>
+                      <tr>
+                        <th>Clé</th>
+                        <th>Valeur</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="attribute in selectedObject.attributes" :key="attribute.key">
+                        <td>{{ attribute.key }}</td>
+                        <td>{{ attribute.value }}</td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </div>
+                <div v-else class="text-medium-emphasis">
+                  Sélectionnez un objet pour afficher ses attributs.
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <v-row class="mt-8">
           <v-col cols="12">
-            <v-card class="card-animate delay-3" elevation="3" rounded="xl">
+            <v-card class="card-animate delay-1" elevation="3" rounded="xl">
               <v-card-title class="section-title">Checklist d'héritage</v-card-title>
               <v-card-text>
                 <v-row>
@@ -234,9 +308,25 @@ import { computed, ref } from 'vue';
 const validateOnly = ref(true);
 const modelSummary = ref(null);
 const dataSummary = ref(null);
+const dataObjects = ref([]);
+const selectedObject = ref(null);
+const objectFilter = ref('');
 const status = ref(null);
 
 const canValidate = computed(() => Boolean(modelSummary.value && dataSummary.value));
+const filteredObjects = computed(() => {
+  const filter = objectFilter.value.trim().toLowerCase();
+  if (!filter) {
+    return dataObjects.value;
+  }
+  return dataObjects.value.filter((object) => {
+    const id = object.id !== null && object.id !== undefined ? String(object.id) : '';
+    return (
+      object.type.toLowerCase().includes(filter) ||
+      id.toLowerCase().includes(filter)
+    );
+  });
+});
 
 async function handleModelFile(files) {
   const file = Array.isArray(files) ? files[0] : files;
@@ -264,6 +354,8 @@ async function handleDataFile(files) {
   status.value = null;
   if (!file) {
     dataSummary.value = null;
+    dataObjects.value = [];
+    selectedObject.value = null;
     return;
   }
 
@@ -271,8 +363,12 @@ async function handleDataFile(files) {
     const text = await readFile(file);
     const doc = parseXml(text);
     dataSummary.value = extractDataSummary(doc);
+    dataObjects.value = extractDataObjects(doc);
+    selectedObject.value = dataObjects.value[0] ?? null;
   } catch (error) {
     dataSummary.value = null;
+    dataObjects.value = [];
+    selectedObject.value = null;
     status.value = {
       type: 'error',
       message: `Erreur de lecture des données: ${error.message}`
@@ -294,6 +390,10 @@ function runLocalCheck() {
     type: 'success',
     message: `${mode} prête. Résumé local effectué, aucune erreur XML détectée.`
   };
+}
+
+function selectObject(object) {
+  selectedObject.value = object;
 }
 
 function readFile(file) {
@@ -340,5 +440,24 @@ function extractDataSummary(doc) {
     objectTypes: objectTypes.slice(0, 6),
     hasMore: objectTypes.length > 6
   };
+}
+
+function extractDataObjects(doc) {
+  const objectNodes = Array.from(doc.querySelectorAll('OBJECT'));
+  return objectNodes.map((node, index) => {
+    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE')).map((attr) => ({
+      key: attr.getAttribute('KEY') || '',
+      value: attr.getAttribute('VALUE') || ''
+    }));
+    const idValue = node.getAttribute('ID');
+    const id = idValue !== null && idValue !== '' ? idValue : null;
+    const type = node.getAttribute('TYPE') || 'Type';
+    return {
+      id,
+      type,
+      attributes,
+      key: `${type}-${id ?? 'na'}-${index}`
+    };
+  });
 }
 </script>
