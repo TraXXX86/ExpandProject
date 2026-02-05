@@ -147,8 +147,15 @@ public class ImportApiServer {
             response.type("application/json");
             try {
                 configureMultipart(request.raw());
-                String modelKey = request.raw().getParameter("modelKey");
-                boolean validateOnly = Boolean.parseBoolean(request.raw().getParameter("validateOnly"));
+                String modelKey = readMultipartField(request.raw(), "modelKey");
+                if (modelKey == null || modelKey.isBlank()) {
+                    modelKey = request.raw().getParameter("modelKey");
+                }
+                String validateOnlyValue = readMultipartField(request.raw(), "validateOnly");
+                if (validateOnlyValue == null || validateOnlyValue.isBlank()) {
+                    validateOnlyValue = request.raw().getParameter("validateOnly");
+                }
+                boolean validateOnly = Boolean.parseBoolean(validateOnlyValue);
                 if (modelKey == null || modelKey.isBlank()) {
                     return error(response, 400, "modelKey manquant");
                 }
@@ -231,6 +238,20 @@ public class ImportApiServer {
         }
         try (InputStream input = part.getInputStream()) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        } finally {
+            part.delete();
+        }
+    }
+
+    private static String readMultipartField(javax.servlet.http.HttpServletRequest request, String partName)
+        throws Exception {
+        configureMultipart(request);
+        Part part = request.getPart(partName);
+        if (part == null) {
+            return null;
+        }
+        try (InputStream input = part.getInputStream()) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
         } finally {
             part.delete();
         }
