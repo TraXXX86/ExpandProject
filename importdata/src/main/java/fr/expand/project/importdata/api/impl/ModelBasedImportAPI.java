@@ -15,6 +15,7 @@ import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.dto.generated.DATAS;
 import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.OBJECT;
+import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.validation.DataValidator;
 import fr.expand.project.importdata.validation.ValidationResult;
@@ -68,6 +69,7 @@ public class ModelBasedImportAPI {
         
         // Import data if validation passed
         LOGGER.info("Validation successful. Starting import...");
+        storeModelToNeo4j();
         importToNeo4j(data);
         
         return result;
@@ -157,6 +159,25 @@ public class ModelBasedImportAPI {
         } catch (Exception e) {
             LOGGER.error("Error during import", e);
             throw new RuntimeException("Import failed", e);
+        }
+    }
+
+    /**
+     * Store the current model in Neo4j as a separate subgraph.
+     */
+    private void storeModelToNeo4j() {
+        var model = modelManager.getCurrentModel();
+        if (model == null) {
+            LOGGER.warn("No model loaded, skipping model persistence");
+            return;
+        }
+
+        try (Neo4jModelStore store = new Neo4jModelStore()) {
+            store.storeModel(model);
+            LOGGER.info("Model stored in Neo4j: " + model.getNAME());
+        } catch (Exception e) {
+            LOGGER.error("Failed to store model in Neo4j", e);
+            throw new RuntimeException("Model persistence failed", e);
         }
     }
     

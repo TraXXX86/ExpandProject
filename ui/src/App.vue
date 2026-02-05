@@ -478,7 +478,12 @@
                           </marker>
                         </defs>
                         <g class="model-graph__edges">
-                          <g v-for="edge in graphEdges" :key="edge.key" class="model-graph__edge">
+                          <g
+                            v-for="edge in graphEdges"
+                            :key="edge.key"
+                            class="model-graph__edge"
+                            @click="selectModelLinkByName(edge.name)"
+                          >
                             <title>{{ edge.label }}</title>
                             <line
                               v-if="!edge.self"
@@ -869,6 +874,17 @@ function selectModelObjectByName(name) {
   if (match) {
     selectedModelObject.value = match;
     modelObjectFilter.value = name;
+  }
+}
+
+function selectModelLinkByName(name) {
+  if (!name) {
+    return;
+  }
+  const match = modelDetails.value.linkTypes.find((link) => link.name === name);
+  if (match) {
+    selectedModelLink.value = match;
+    modelLinkFilter.value = name;
   }
 }
 

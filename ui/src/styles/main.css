@@ -128,3 +128,7 @@ body {
   stroke-width: 2.5;
   opacity: 0.9;
 }
+
+.model-graph__edge {
+  cursor: pointer;
+}
