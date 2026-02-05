@@ -13,7 +13,7 @@ ExpandProject est un outil d'import de données dans Neo4j avec support de modè
 
 ## 📋 Prérequis
 
-- **Java 11+** (OpenJDK 11 ou supérieur)
+- **Java 17+** (OpenJDK 17 ou supérieur)
 - **Maven 3.8+** (pour la compilation)
 - **Neo4j** (pour l'import de données)
   - Version recommandée: 5.x
@@ -391,7 +391,7 @@ neo4j-admin set-initial-password expand
 
 ### Erreur de compilation : "package jakarta.xml.bind does not exist"
 
-**Solution** : Assurez-vous d'utiliser Java 11+ et que Maven a bien téléchargé les dépendances :
+**Solution** : Assurez-vous d'utiliser Java 17+ et que Maven a bien téléchargé les dépendances :
 ```bash
 mvn clean install -U
 ```

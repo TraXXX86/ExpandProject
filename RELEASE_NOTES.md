@@ -73,11 +73,11 @@ java -jar expandproject-importdata.jar <model.xml> <data.xml> [--validate-only]
 
 ### Mises à Jour Majeures
 
-- ✅ **Java 8 → Java 11** (LTS moderne)
+- ✅ **Java 8 → Java 17** (LTS moderne)
 - ✅ **Neo4j 3.0.4 → 5.17.0** (dernière version)
 - ✅ **Neo4j Driver 1.0.6 → 5.17.0** (API moderne)
 - ✅ **Log4j 2.7 → 2.23.0** (corrections de sécurité critiques)
-- ✅ **JAXB 2.x → JAXB 3.x** (Jakarta, compatible Java 11+)
+- ✅ **JAXB 2.x → JAXB 3.x** (Jakarta, compatible Java 17+)
 - ✅ **JUnit 4.12 → 4.13.2**
 - ✅ **Commons IO 2.5 → 2.15.1**
 - ✅ **Commons Lang3 3.0 → 3.14.0**
@@ -212,7 +212,7 @@ java -jar expandproject-importdata.jar model.xml data.xml --validate-only
 
 ### Prérequis de Production
 
-- Java Runtime Environment (JRE) 11+
+- Java Runtime Environment (JRE) 17+
 - Neo4j 5.x accessible
 - Réseau : accès au port 7687 (Bolt)
 

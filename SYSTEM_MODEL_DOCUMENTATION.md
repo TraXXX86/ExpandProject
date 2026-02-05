@@ -113,7 +113,7 @@ Contient des instances conformes au modèle:
 
 ### Dépendances
 
-- **jakarta.xml.bind-api** 3.0.1: API JAXB pour Java 11+
+- **jakarta.xml.bind-api** 3.0.1: API JAXB pour Java 17+
 - **jaxb-impl** 3.0.2: Implémentation JAXB
 
 ## Utilisation
@@ -205,7 +205,7 @@ L'API d'import pourra:
 - Schémas XSD créés (model.xsd, data.xsd mis à jour)
 - Génération automatique des DTOs via JAXB 3.x
 - Exemples de modèle et données
-- Migration vers Jakarta JAXB (Java 11+)
+- Migration vers Jakarta JAXB (Java 17+)
 - Compilation du code principal réussie
 
 ⚠️ **En cours/À faire**:

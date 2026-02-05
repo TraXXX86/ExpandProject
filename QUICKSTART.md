@@ -34,17 +34,17 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 
 ### 1️⃣ Installer les Prérequis
 
-**Java 11+**
+**Java 17+**
 ```bash
 # Vérifier la version
 java -version
 
 # Si besoin d'installer (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install openjdk-11-jdk
+sudo apt-get install openjdk-17-jdk
 
 # macOS
-brew install openjdk@11
+brew install openjdk@17
 ```
 
 **Maven**
