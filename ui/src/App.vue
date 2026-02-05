@@ -120,7 +120,7 @@
                       @update:model-value="handleDataFile"
                     />
                     <div class="file-hint">
-                      Les données seront importées pour le modèle sélectionné.
+                      Les données seront importées pour le modèle sélectionné (sauf si validation uniquement).
                     </div>
 
                     <v-switch
@@ -139,7 +139,7 @@
                         :disabled="!canUploadData"
                         @click="uploadData"
                       >
-                        Charger les données
+                        {{ validateOnly ? 'Valider les données' : 'Importer les données' }}
                       </v-btn>
                       <v-btn
                         variant="tonal"
@@ -835,7 +835,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
 const currentPage = ref('import');
-const validateOnly = ref(true);
+const validateOnly = ref(false);
 const modelSummary = ref(null);
 const modelDetails = ref({ objectTypes: [], linkTypes: [] });
 const selectedModelObject = ref(null);
