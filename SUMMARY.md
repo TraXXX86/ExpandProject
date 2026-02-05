@@ -11,7 +11,7 @@ L'application ExpandProject a été complètement mise à jour et étendue avec 
 ### 1. Mise à Jour Complète de l'Application ✅
 
 **Plateforme:**
-- Java 8 → Java 11 (LTS moderne)
+- Java 8 → Java 17 (LTS moderne)
 - Encodage UTF-8 configuré
 
 **Neo4j:**
@@ -35,7 +35,7 @@ L'application ExpandProject a été complètement mise à jour et étendue avec 
 - `data.xsd` : Définition des données à importer
 
 **Génération automatique:**
-- DTOs JAXB 3.x (Jakarta) pour Java 11+
+- DTOs JAXB 3.x (Jakarta) pour Java 17+
 - 2 executions Maven (datapack + model)
 - Classes générées dans packages séparés
 
@@ -193,7 +193,7 @@ L'application ExpandProject a été complètement mise à jour et étendue avec 
 **Branche:** `cursor/application-nouvelle-version-54f8`
 
 1. **Mise à jour de l'application vers des versions modernes**
-   - Dépendances, Java 11, Neo4j 5.x
+   - Dépendances, Java 17, Neo4j 5.x
    
 2. **Ajout du changelog de mise à jour**
    - Documentation des changements
@@ -272,7 +272,7 @@ docker run -d --name neo4j-expand \
 
 ### Après
 
-- ✅ Java 11 moderne
+- ✅ Java 17 moderne
 - ✅ Neo4j 5.17 dernière version
 - ✅ Log4j 2.23 sécurisé
 - ✅ Validation complète et automatique

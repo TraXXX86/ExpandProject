@@ -101,7 +101,7 @@ MATCH (n) RETURN n LIMIT 50
 
 ## ❓ Besoin d'Aide ?
 
-- **Problème de compilation ?** → Vérifiez que Java 11+ est installé : `java -version`
+- **Problème de compilation ?** → Vérifiez que Java 17+ est installé : `java -version`
 - **Neo4j ne démarre pas ?** → Vérifiez Docker : `docker ps` ou le service : `neo4j status`
 - **Erreurs de validation ?** → Consultez les logs dans `logs/expandproject.log`
 

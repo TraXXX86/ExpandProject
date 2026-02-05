@@ -4,11 +4,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.commons.ObjectTypeEnum;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public abstract class IConnectorDb {
 
 	protected static final Logger LOGGER = LogManager.getLogger(IConnectorDb.class.toString());
+	protected String modelKey;
 
 	/**
 	 * Constructor
@@ -54,7 +55,7 @@ public abstract class IConnectorDb {
 	 *            : true if link is oriented objectA to objectB
 	 * @return
 	 */
-	public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented);
+    public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType);
 
 	/**
 	 * Get object from DB
@@ -71,4 +72,15 @@ public abstract class IConnectorDb {
 	 * @return
 	 */
 	public abstract void deleteAll();
+
+	/**
+	 * Optional model key used to tag data imported to Neo4j.
+	 */
+	public void setModelKey(String modelKey) {
+		this.modelKey = modelKey;
+	}
+
+	public String getModelKey() {
+		return modelKey;
+	}
 }

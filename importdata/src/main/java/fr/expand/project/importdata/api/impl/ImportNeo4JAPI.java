@@ -3,7 +3,7 @@ package fr.expand.project.importdata.api.impl;
 import java.nio.file.Path;
 
 import fr.expand.project.importdata.api.IImportAPI;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackObject;
 
 public class ImportNeo4JAPI implements IImportAPI {
 

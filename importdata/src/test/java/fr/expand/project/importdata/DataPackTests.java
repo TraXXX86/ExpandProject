@@ -14,8 +14,8 @@ import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.LINKS;
 import fr.expand.project.importdata.dto.generated.OBJECT;
 import fr.expand.project.importdata.dto.generated.OBJECTS;
-import fr.expand.project.importdata.dto.generated.DataPackAttribute;
-import fr.expand.project.importdata.dto.generated.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackAttribute;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.dto.util.DataPackDtoUtils;
 
 public class DataPackTests {

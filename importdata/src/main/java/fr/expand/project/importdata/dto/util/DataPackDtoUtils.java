@@ -1,7 +1,7 @@
 package fr.expand.project.importdata.dto.util;
 
-import fr.expand.project.importdata.dto.generated.DataPackObject;
-import fr.expand.project.importdata.dto.generated.DataPackObjectLink;
+import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackObjectLink;
 
 public class DataPackDtoUtils {
 	

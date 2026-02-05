@@ -13,7 +13,7 @@ ExpandProject est un outil d'import de données dans Neo4j avec support de modè
 
 ## 📋 Prérequis
 
-- **Java 11+** (OpenJDK 11 ou supérieur)
+- **Java 17+** (OpenJDK 17 ou supérieur)
 - **Maven 3.8+** (pour la compilation)
 - **Neo4j** (pour l'import de données)
   - Version recommandée: 5.x
@@ -38,6 +38,54 @@ Cette commande va :
 - Compiler tous les modules (commons, importdata, model)
 - Générer les DTOs à partir des schémas XSD
 - Créer les JARs dans les dossiers `target/`
+
+## 🖥️ IHM Vue + Vuetify
+
+Une interface locale Vue 3 + Vuetify est disponible dans le dossier `ui/`.
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+L'interface consomme l'API d'import pour charger les modèles et données dans Neo4j, puis afficher uniquement ce qui est stocké en base.
+
+Pour démarrer l'API :
+
+```bash
+mvn -pl importdata -am package
+java -jar importdata/target/expandproject-importdata.jar --api 8080
+```
+
+Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
+
+## 🐳 Docker Compose
+
+Pour lancer Neo4j + API + IHM sans installer Java localement :
+
+```bash
+docker compose up --build
+```
+
+Accès :
+- IHM : http://localhost:5173
+- API : http://localhost:8080
+- Neo4j : http://localhost:7474 (bolt 7687)
+
+Le mot de passe par défaut est `neo4j/expand123456`. Vous pouvez modifier cette valeur dans `docker-compose.yml`.
+
+### Vérifier rapidement l'import du modèle
+
+```bash
+./scripts/smoke-api.sh
+```
+
+Vous pouvez surcharger l'URL de l'API et le fichier modèle :
+
+```bash
+API_BASE=http://localhost:8080 MODEL_FILE=chemin/vers/model.xml ./scripts/smoke-api.sh
+```
 
 ### 3. Configurer Neo4j
 
@@ -87,6 +135,12 @@ Par défaut, l'application utilise :
 
 Pour modifier ces paramètres, éditez :
 - `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` (ligne 35)
+
+Vous pouvez aussi surcharger via variables d'environnement ou propriétés JVM :
+- `NEO4J_BOLT_URI` (ex: `bolt://localhost:7687`)
+- `NEO4J_HTTP_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
+- `NEO4J_USER` / `NEO4J_PASSWORD`
+- `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`)
 
 ## 📖 Utilisation
 
@@ -349,7 +403,7 @@ neo4j-admin set-initial-password expand
 
 ### Erreur de compilation : "package jakarta.xml.bind does not exist"
 
-**Solution** : Assurez-vous d'utiliser Java 11+ et que Maven a bien téléchargé les dépendances :
+**Solution** : Assurez-vous d'utiliser Java 17+ et que Maven a bien téléchargé les dépendances :
 ```bash
 mvn clean install -U
 ```

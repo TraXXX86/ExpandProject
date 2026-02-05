@@ -1,5 +1,11 @@
 /.settings/
 /target/
+
+# Generated sources (JAXB from XSD)
+**/dto/generated/
+**/model/generated/
+**/META-INF/JAXB/
+
 *.class
 *.jar
 *.war
@@ -17,3 +23,8 @@
 .project
 .vscode/
 logs/
+
+# UI (Vue/Vite)
+ui/node_modules/
+ui/dist/
+ui/.vite/

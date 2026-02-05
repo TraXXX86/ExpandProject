@@ -11,7 +11,7 @@ Si vous avez Docker installé, utilisez cette méthode :
 docker run -d \
   --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/expand123456 \
   neo4j:5.17.0
 
 # 2. Compiler le projet
@@ -34,17 +34,17 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 
 ### 1️⃣ Installer les Prérequis
 
-**Java 11+**
+**Java 17+**
 ```bash
 # Vérifier la version
 java -version
 
 # Si besoin d'installer (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install openjdk-11-jdk
+sudo apt-get install openjdk-17-jdk
 
 # macOS
-brew install openjdk@11
+brew install openjdk@17
 ```
 
 **Maven**

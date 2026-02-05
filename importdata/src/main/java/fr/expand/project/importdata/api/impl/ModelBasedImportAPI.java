@@ -11,9 +11,11 @@ import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.dto.generated.DATAS;
 import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.OBJECT;
+import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.validation.DataValidator;
 import fr.expand.project.importdata.validation.ValidationResult;
@@ -47,28 +49,47 @@ public class ModelBasedImportAPI {
         
         // Parse data XML
         DATAS data = loadDataFromFile(dataFile);
-        
+
+        ValidationResult result = importData(data, validateOnly);
+        return result;
+    }
+
+    /**
+     * Validate and import a data pack already loaded in memory.
+     */
+    public ValidationResult importData(DATAS data, boolean validateOnly) {
+        return importData(data, validateOnly, null);
+    }
+
+    /**
+     * Validate and import a data pack with an optional model key.
+     */
+    public ValidationResult importData(DATAS data, boolean validateOnly, String modelKey) {
         // Validate against current model
         LOGGER.info("Validating data against model...");
         ValidationResult result = validator.validate(data);
-        
+
         // Log validation results
         LOGGER.info(result.getReport());
-        
+
         if (!result.isValid()) {
             LOGGER.error("Validation failed. Import aborted.");
             return result;
         }
-        
+
         if (validateOnly) {
             LOGGER.info("Validation-only mode. Skipping import.");
             return result;
         }
-        
+
         // Import data if validation passed
         LOGGER.info("Validation successful. Starting import...");
+        if (modelKey == null || modelKey.isBlank()) {
+            modelKey = storeModelToNeo4j();
+        }
+        connector.setModelKey(modelKey);
         importToNeo4j(data);
-        
+
         return result;
     }
     
@@ -109,8 +130,7 @@ public class ModelBasedImportAPI {
                 LOGGER.info("Importing objects...");
                 for (OBJECT obj : data.getOBJECTS().getOBJECT()) {
                     // Create wrapper for compatibility
-                    fr.expand.project.importdata.dto.generated.DataPackObject dpObj = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject dpObj = new DataPackObject();
                     dpObj.setID(obj.getID());
                     dpObj.setTYPE(obj.getTYPE());
                     dpObj.getATTRIBUTE().addAll(obj.getATTRIBUTE());
@@ -126,13 +146,11 @@ public class ModelBasedImportAPI {
                 LOGGER.info("Importing links...");
                 for (LINK link : data.getLINKS().getLINK()) {
                     // Create wrapper objects
-                    fr.expand.project.importdata.dto.generated.DataPackObject objA = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject objA = new DataPackObject();
                     objA.setID(link.getOBJLINKA().getID());
                     objA.setTYPE(link.getOBJLINKA().getTYPE());
                     
-                    fr.expand.project.importdata.dto.generated.DataPackObject objB = 
-                        new fr.expand.project.importdata.dto.generated.DataPackObject();
+                    DataPackObject objB = new DataPackObject();
                     objB.setID(link.getOBJLINKB().getID());
                     objB.setTYPE(link.getOBJLINKB().getTYPE());
                     
@@ -148,7 +166,7 @@ public class ModelBasedImportAPI {
                         }
                     }
                     
-                    connector.writeLink(objA, objB, isDirected);
+                    connector.writeLink(objA, objB, isDirected, link.getTYPE());
                     linkCount++;
                 }
                 LOGGER.info("Imported " + linkCount + " links");
@@ -159,6 +177,26 @@ public class ModelBasedImportAPI {
         } catch (Exception e) {
             LOGGER.error("Error during import", e);
             throw new RuntimeException("Import failed", e);
+        }
+    }
+
+    /**
+     * Store the current model in Neo4j as a separate subgraph.
+     */
+    private String storeModelToNeo4j() {
+        var model = modelManager.getCurrentModel();
+        if (model == null) {
+            LOGGER.warn("No model loaded, skipping model persistence");
+            return null;
+        }
+
+        try (Neo4jModelStore store = new Neo4jModelStore()) {
+            String modelKey = store.storeModel(model, modelManager.getCurrentModelXml());
+            LOGGER.info("Model stored in Neo4j: " + model.getNAME());
+            return modelKey;
+        } catch (Exception e) {
+            LOGGER.error("Failed to store model in Neo4j", e);
+            throw new RuntimeException("Model persistence failed", e);
         }
     }
     
