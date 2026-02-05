@@ -26,6 +26,7 @@
           <v-col cols="12">
             <v-tabs v-model="currentPage" color="primary" align-tabs="start">
               <v-tab value="import">Import</v-tab>
+              <v-tab value="model">Modèle</v-tab>
               <v-tab value="navigate">Navigation</v-tab>
             </v-tabs>
           </v-col>
@@ -236,6 +237,223 @@
             </v-row>
           </v-window-item>
 
+          <v-window-item value="model">
+            <v-row class="mb-6">
+              <v-col cols="12">
+                <div class="kicker">Modèle</div>
+                <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
+                  Visualisez les types, attributs et liens du modèle.
+                </h2>
+                <p class="subhead">
+                  Cette page synthétise la définition du modèle chargé pour vous permettre de comprendre
+                  rapidement sa structure.
+                </p>
+              </v-col>
+            </v-row>
+
+            <v-row>
+              <v-col cols="12" md="4">
+                <v-card class="card-animate delay-1" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Types d'objets</v-card-title>
+                  <v-card-text>
+                    <v-text-field
+                      v-model="modelObjectFilter"
+                      label="Filtrer un type d'objet"
+                      prepend-icon="mdi-filter-outline"
+                      variant="outlined"
+                      density="comfortable"
+                      clearable
+                    />
+                    <v-list v-if="filteredModelObjects.length" density="compact">
+                      <v-list-item
+                        v-for="type in filteredModelObjects"
+                        :key="type.key"
+                        :title="type.name"
+                        :subtitle="type.parent ? `Parent: ${type.parent}` : 'Sans parent'"
+                        :active="selectedModelObject && selectedModelObject.key === type.key"
+                        @click="selectedModelObject = type"
+                      >
+                        <template #prepend>
+                          <v-icon icon="mdi-shape-outline" />
+                        </template>
+                      </v-list-item>
+                    </v-list>
+                    <div v-else class="text-medium-emphasis">
+                      Aucun type d'objet détecté.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+
+              <v-col cols="12" md="8">
+                <v-card class="card-animate delay-2" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Détails du type</v-card-title>
+                  <v-card-text>
+                    <div v-if="selectedModelObject">
+                      <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
+                        <v-chip color="primary" variant="tonal">
+                          {{ selectedModelObject.name }}
+                        </v-chip>
+                        <v-chip v-if="selectedModelObject.parent" color="secondary" variant="tonal">
+                          Parent: {{ selectedModelObject.parent }}
+                        </v-chip>
+                        <v-chip color="accent" variant="tonal">
+                          {{ selectedModelObject.attributes.length }} attributs
+                        </v-chip>
+                      </div>
+                      <div v-if="selectedModelObject.description" class="mt-3 text-medium-emphasis">
+                        {{ selectedModelObject.description }}
+                      </div>
+
+                      <v-divider class="my-4" />
+
+                      <div class="text-subtitle-2 font-weight-bold">Attributs</div>
+                      <v-table v-if="selectedModelObject.attributes.length" class="mt-2" density="compact">
+                        <thead>
+                          <tr>
+                            <th>Nom</th>
+                            <th>Type</th>
+                            <th>Obligatoire</th>
+                            <th>Valeur par défaut</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="attribute in selectedModelObject.attributes" :key="attribute.name">
+                            <td>{{ attribute.name }}</td>
+                            <td>{{ attribute.type }}</td>
+                            <td>{{ attribute.required ? 'Oui' : 'Non' }}</td>
+                            <td>{{ attribute.defaultValue || '-' }}</td>
+                          </tr>
+                        </tbody>
+                      </v-table>
+                      <div v-else class="text-medium-emphasis mt-2">
+                        Aucun attribut défini pour ce type.
+                      </div>
+                    </div>
+                    <div v-else class="text-medium-emphasis">
+                      Chargez un modèle puis sélectionnez un type d'objet.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+
+            <v-row class="mt-8">
+              <v-col cols="12" md="4">
+                <v-card class="card-animate delay-1" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Types de liens</v-card-title>
+                  <v-card-text>
+                    <v-text-field
+                      v-model="modelLinkFilter"
+                      label="Filtrer un type de lien"
+                      prepend-icon="mdi-filter-outline"
+                      variant="outlined"
+                      density="comfortable"
+                      clearable
+                    />
+                    <v-list v-if="filteredModelLinks.length" density="compact">
+                      <v-list-item
+                        v-for="link in filteredModelLinks"
+                        :key="link.key"
+                        :title="link.name"
+                        :subtitle="link.directed ? 'Orienté' : 'Non orienté'"
+                        :active="selectedModelLink && selectedModelLink.key === link.key"
+                        @click="selectedModelLink = link"
+                      >
+                        <template #prepend>
+                          <v-icon icon="mdi-link-variant" />
+                        </template>
+                      </v-list-item>
+                    </v-list>
+                    <div v-else class="text-medium-emphasis">
+                      Aucun type de lien détecté.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+
+              <v-col cols="12" md="8">
+                <v-card class="card-animate delay-2" elevation="4" rounded="xl">
+                  <v-card-title class="section-title">Détails du lien</v-card-title>
+                  <v-card-text>
+                    <div v-if="selectedModelLink">
+                      <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
+                        <v-chip color="primary" variant="tonal">
+                          {{ selectedModelLink.name }}
+                        </v-chip>
+                        <v-chip color="secondary" variant="tonal">
+                          {{ selectedModelLink.directed ? 'Orienté' : 'Non orienté' }}
+                        </v-chip>
+                        <v-chip color="accent" variant="tonal">
+                          {{ selectedModelLink.attributes.length }} attributs
+                        </v-chip>
+                      </div>
+                      <div v-if="selectedModelLink.description" class="mt-3 text-medium-emphasis">
+                        {{ selectedModelLink.description }}
+                      </div>
+
+                      <v-divider class="my-4" />
+
+                      <div class="text-subtitle-2 font-weight-bold">Sources autorisées</div>
+                      <v-chip-group column class="mt-2">
+                        <v-chip
+                          v-for="source in selectedModelLink.sources"
+                          :key="source"
+                          color="primary"
+                          variant="tonal"
+                          class="ma-1"
+                        >
+                          {{ source }}
+                        </v-chip>
+                      </v-chip-group>
+
+                      <div class="text-subtitle-2 font-weight-bold mt-4">Cibles autorisées</div>
+                      <v-chip-group column class="mt-2">
+                        <v-chip
+                          v-for="target in selectedModelLink.targets"
+                          :key="target"
+                          color="secondary"
+                          variant="tonal"
+                          class="ma-1"
+                        >
+                          {{ target }}
+                        </v-chip>
+                      </v-chip-group>
+
+                      <v-divider class="my-4" />
+
+                      <div class="text-subtitle-2 font-weight-bold">Attributs du lien</div>
+                      <v-table v-if="selectedModelLink.attributes.length" class="mt-2" density="compact">
+                        <thead>
+                          <tr>
+                            <th>Nom</th>
+                            <th>Type</th>
+                            <th>Obligatoire</th>
+                            <th>Valeur par défaut</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="attribute in selectedModelLink.attributes" :key="attribute.name">
+                            <td>{{ attribute.name }}</td>
+                            <td>{{ attribute.type }}</td>
+                            <td>{{ attribute.required ? 'Oui' : 'Non' }}</td>
+                            <td>{{ attribute.defaultValue || '-' }}</td>
+                          </tr>
+                        </tbody>
+                      </v-table>
+                      <div v-else class="text-medium-emphasis mt-2">
+                        Aucun attribut défini pour ce lien.
+                      </div>
+                    </div>
+                    <div v-else class="text-medium-emphasis">
+                      Chargez un modèle puis sélectionnez un type de lien.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-window-item>
+
           <v-window-item value="navigate">
             <v-row class="mb-6">
               <v-col cols="12">
@@ -366,6 +584,11 @@ import { computed, ref } from 'vue';
 const currentPage = ref('import');
 const validateOnly = ref(true);
 const modelSummary = ref(null);
+const modelDetails = ref({ objectTypes: [], linkTypes: [] });
+const selectedModelObject = ref(null);
+const selectedModelLink = ref(null);
+const modelObjectFilter = ref('');
+const modelLinkFilter = ref('');
 const dataSummary = ref(null);
 const dataObjects = ref([]);
 const dataLinks = ref([]);
@@ -375,6 +598,26 @@ const objectFilter = ref('');
 const status = ref(null);
 
 const canValidate = computed(() => Boolean(modelSummary.value && dataSummary.value));
+
+const filteredModelObjects = computed(() => {
+  const filter = modelObjectFilter.value.trim().toLowerCase();
+  if (!filter) {
+    return modelDetails.value.objectTypes;
+  }
+  return modelDetails.value.objectTypes.filter((type) =>
+    type.name.toLowerCase().includes(filter)
+  );
+});
+
+const filteredModelLinks = computed(() => {
+  const filter = modelLinkFilter.value.trim().toLowerCase();
+  if (!filter) {
+    return modelDetails.value.linkTypes;
+  }
+  return modelDetails.value.linkTypes.filter((link) =>
+    link.name.toLowerCase().includes(filter)
+  );
+});
 
 const filteredObjects = computed(() => {
   const filter = objectFilter.value.trim().toLowerCase();
@@ -438,6 +681,9 @@ async function handleModelFile(files) {
   status.value = null;
   if (!file) {
     modelSummary.value = null;
+    modelDetails.value = { objectTypes: [], linkTypes: [] };
+    selectedModelObject.value = null;
+    selectedModelLink.value = null;
     linkTypeInfo.value = {};
     return;
   }
@@ -446,9 +692,15 @@ async function handleModelFile(files) {
     const text = await readFile(file);
     const doc = parseXml(text);
     modelSummary.value = extractModelSummary(doc);
+    modelDetails.value = extractModelDetails(doc);
+    selectedModelObject.value = modelDetails.value.objectTypes[0] ?? null;
+    selectedModelLink.value = modelDetails.value.linkTypes[0] ?? null;
     linkTypeInfo.value = extractLinkTypeDirections(doc);
   } catch (error) {
     modelSummary.value = null;
+    modelDetails.value = { objectTypes: [], linkTypes: [] };
+    selectedModelObject.value = null;
+    selectedModelLink.value = null;
     linkTypeInfo.value = {};
     status.value = {
       type: 'error',
@@ -594,6 +846,62 @@ function extractLinkTypeDirections(doc) {
     }
   });
   return map;
+}
+
+function extractModelDetails(doc) {
+  const objectTypes = Array.from(doc.querySelectorAll('OBJECT_TYPE')).map((node, index) => {
+    const name = node.getAttribute('NAME') || `Type-${index + 1}`;
+    const parent = node.getAttribute('PARENT') || '';
+    const description = node.querySelector('DESCRIPTION')?.textContent?.trim() || '';
+    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE_DEFINITION')).map((attr) => ({
+      name: attr.getAttribute('NAME') || '',
+      type: attr.getAttribute('TYPE') || 'STRING',
+      required: (attr.getAttribute('REQUIRED') || 'false').toLowerCase() === 'true',
+      defaultValue: attr.getAttribute('DEFAULT_VALUE') || '',
+      description: attr.querySelector('DESCRIPTION')?.textContent?.trim() || ''
+    }));
+    return {
+      key: `${name}-${index}`,
+      name,
+      parent,
+      description,
+      attributes
+    };
+  });
+
+  const linkTypes = Array.from(doc.querySelectorAll('LINK_TYPE')).map((node, index) => {
+    const name = node.getAttribute('NAME') || `Lien-${index + 1}`;
+    const directedAttr = node.getAttribute('DIRECTED');
+    const directed = directedAttr ? directedAttr.toLowerCase() !== 'false' : true;
+    const description = node.querySelector('DESCRIPTION')?.textContent?.trim() || '';
+    const sources = Array.from(node.querySelectorAll('SOURCE_TYPES TYPE_REF')).map(
+      (refNode) => refNode.getAttribute('NAME') || ''
+    );
+    const targets = Array.from(node.querySelectorAll('TARGET_TYPES TYPE_REF')).map(
+      (refNode) => refNode.getAttribute('NAME') || ''
+    );
+    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE_DEFINITION')).map((attr) => ({
+      name: attr.getAttribute('NAME') || '',
+      type: attr.getAttribute('TYPE') || 'STRING',
+      required: (attr.getAttribute('REQUIRED') || 'false').toLowerCase() === 'true',
+      defaultValue: attr.getAttribute('DEFAULT_VALUE') || '',
+      description: attr.querySelector('DESCRIPTION')?.textContent?.trim() || ''
+    }));
+    return {
+      key: `${name}-${index}`,
+      name,
+      directed,
+      description,
+      sources,
+      targets,
+      attributes
+    };
+  });
+
+  return {
+    objectTypes,
+    linkTypes
+  };
 }
 
 function extractDataSummary(doc) {
