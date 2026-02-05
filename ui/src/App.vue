@@ -452,6 +452,86 @@
                 </v-card>
               </v-col>
             </v-row>
+
+            <v-row class="mt-8">
+              <v-col cols="12">
+                <v-card class="card-animate delay-3" elevation="3" rounded="xl">
+                  <v-card-title class="section-title">Graph des liens</v-card-title>
+                  <v-card-text>
+                    <div v-if="graphNodes.length" class="model-graph">
+                      <svg
+                        class="model-graph__svg"
+                        viewBox="0 0 640 400"
+                        role="img"
+                        aria-label="Graphique des liens entre types d'objets"
+                      >
+                        <defs>
+                          <marker
+                            id="arrow"
+                            markerWidth="10"
+                            markerHeight="10"
+                            refX="10"
+                            refY="5"
+                            orient="auto"
+                          >
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#1C4E80" />
+                          </marker>
+                        </defs>
+                        <g class="model-graph__edges">
+                          <line
+                            v-for="edge in graphEdges"
+                            :key="edge.key"
+                            :x1="edge.from.x"
+                            :y1="edge.from.y"
+                            :x2="edge.to.x"
+                            :y2="edge.to.y"
+                            :marker-end="edge.directed ? 'url(#arrow)' : undefined"
+                            stroke="#1C4E80"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            opacity="0.7"
+                          />
+                        </g>
+                        <g class="model-graph__nodes">
+                          <g
+                            v-for="node in graphNodes"
+                            :key="node.key"
+                            class="model-graph__node"
+                            @click="selectModelObjectByName(node.name)"
+                          >
+                            <circle
+                              :cx="node.x"
+                              :cy="node.y"
+                              r="22"
+                              fill="#F18F01"
+                              stroke="#1C4E80"
+                              stroke-width="2"
+                            />
+                            <text
+                              :x="node.x"
+                              :y="node.y"
+                              text-anchor="middle"
+                              dominant-baseline="middle"
+                              fill="#12243A"
+                              font-size="10"
+                              font-weight="600"
+                            >
+                              {{ node.label }}
+                            </text>
+                          </g>
+                        </g>
+                      </svg>
+                      <div class="text-caption text-medium-emphasis mt-2">
+                        Les flèches indiquent les liens orientés. Cliquez sur un type d'objet pour filtrer dans la liste.
+                      </div>
+                    </div>
+                    <div v-else class="text-medium-emphasis">
+                      Chargez un modèle pour afficher son graphe de liens.
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
           </v-window-item>
 
           <v-window-item value="navigate">
@@ -633,6 +713,9 @@ const filteredObjects = computed(() => {
   });
 });
 
+const graphNodes = computed(() => buildGraphNodes());
+const graphEdges = computed(() => buildGraphEdges());
+
 const objectIndex = computed(() => {
   const map = new Map();
   dataObjects.value.forEach((object) => {
@@ -766,6 +849,17 @@ function selectObjectByKey(key) {
   }
 }
 
+function selectModelObjectByName(name) {
+  if (!name) {
+    return;
+  }
+  const match = modelDetails.value.objectTypes.find((type) => type.name === name);
+  if (match) {
+    selectedModelObject.value = match;
+    modelObjectFilter.value = name;
+  }
+}
+
 function buildRelation(link, direction, targetKey, index) {
   return {
     key: `${link.type}-${index}-${direction}`,
@@ -795,6 +889,59 @@ function directionToIcon(direction) {
     return 'mdi-arrow-left';
   }
   return 'mdi-arrow-left-right';
+}
+
+function buildGraphNodes() {
+  const nodes = modelDetails.value.objectTypes;
+  if (!nodes.length) {
+    return [];
+  }
+  const centerX = 320;
+  const centerY = 200;
+  const radius = Math.max(120, Math.min(160, nodes.length * 12));
+  const step = (Math.PI * 2) / nodes.length;
+
+  return nodes.map((node, index) => {
+    const angle = index * step - Math.PI / 2;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+    const label = node.name.length > 6 ? `${node.name.slice(0, 6)}...` : node.name;
+    return {
+      key: `node-${node.name}-${index}`,
+      name: node.name,
+      label,
+      x,
+      y
+    };
+  });
+}
+
+function buildGraphEdges() {
+  if (!graphNodes.value.length) {
+    return [];
+  }
+  const nodeMap = new Map(graphNodes.value.map((node) => [node.name, node]));
+  const edges = [];
+
+  modelDetails.value.linkTypes.forEach((link, linkIndex) => {
+    link.sources.forEach((source) => {
+      link.targets.forEach((target) => {
+        const from = nodeMap.get(source);
+        const to = nodeMap.get(target);
+        if (!from || !to) {
+          return;
+        }
+        edges.push({
+          key: `${link.name}-${source}-${target}-${linkIndex}`,
+          from,
+          to,
+          directed: link.directed
+        });
+      });
+    });
+  });
+
+  return edges;
 }
 
 function readFile(file) {

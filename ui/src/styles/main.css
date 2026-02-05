@@ -99,3 +99,26 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+.model-graph {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(18, 36, 58, 0.1);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.model-graph__svg {
+  width: 100%;
+  height: 360px;
+}
+
+.model-graph__node {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.model-graph__node:hover {
+  transform: scale(1.03);
+}
