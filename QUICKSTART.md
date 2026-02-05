@@ -11,7 +11,7 @@ Si vous avez Docker installé, utilisez cette méthode :
 docker run -d \
   --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/expand123456 \
   neo4j:5.17.0
 
 # 2. Compiler le projet
