@@ -50,7 +50,7 @@ public class Neo4jDataStore implements AutoCloseable {
                     List<Object> labels = record.get("labels").asList();
                     String type = resolveType(labels);
 
-                    Map<String, Object> props = record.get("props").asMap();
+                    Map<String, Object> props = new HashMap<>(record.get("props").asMap());
                     props.remove("modelKey");
 
                     List<Map<String, Object>> attributes = new ArrayList<>();
