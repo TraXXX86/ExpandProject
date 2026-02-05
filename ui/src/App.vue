@@ -846,6 +846,7 @@ const dataSummary = ref(null);
 const dataObjects = ref([]);
 const dataLinks = ref([]);
 const linkTypeInfo = ref({});
+const hasModel = ref(false);
 const selectedObject = ref(null);
 const objectFilter = ref('');
 const status = ref(null);
@@ -969,8 +970,7 @@ const linkedObjects = computed(() => {
   const currentKey = selectedObject.value.idKey;
 
   dataLinks.value.forEach((link, index) => {
-    const directedValue = linkTypeInfo.value[link.type];
-    const directed = directedValue === undefined ? true : directedValue;
+    const directed = isDirectedLink(link.type);
     const outDirection = directed ? 'out' : 'both';
     const inDirection = directed ? 'in' : 'both';
 
@@ -1090,10 +1090,12 @@ async function refreshModelDetails(modelKey) {
     selectedModelObject.value = objectTypes[0] ?? null;
     selectedModelLink.value = linkTypes[0] ?? null;
     linkTypeInfo.value = buildLinkTypeInfo(linkTypes);
+    hasModel.value = objectTypes.length > 0 || linkTypes.length > 0;
     modelObjectFilter.value = '';
     modelLinkFilter.value = '';
   } catch (error) {
     resetModelState();
+    hasModel.value = false;
     status.value = { type: 'error', message: error.message };
   } finally {
     isLoadingModel.value = false;
@@ -1254,6 +1256,7 @@ function resetModelState() {
   selectedModelObject.value = null;
   selectedModelLink.value = null;
   linkTypeInfo.value = {};
+  hasModel.value = false;
 }
 
 function resetDataState() {
@@ -1429,10 +1432,24 @@ function buildLinkTypeInfo(linkTypes) {
   const map = {};
   linkTypes.forEach((link) => {
     if (link.name) {
-      map[link.name] = link.directed !== false;
+      map[link.name] = Boolean(link.directed);
     }
   });
   return map;
+}
+
+function isDirectedLink(linkType) {
+  if (!linkType) {
+    return false;
+  }
+  const known = linkTypeInfo.value[linkType];
+  if (known !== undefined) {
+    return known;
+  }
+  if (!hasModel.value) {
+    return false;
+  }
+  return true;
 }
 
 function buildDataSummary(payload, objects, links) {
