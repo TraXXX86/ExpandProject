@@ -49,30 +49,47 @@ public class ModelBasedImportAPI {
         
         // Parse data XML
         DATAS data = loadDataFromFile(dataFile);
-        
+
+        ValidationResult result = importData(data, validateOnly);
+        return result;
+    }
+
+    /**
+     * Validate and import a data pack already loaded in memory.
+     */
+    public ValidationResult importData(DATAS data, boolean validateOnly) {
+        return importData(data, validateOnly, null);
+    }
+
+    /**
+     * Validate and import a data pack with an optional model key.
+     */
+    public ValidationResult importData(DATAS data, boolean validateOnly, String modelKey) {
         // Validate against current model
         LOGGER.info("Validating data against model...");
         ValidationResult result = validator.validate(data);
-        
+
         // Log validation results
         LOGGER.info(result.getReport());
-        
+
         if (!result.isValid()) {
             LOGGER.error("Validation failed. Import aborted.");
             return result;
         }
-        
+
         if (validateOnly) {
             LOGGER.info("Validation-only mode. Skipping import.");
             return result;
         }
-        
+
         // Import data if validation passed
         LOGGER.info("Validation successful. Starting import...");
-        String modelKey = storeModelToNeo4j();
+        if (modelKey == null || modelKey.isBlank()) {
+            modelKey = storeModelToNeo4j();
+        }
         connector.setModelKey(modelKey);
         importToNeo4j(data);
-        
+
         return result;
     }
     
@@ -149,7 +166,7 @@ public class ModelBasedImportAPI {
                         }
                     }
                     
-                    connector.writeLink(objA, objB, isDirected);
+                    connector.writeLink(objA, objB, isDirected, link.getTYPE());
                     linkCount++;
                 }
                 LOGGER.info("Imported " + linkCount + " links");
@@ -174,7 +191,7 @@ public class ModelBasedImportAPI {
         }
 
         try (Neo4jModelStore store = new Neo4jModelStore()) {
-            String modelKey = store.storeModel(model);
+            String modelKey = store.storeModel(model, modelManager.getCurrentModelXml());
             LOGGER.info("Model stored in Neo4j: " + model.getNAME());
             return modelKey;
         } catch (Exception e) {

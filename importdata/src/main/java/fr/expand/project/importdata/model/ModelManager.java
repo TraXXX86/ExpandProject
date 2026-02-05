@@ -1,6 +1,10 @@
 package fr.expand.project.importdata.model;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +36,7 @@ public class ModelManager {
     private static ModelManager instance;
     private Map<String, DATAMODEL> loadedModels;
     private DATAMODEL currentModel;
+    private String currentModelXml;
     private Map<String, OBJECTTYPE> objectTypeIndex;
     private Map<String, LINKTYPE> linkTypeIndex;
     
@@ -59,7 +64,14 @@ public class ModelManager {
      */
     public DATAMODEL loadModel(File modelFile) throws JAXBException {
         LOGGER.info("Loading model from file: " + modelFile.getAbsolutePath());
-        
+
+        try {
+            currentModelXml = Files.readString(modelFile.toPath(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            LOGGER.warn("Unable to read model XML content", e);
+            currentModelXml = null;
+        }
+
         JAXBContext jaxbContext = JAXBContext.newInstance(DATAMODEL.class);
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
         DATAMODEL model = (DATAMODEL) unmarshaller.unmarshal(modelFile);
@@ -85,7 +97,18 @@ public class ModelManager {
      */
     public DATAMODEL loadModelFromResource(String resourcePath) throws JAXBException {
         LOGGER.info("Loading model from resource: " + resourcePath);
-        
+
+        InputStream stream = getClass().getClassLoader().getResourceAsStream(resourcePath);
+        if (stream == null) {
+            throw new JAXBException("Resource not found: " + resourcePath);
+        }
+        try {
+            currentModelXml = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            LOGGER.warn("Unable to read model XML content from resource", e);
+            currentModelXml = null;
+        }
+
         JAXBContext jaxbContext = JAXBContext.newInstance(DATAMODEL.class);
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
         DATAMODEL model = (DATAMODEL) unmarshaller.unmarshal(
@@ -102,6 +125,29 @@ public class ModelManager {
         
         return model;
     }
+
+    /**
+     * Load a model from a raw XML string.
+     */
+    public DATAMODEL loadModelFromXml(String xmlContent) throws JAXBException {
+        if (xmlContent == null || xmlContent.isBlank()) {
+            throw new JAXBException("Model XML content is empty");
+        }
+
+        LOGGER.info("Loading model from raw XML content");
+        JAXBContext jaxbContext = JAXBContext.newInstance(DATAMODEL.class);
+        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+        DATAMODEL model = (DATAMODEL) unmarshaller.unmarshal(new StringReader(xmlContent));
+
+        loadedModels.put(model.getNAME(), model);
+        currentModel = model;
+        currentModelXml = xmlContent;
+        indexCurrentModel();
+        validateInheritance(currentModel);
+
+        LOGGER.info("Model loaded successfully: " + model.getNAME() + " (version " + model.getVERSION() + ")");
+        return model;
+    }
     
     /**
      * Get the current active model
@@ -109,6 +155,13 @@ public class ModelManager {
      */
     public DATAMODEL getCurrentModel() {
         return currentModel;
+    }
+
+    /**
+     * Return the raw XML for the current model, if available.
+     */
+    public String getCurrentModelXml() {
+        return currentModelXml;
     }
     
     /**
@@ -120,6 +173,7 @@ public class ModelManager {
         DATAMODEL model = loadedModels.get(modelName);
         if (model != null) {
             currentModel = model;
+            currentModelXml = null;
             indexCurrentModel();
             validateInheritance(currentModel);
             LOGGER.info("Current model set to: " + modelName);
@@ -189,6 +243,7 @@ public class ModelManager {
     public void clearModels() {
         loadedModels.clear();
         currentModel = null;
+        currentModelXml = null;
         objectTypeIndex.clear();
         linkTypeIndex.clear();
         LOGGER.info("All models cleared");

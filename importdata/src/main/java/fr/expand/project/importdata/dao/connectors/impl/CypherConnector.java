@@ -69,17 +69,15 @@ public class CypherConnector extends IConnectorDb {
 	}
 
 	@Override
-	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
-		String relationProperties = "";
-		if (modelKey != null && !modelKey.isBlank()) {
-			relationProperties = " {modelKey:'" + modelKey + "'}";
-		}
-		String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
-				+ objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:KNOWS"
-				+ relationProperties + "]->(b)";
-		LOGGER.info(request);
-		return launchCreationRequest(request, false);
-	}
+    public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
+        String relationType = normalizeRelationshipType(linkType);
+        String relationProperties = buildRelationProperties(linkType);
+        String request = "MATCH (a:" + objectA.getTYPE() + ") WHERE ID(a)=" + objectA.getID() + " " + "MATCH (b:"
+                + objectB.getTYPE() + ") WHERE ID(b)=" + objectB.getID() + " " + "CREATE (a)-[:"
+                + relationType + relationProperties + "]->(b)";
+        LOGGER.info(request);
+        return launchCreationRequest(request, false);
+    }
 
 	@Override
 	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
@@ -133,7 +131,7 @@ public class CypherConnector extends IConnectorDb {
 	 * @param object
 	 * @return
 	 */
-	private DataPackObject convertResultToObjectToDb(ObjectTypeEnum typeObject, Record record) {
+    private DataPackObject convertResultToObjectToDb(ObjectTypeEnum typeObject, Record record) {
 		DataPackObject result = new DataPackObject();
 		result.setTYPE(typeObject.toString());
 		for (Entry<String, Object> entry : record.asMap().entrySet()) {
@@ -156,6 +154,40 @@ public class CypherConnector extends IConnectorDb {
 		}
 		return result;
 	}
+
+    private String buildRelationProperties(String linkType) {
+        boolean hasModel = modelKey != null && !modelKey.isBlank();
+        boolean hasLinkType = linkType != null && !linkType.isBlank();
+        if (!hasModel && !hasLinkType) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append(" {");
+        boolean first = true;
+        if (hasModel) {
+            builder.append("modelKey:'").append(modelKey).append("'");
+            first = false;
+        }
+        if (hasLinkType) {
+            if (!first) {
+                builder.append(",");
+            }
+            builder.append("linkType:'").append(linkType).append("'");
+        }
+        builder.append("}");
+        return builder.toString();
+    }
+
+    private String normalizeRelationshipType(String linkType) {
+        if (linkType == null || linkType.isBlank()) {
+            return "KNOWS";
+        }
+        String sanitized = linkType.trim().replaceAll("[^A-Za-z0-9_]", "_");
+        if (sanitized.isEmpty()) {
+            return "KNOWS";
+        }
+        return sanitized.toUpperCase();
+    }
 
 	private AuthToken buildAuthToken() {
 		String auth = readSetting("NEO4J_AUTH", null, null);

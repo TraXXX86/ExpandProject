@@ -49,7 +49,16 @@ npm install
 npm run dev
 ```
 
-L'interface permet de charger un `model.xml` et un `data.xml` pour en afficher un résumé local. Le câblage avec l'import backend pourra être ajouté ensuite.
+L'interface consomme l'API d'import pour charger les modèles et données dans Neo4j, puis afficher uniquement ce qui est stocké en base.
+
+Pour démarrer l'API :
+
+```bash
+mvn -pl importdata -am package
+java -jar importdata/target/expandproject-importdata.jar --api 8080
+```
+
+Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
 
 ### 3. Configurer Neo4j
 

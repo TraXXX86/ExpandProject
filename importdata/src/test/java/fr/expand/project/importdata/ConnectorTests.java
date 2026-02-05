@@ -59,7 +59,7 @@ public class ConnectorTests {
 		LOGGER.info("Create new Node with id " + idObjB);
 
 		// Create a new link
-		connector.writeLink(objectA, objectB, true);
+		connector.writeLink(objectA, objectB, true, fr.expand.project.commons.LinkTypeEnum.CONNAISSANCE.toString());
 		LOGGER.info("Create new link with id " + idObjB);
 
 		// Get a node from DB

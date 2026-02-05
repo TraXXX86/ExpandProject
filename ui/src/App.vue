@@ -8,7 +8,7 @@
           </v-avatar>
           <div>
             <div class="text-subtitle-1 font-weight-bold">ExpandProject Studio</div>
-            <div class="text-caption text-medium-emphasis">IHM locale pour modèles XML</div>
+            <div class="text-caption text-medium-emphasis">IHM connectée à l'API d'import</div>
           </div>
         </div>
         <div class="d-flex align-center" style="gap: 8px;">
@@ -40,15 +40,21 @@
                 <div class="kicker">Studio d'import</div>
                 <h1 class="headline">Donnez un héritage clair à vos objets.</h1>
                 <p class="subhead">
-                  Chargez vos modèles XML, explorez les attributs hérités et préparez l'import Neo4j.
-                  L'interface fonctionne en local pour prévisualiser vos données avant validation.
+                  Chargez vos modèles XML, importez les données et explorez ce qui est stocké dans Neo4j.
+                  L'interface reflète uniquement le contenu réellement chargé en base.
                 </p>
                 <div class="d-flex flex-wrap" style="gap: 12px; margin-top: 24px;">
-                  <v-btn color="primary" size="large" prepend-icon="mdi-upload">
-                    Charger un modèle
+                  <v-btn color="primary" size="large" prepend-icon="mdi-database-refresh" @click="refreshModels()">
+                    Rafraîchir la base
                   </v-btn>
-                  <v-btn variant="tonal" color="primary" size="large" prepend-icon="mdi-file-chart-outline">
-                    Voir un exemple
+                  <v-btn
+                    variant="tonal"
+                    color="primary"
+                    size="large"
+                    prepend-icon="mdi-graph-outline"
+                    @click="currentPage = 'model'"
+                  >
+                    Visualiser le modèle
                   </v-btn>
                 </div>
                 <v-alert
@@ -59,7 +65,7 @@
                   icon="mdi-information-outline"
                   border="start"
                 >
-                  Cette IHM lit et résume vos fichiers localement. L'envoi au backend n'est pas encore câblé.
+                  Cette IHM échange avec l'API Java ({{ apiBase }}) pour charger les modèles et les données.
                 </v-alert>
               </v-col>
 
@@ -67,7 +73,22 @@
                 <v-card class="card-animate" elevation="6" rounded="xl">
                   <v-card-title class="section-title">Session d'import</v-card-title>
                   <v-card-text>
+                    <v-select
+                      v-model="selectedModelKey"
+                      :items="modelOptions"
+                      label="Modèle chargé en base"
+                      prepend-icon="mdi-database-check"
+                      variant="outlined"
+                      density="comfortable"
+                      :loading="isLoadingModels"
+                      clearable
+                    />
+                    <div class="file-hint">
+                      Sélectionnez un modèle déjà stocké pour naviguer dans les données.
+                    </div>
+
                     <v-file-input
+                      class="mt-5"
                       label="Fichier de modèle (model.xml)"
                       accept=".xml"
                       prepend-icon="mdi-file-code"
@@ -75,10 +96,20 @@
                       density="comfortable"
                       @update:model-value="handleModelFile"
                     />
-                    <div class="file-hint">Déclarez vos types, liens et héritages.</div>
+                    <div class="file-hint">Le modèle sera enregistré dans Neo4j.</div>
+                    <v-btn
+                      class="mt-3"
+                      color="primary"
+                      size="large"
+                      :loading="isLoadingModel"
+                      :disabled="!canUploadModel"
+                      @click="uploadModel"
+                    >
+                      Charger le modèle
+                    </v-btn>
 
                     <v-file-input
-                      class="mt-5"
+                      class="mt-6"
                       label="Fichier de données (data.xml)"
                       accept=".xml"
                       prepend-icon="mdi-file-tree"
@@ -86,7 +117,9 @@
                       density="comfortable"
                       @update:model-value="handleDataFile"
                     />
-                    <div class="file-hint">Prévisualisez le nombre d'objets et de liens.</div>
+                    <div class="file-hint">
+                      Les données seront importées pour le modèle sélectionné.
+                    </div>
 
                     <v-switch
                       class="mt-4"
@@ -100,18 +133,20 @@
                       <v-btn
                         color="primary"
                         size="large"
-                        :disabled="!canValidate"
-                        @click="runLocalCheck"
+                        :loading="isLoadingData"
+                        :disabled="!canUploadData"
+                        @click="uploadData"
                       >
-                        Vérifier la cohérence
+                        Charger les données
                       </v-btn>
                       <v-btn
                         variant="tonal"
                         color="secondary"
                         size="large"
-                        :disabled="!canValidate"
+                        :disabled="!selectedModelKey"
+                        @click="refreshData(selectedModelKey)"
                       >
-                        Préparer l'import
+                        Rafraîchir
                       </v-btn>
                     </div>
 
@@ -200,7 +235,7 @@
                       </div>
                     </div>
                     <div v-else class="text-medium-emphasis">
-                      Aucun jeu de données chargé pour le moment.
+                      Aucune donnée importée pour le moment.
                     </div>
                   </v-card-text>
                 </v-card>
@@ -249,6 +284,12 @@
                   Cette page synthétise la définition du modèle chargé pour vous permettre de comprendre
                   rapidement sa structure.
                 </p>
+                <div class="d-flex align-center" style="gap: 8px; margin-top: 12px;">
+                  <v-chip v-if="selectedModel" color="primary" variant="tonal">
+                    {{ selectedModel.name }}<span v-if="selectedModel.version"> v{{ selectedModel.version }}</span>
+                  </v-chip>
+                  <v-chip v-else color="secondary" variant="tonal">Aucun modèle sélectionné</v-chip>
+                </div>
               </v-col>
             </v-row>
 
@@ -560,9 +601,15 @@
                   Explorez les objets et leurs connexions.
                 </h2>
                 <p class="subhead">
-                  Cette page s'adapte au modèle chargé et vous permet de suivre les liens entre les objets du
-                  fichier de données.
+                  Cette page s'adapte au modèle chargé et vous permet de suivre les liens entre les objets
+                  importés en base.
                 </p>
+                <div class="d-flex align-center" style="gap: 8px; margin-top: 12px;">
+                  <v-chip v-if="selectedModel" color="primary" variant="tonal">
+                    {{ selectedModel.name }}<span v-if="selectedModel.version"> v{{ selectedModel.version }}</span>
+                  </v-chip>
+                  <v-chip v-else color="secondary" variant="tonal">Aucun modèle sélectionné</v-chip>
+                </div>
               </v-col>
             </v-row>
 
@@ -594,7 +641,7 @@
                       </v-list-item>
                     </v-list>
                     <div v-else class="text-medium-emphasis">
-                      Aucun objet détecté dans le fichier de données.
+                      Aucun objet importé pour ce modèle.
                     </div>
                   </v-card-text>
                 </v-card>
@@ -663,7 +710,7 @@
                       </div>
                     </div>
                     <div v-else class="text-medium-emphasis">
-                      Chargez un fichier de données puis sélectionnez un objet pour afficher ses détails.
+                      Importez des données pour ce modèle puis sélectionnez un objet pour afficher ses détails.
                     </div>
                   </v-card-text>
                 </v-card>
@@ -689,20 +736,18 @@
                 <v-card class="card-animate delay-1" elevation="4" rounded="xl">
                   <v-card-title class="section-title">Suppression du modèle</v-card-title>
                   <v-card-text>
-                    <v-text-field
-                      v-model="adminModelName"
-                      label="Nom du modèle"
-                      prepend-icon="mdi-database-outline"
+                    <v-select
+                      v-model="adminModelKey"
+                      :items="modelOptions"
+                      label="Modèle à supprimer"
+                      prepend-icon="mdi-database-remove"
                       variant="outlined"
                       density="comfortable"
+                      clearable
                     />
-                    <v-text-field
-                      v-model="adminModelVersion"
-                      label="Version (optionnelle)"
-                      prepend-icon="mdi-tag-outline"
-                      variant="outlined"
-                      density="comfortable"
-                    />
+                    <div class="file-hint">
+                      Sélectionnez un modèle chargé en base pour le supprimer.
+                    </div>
 
                     <v-alert
                       class="mt-4"
@@ -719,15 +764,23 @@
                       <v-btn
                         color="error"
                         variant="flat"
-                        :disabled="!adminModelName"
+                        :disabled="!adminModelKey"
+                        @click="deleteModel"
+                      >
+                        Supprimer via l'API
+                      </v-btn>
+                      <v-btn
+                        color="secondary"
+                        variant="tonal"
+                        :disabled="!adminModelKey"
                         @click="copyAdminCommand"
                       >
-                        Copier la commande de suppression
+                        Copier la commande CLI
                       </v-btn>
                       <v-btn
                         color="primary"
                         variant="tonal"
-                        :disabled="!adminModelName"
+                        :disabled="!adminModelKey"
                         @click="adminCommandVisible = !adminCommandVisible"
                       >
                         {{ adminCommandVisible ? 'Masquer la commande' : 'Voir la commande' }}
@@ -775,7 +828,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+
+const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
 const currentPage = ref('import');
 const validateOnly = ref(true);
@@ -792,12 +847,38 @@ const linkTypeInfo = ref({});
 const selectedObject = ref(null);
 const objectFilter = ref('');
 const status = ref(null);
-const adminModelName = ref('');
-const adminModelVersion = ref('');
+
+const models = ref([]);
+const selectedModelKey = ref('');
+const modelFile = ref(null);
+const dataFile = ref(null);
+const isLoadingModels = ref(false);
+const isLoadingModel = ref(false);
+const isLoadingData = ref(false);
+
+const adminModelKey = ref('');
 const adminCommandVisible = ref(false);
 const adminStatus = ref(null);
 
-const canValidate = computed(() => Boolean(modelSummary.value && dataSummary.value));
+const modelOptions = computed(() =>
+  models.value.map((model) => ({
+    title: model.version ? `${model.name} v${model.version}` : model.name,
+    value: model.key
+  }))
+);
+
+const selectedModel = computed(
+  () => models.value.find((model) => model.key === selectedModelKey.value) || null
+);
+
+const adminModel = computed(
+  () => models.value.find((model) => model.key === adminModelKey.value) || null
+);
+
+const canUploadModel = computed(() => Boolean(getFirstFile(modelFile.value)));
+const canUploadData = computed(
+  () => Boolean(getFirstFile(dataFile.value) && selectedModelKey.value)
+);
 
 const filteredModelObjects = computed(() => {
   const filter = modelObjectFilter.value.trim().toLowerCase();
@@ -834,11 +915,11 @@ const filteredObjects = computed(() => {
 });
 
 const adminCommand = computed(() => {
-  if (!adminModelName.value) {
+  if (!adminModel.value) {
     return 'java -jar importpackage.jar --delete-model <modelName> [modelVersion]';
   }
-  const name = adminModelName.value.trim();
-  const version = adminModelVersion.value.trim();
+  const name = adminModel.value.name;
+  const version = adminModel.value.version || '';
   if (version) {
     return `java -jar importpackage.jar --delete-model \"${name}\" \"${version}\"`;
   }
@@ -865,7 +946,8 @@ const linkedObjects = computed(() => {
   const currentKey = selectedObject.value.idKey;
 
   dataLinks.value.forEach((link, index) => {
-    const directed = linkTypeInfo.value[link.type] === true;
+    const directedValue = linkTypeInfo.value[link.type];
+    const directed = directedValue === undefined ? true : directedValue;
     const outDirection = directed ? 'out' : 'both';
     const inDirection = directed ? 'in' : 'both';
 
@@ -891,83 +973,252 @@ const linkedObjects = computed(() => {
     .filter(Boolean);
 });
 
-async function handleModelFile(files) {
-  const file = Array.isArray(files) ? files[0] : files;
-  status.value = null;
-  if (!file) {
-    modelSummary.value = null;
-    modelDetails.value = { objectTypes: [], linkTypes: [] };
-    selectedModelObject.value = null;
-    selectedModelLink.value = null;
-    linkTypeInfo.value = {};
-    return;
-  }
+onMounted(() => {
+  refreshModels();
+});
 
+watch(
+  () => selectedModelKey.value,
+  async (key) => {
+    if (!key) {
+      resetModelState();
+      resetDataState();
+      return;
+    }
+    await refreshModelDetails(key);
+    await refreshData(key);
+  }
+);
+
+watch(
+  () => models.value,
+  (list) => {
+    if (!list.length) {
+      adminModelKey.value = '';
+      return;
+    }
+    const exists = list.some((model) => model.key === adminModelKey.value);
+    if (!exists) {
+      adminModelKey.value = list[0].key;
+    }
+  }
+);
+
+function handleModelFile(files) {
+  modelFile.value = Array.isArray(files) ? files[0] : files;
+}
+
+function handleDataFile(files) {
+  dataFile.value = Array.isArray(files) ? files[0] : files;
+}
+
+async function refreshModels(preferredKey) {
+  isLoadingModels.value = true;
+  status.value = null;
   try {
-    const text = await readFile(file);
-    const doc = parseXml(text);
-    modelSummary.value = extractModelSummary(doc);
-    modelDetails.value = extractModelDetails(doc);
-    selectedModelObject.value = modelDetails.value.objectTypes[0] ?? null;
-    selectedModelLink.value = modelDetails.value.linkTypes[0] ?? null;
-    linkTypeInfo.value = extractLinkTypeDirections(doc);
+    const response = await fetch(`${apiBase}/api/models`);
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors du chargement des modèles');
+    }
+    const list = Array.isArray(payload) ? payload : [];
+    models.value = list;
+
+    const currentKey = selectedModelKey.value;
+    let nextKey = preferredKey || currentKey;
+    if (!nextKey || !list.find((model) => model.key === nextKey)) {
+      nextKey = list[0]?.key || '';
+    }
+    selectedModelKey.value = nextKey;
+
+    if (nextKey && nextKey === currentKey) {
+      await refreshModelDetails(nextKey);
+      await refreshData(nextKey);
+    }
+
+    if (!nextKey) {
+      resetModelState();
+      resetDataState();
+    }
   } catch (error) {
-    modelSummary.value = null;
-    modelDetails.value = { objectTypes: [], linkTypes: [] };
-    selectedModelObject.value = null;
-    selectedModelLink.value = null;
-    linkTypeInfo.value = {};
     status.value = {
       type: 'error',
-      message: `Erreur de lecture du modèle: ${error.message}`
+      message: error.message
     };
+  } finally {
+    isLoadingModels.value = false;
   }
 }
 
-async function handleDataFile(files) {
-  const file = Array.isArray(files) ? files[0] : files;
-  status.value = null;
-  if (!file) {
-    dataSummary.value = null;
-    dataObjects.value = [];
-    dataLinks.value = [];
-    selectedObject.value = null;
-    return;
-  }
-
+async function refreshModelDetails(modelKey) {
+  isLoadingModel.value = true;
   try {
-    const text = await readFile(file);
-    const doc = parseXml(text);
-    dataSummary.value = extractDataSummary(doc);
-    dataObjects.value = extractDataObjects(doc);
-    dataLinks.value = extractDataLinks(doc);
-    selectedObject.value = dataObjects.value[0] ?? null;
+    const response = await fetch(`${apiBase}/api/models/${encodeURIComponent(modelKey)}`);
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors du chargement du modèle');
+    }
+    const objectTypes = payload?.objectTypes || [];
+    const linkTypes = payload?.linkTypes || [];
+    modelDetails.value = { objectTypes, linkTypes };
+    modelSummary.value = buildModelSummary(payload);
+    selectedModelObject.value = objectTypes[0] ?? null;
+    selectedModelLink.value = linkTypes[0] ?? null;
+    linkTypeInfo.value = buildLinkTypeInfo(linkTypes);
+    modelObjectFilter.value = '';
+    modelLinkFilter.value = '';
   } catch (error) {
-    dataSummary.value = null;
-    dataObjects.value = [];
-    dataLinks.value = [];
-    selectedObject.value = null;
-    status.value = {
-      type: 'error',
-      message: `Erreur de lecture des données: ${error.message}`
-    };
+    resetModelState();
+    status.value = { type: 'error', message: error.message };
+  } finally {
+    isLoadingModel.value = false;
   }
 }
 
-function runLocalCheck() {
-  if (!canValidate.value) {
-    status.value = {
-      type: 'warning',
-      message: 'Chargez un modèle et un fichier de données pour continuer.'
-    };
+async function refreshData(modelKey) {
+  isLoadingData.value = true;
+  try {
+    const response = await fetch(
+      `${apiBase}/api/data?modelKey=${encodeURIComponent(modelKey)}`
+    );
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors du chargement des données');
+    }
+
+    const objects = normalizeObjects(payload?.objects || []);
+    const links = normalizeLinks(payload?.links || []);
+    dataObjects.value = objects;
+    dataLinks.value = links;
+    dataSummary.value = buildDataSummary(payload, objects, links);
+    selectedObject.value = objects[0] ?? null;
+    objectFilter.value = '';
+  } catch (error) {
+    resetDataState();
+    status.value = { type: 'error', message: error.message };
+  } finally {
+    isLoadingData.value = false;
+  }
+}
+
+async function uploadModel() {
+  const file = getFirstFile(modelFile.value);
+  if (!file) {
+    status.value = { type: 'warning', message: 'Sélectionnez un fichier modèle.' };
     return;
   }
+  status.value = null;
+  isLoadingModel.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('modelFile', file);
+    const response = await fetch(`${apiBase}/api/models`, {
+      method: 'POST',
+      body: formData
+    });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors de l’import du modèle');
+    }
+    status.value = {
+      type: 'success',
+      message: `Modèle chargé en base (${payload?.name || 'OK'}).`
+    };
+    await refreshModels(payload?.key);
+  } catch (error) {
+    status.value = { type: 'error', message: error.message };
+  } finally {
+    isLoadingModel.value = false;
+  }
+}
 
-  const mode = validateOnly.value ? 'Validation seule' : 'Préparation import';
-  status.value = {
-    type: 'success',
-    message: `${mode} prête. Résumé local effectué, aucune erreur XML détectée.`
-  };
+async function uploadData() {
+  const file = getFirstFile(dataFile.value);
+  if (!file) {
+    status.value = { type: 'warning', message: 'Sélectionnez un fichier de données.' };
+    return;
+  }
+  if (!selectedModelKey.value) {
+    status.value = { type: 'warning', message: 'Sélectionnez un modèle en base.' };
+    return;
+  }
+  status.value = null;
+  isLoadingData.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('dataFile', file);
+    formData.append('modelKey', selectedModelKey.value);
+    formData.append('validateOnly', String(validateOnly.value));
+    const response = await fetch(`${apiBase}/api/data`, {
+      method: 'POST',
+      body: formData
+    });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors de l’import des données');
+    }
+
+    if (payload?.valid) {
+      const actionLabel = payload.validateOnly ? 'Validation effectuée' : 'Données importées';
+      status.value = {
+        type: 'success',
+        message: `${actionLabel}. ${payload.objectCount || 0} objets, ${payload.linkCount || 0} liens.`
+      };
+    } else {
+      status.value = {
+        type: 'warning',
+        message: `Validation échouée. ${payload?.errors?.length || 0} erreurs détectées.`
+      };
+    }
+
+    if (payload?.valid && !payload?.validateOnly) {
+      await refreshData(selectedModelKey.value);
+    }
+  } catch (error) {
+    status.value = { type: 'error', message: error.message };
+  } finally {
+    isLoadingData.value = false;
+  }
+}
+
+async function deleteModel() {
+  if (!adminModelKey.value) {
+    adminStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
+    return;
+  }
+  adminStatus.value = null;
+  try {
+    const response = await fetch(
+      `${apiBase}/api/models/${encodeURIComponent(adminModelKey.value)}`,
+      { method: 'DELETE' }
+    );
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors de la suppression du modèle');
+    }
+    adminStatus.value = {
+      type: 'success',
+      message: 'Modèle et données associés supprimés.'
+    };
+    await refreshModels();
+  } catch (error) {
+    adminStatus.value = { type: 'error', message: error.message };
+  }
+}
+
+function resetModelState() {
+  modelSummary.value = null;
+  modelDetails.value = { objectTypes: [], linkTypes: [] };
+  selectedModelObject.value = null;
+  selectedModelLink.value = null;
+  linkTypeInfo.value = {};
+}
+
+function resetDataState() {
+  dataSummary.value = null;
+  dataObjects.value = [];
+  dataLinks.value = [];
+  selectedObject.value = null;
 }
 
 function selectObject(object) {
@@ -1004,7 +1255,7 @@ function selectModelLinkByName(name) {
 }
 
 async function copyAdminCommand() {
-  if (!adminModelName.value) {
+  if (!adminModel.value) {
     return;
   }
   try {
@@ -1118,162 +1369,85 @@ function buildSelfLoopPath(node) {
   return `M ${startX} ${startY} C ${c1X} ${c1Y}, ${c2X} ${c2Y}, ${endX} ${endY}`;
 }
 
-function readFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('lecture impossible'));
-    reader.readAsText(file);
-  });
-}
-
-function parseXml(text) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, 'application/xml');
-  if (doc.querySelector('parsererror')) {
-    throw new Error('XML invalide');
-  }
-  return doc;
-}
-
-function extractModelSummary(doc) {
-  const objectTypes = Array.from(doc.querySelectorAll('OBJECT_TYPE')).map((node) => ({
-    name: node.getAttribute('NAME') || 'Type',
-    parent: node.getAttribute('PARENT') || ''
-  }));
-  const linkTypes = Array.from(doc.querySelectorAll('LINK_TYPE')).map(
-    (node) => node.getAttribute('NAME') || 'Lien'
-  );
+function buildModelSummary(payload) {
+  const objectTypes = payload?.objectTypes || [];
+  const linkTypes = payload?.linkTypes || [];
   return {
-    objectCount: objectTypes.length,
-    linkCount: linkTypes.length,
-    types: objectTypes.slice(0, 6),
+    objectCount: payload?.objectTypeCount ?? objectTypes.length,
+    linkCount: payload?.linkTypeCount ?? linkTypes.length,
+    types: objectTypes.slice(0, 6).map((type) => ({
+      name: type.name,
+      parent: type.parent
+    })),
     hasMore: objectTypes.length > 6 || linkTypes.length > 6
   };
 }
 
-function extractLinkTypeDirections(doc) {
-  const linkTypes = Array.from(doc.querySelectorAll('LINK_TYPE'));
+function buildLinkTypeInfo(linkTypes) {
   const map = {};
-  linkTypes.forEach((node) => {
-    const name = node.getAttribute('NAME') || '';
-    const directedAttr = node.getAttribute('DIRECTED');
-    let directed = true;
-    if (directedAttr !== null && directedAttr !== '') {
-      directed = directedAttr.toLowerCase() !== 'false';
-    }
-    if (name) {
-      map[name] = directed;
+  linkTypes.forEach((link) => {
+    if (link.name) {
+      map[link.name] = link.directed !== false;
     }
   });
   return map;
 }
 
-function extractModelDetails(doc) {
-  const objectTypes = Array.from(doc.querySelectorAll('OBJECT_TYPE')).map((node, index) => {
-    const name = node.getAttribute('NAME') || `Type-${index + 1}`;
-    const parent = node.getAttribute('PARENT') || '';
-    const description = node.querySelector('DESCRIPTION')?.textContent?.trim() || '';
-    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE_DEFINITION')).map((attr) => ({
-      name: attr.getAttribute('NAME') || '',
-      type: attr.getAttribute('TYPE') || 'STRING',
-      required: (attr.getAttribute('REQUIRED') || 'false').toLowerCase() === 'true',
-      defaultValue: attr.getAttribute('DEFAULT_VALUE') || '',
-      description: attr.querySelector('DESCRIPTION')?.textContent?.trim() || ''
-    }));
-    return {
-      key: `${name}-${index}`,
-      name,
-      parent,
-      description,
-      attributes
-    };
-  });
-
-  const linkTypes = Array.from(doc.querySelectorAll('LINK_TYPE')).map((node, index) => {
-    const name = node.getAttribute('NAME') || `Lien-${index + 1}`;
-    const directedAttr = node.getAttribute('DIRECTED');
-    const directed = directedAttr ? directedAttr.toLowerCase() !== 'false' : true;
-    const description = node.querySelector('DESCRIPTION')?.textContent?.trim() || '';
-    const sources = Array.from(node.querySelectorAll('SOURCE_TYPES TYPE_REF')).map(
-      (refNode) => refNode.getAttribute('NAME') || ''
-    );
-    const targets = Array.from(node.querySelectorAll('TARGET_TYPES TYPE_REF')).map(
-      (refNode) => refNode.getAttribute('NAME') || ''
-    );
-    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE_DEFINITION')).map((attr) => ({
-      name: attr.getAttribute('NAME') || '',
-      type: attr.getAttribute('TYPE') || 'STRING',
-      required: (attr.getAttribute('REQUIRED') || 'false').toLowerCase() === 'true',
-      defaultValue: attr.getAttribute('DEFAULT_VALUE') || '',
-      description: attr.querySelector('DESCRIPTION')?.textContent?.trim() || ''
-    }));
-    return {
-      key: `${name}-${index}`,
-      name,
-      directed,
-      description,
-      sources,
-      targets,
-      attributes
-    };
-  });
-
+function buildDataSummary(payload, objects, links) {
+  const objectTypes = Array.isArray(payload?.objectTypes)
+    ? payload.objectTypes
+    : Array.from(new Set(objects.map((object) => object.type)));
   return {
-    objectTypes,
-    linkTypes
-  };
-}
-
-function extractDataSummary(doc) {
-  const objects = Array.from(doc.querySelectorAll('OBJECT'));
-  const links = Array.from(doc.querySelectorAll('LINK'));
-  const objectTypes = [...new Set(objects.map((node) => node.getAttribute('TYPE') || 'Type'))];
-  return {
-    objectCount: objects.length,
-    linkCount: links.length,
+    objectCount: payload?.objectCount ?? objects.length,
+    linkCount: payload?.linkCount ?? links.length,
     objectTypes: objectTypes.slice(0, 6),
     hasMore: objectTypes.length > 6
   };
 }
 
-function extractDataObjects(doc) {
-  const objectNodes = Array.from(doc.querySelectorAll('OBJECT'));
-  return objectNodes.map((node, index) => {
-    const attributes = Array.from(node.querySelectorAll('ATTRIBUTE')).map((attr) => ({
-      key: attr.getAttribute('KEY') || '',
-      value: attr.getAttribute('VALUE') || ''
-    }));
-    const idValue = node.getAttribute('ID');
-    const id = idValue !== null && idValue !== '' ? idValue : null;
-    const type = node.getAttribute('TYPE') || 'Type';
-    const idKey = id !== null ? `${type}|${id}` : `${type}|index-${index}`;
+function normalizeObjects(objects) {
+  return objects.map((object, index) => {
+    const id = object.id ?? null;
+    const type = object.type || 'Objet';
+    const idKey = id !== null && id !== undefined ? String(id) : `index-${index}`;
     return {
       id,
       type,
-      attributes,
+      attributes: Array.isArray(object.attributes) ? object.attributes : [],
       idKey,
       key: `${idKey}-${index}`
     };
   });
 }
 
-function extractDataLinks(doc) {
-  const linkNodes = Array.from(doc.querySelectorAll('LINK'));
-  return linkNodes.map((node, index) => {
-    const type = node.getAttribute('TYPE') || 'Lien';
-    const source = node.querySelector('OBJ_LINK_A');
-    const target = node.querySelector('OBJ_LINK_B');
-    const fromType = source?.getAttribute('TYPE') || 'Type';
-    const fromId = source?.getAttribute('ID') || '';
-    const toType = target?.getAttribute('TYPE') || 'Type';
-    const toId = target?.getAttribute('ID') || '';
+function normalizeLinks(links) {
+  return links.map((link, index) => {
+    const fromKey = link.fromId !== undefined ? String(link.fromId) : '';
+    const toKey = link.toId !== undefined ? String(link.toId) : '';
     return {
-      key: `${type}-${index}`,
-      type,
-      fromKey: `${fromType}|${fromId}`,
-      toKey: `${toType}|${toId}`
+      key: `link-${index}-${fromKey}-${toKey}`,
+      type: link.type || link.linkType || link.relationshipType || 'Lien',
+      fromKey,
+      toKey
     };
   });
+}
+
+function getFirstFile(value) {
+  if (!value) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return value[0] || null;
+  }
+  return value;
+}
+
+async function readJson(response) {
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
 }
 </script>

@@ -55,7 +55,7 @@ public abstract class IConnectorDb {
 	 *            : true if link is oriented objectA to objectB
 	 * @return
 	 */
-	public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented);
+    public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType);
 
 	/**
 	 * Get object from DB

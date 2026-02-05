@@ -106,10 +106,11 @@ public class Neo4jConnector extends IConnectorDb {
 	}
 
 	@Override
-	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented) {
+	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
 		connectToDb();
 
 		// Create query
+		String relationType = normalizeRelationshipType(linkType);
 		StringBuilder request = new StringBuilder();
 		request.append("MATCH (a:").append(objectA.getTYPE()).append(") WHERE ID(a)=?");
 		if (modelKey != null && !modelKey.isBlank()) {
@@ -119,9 +120,10 @@ public class Neo4jConnector extends IConnectorDb {
 		if (modelKey != null && !modelKey.isBlank()) {
 			request.append(" AND b.modelKey=?");
 		}
-		request.append(" CREATE (a)-[:KNOWS");
-		if (modelKey != null && !modelKey.isBlank()) {
-			request.append(" {modelKey:?}");
+		request.append(" CREATE (a)-[:").append(relationType);
+		String relationProperties = buildRelationProperties(linkType);
+		if (!relationProperties.isEmpty()) {
+			request.append(" {").append(relationProperties).append("}");
 		}
 		request.append("]->(b)");
 		String requestString = request.toString();
@@ -139,7 +141,10 @@ public class Neo4jConnector extends IConnectorDb {
 			params.put(Integer.toString(index++), modelKey);
 		}
 		if (modelKey != null && !modelKey.isBlank()) {
-			params.put(Integer.toString(index), modelKey);
+			params.put(Integer.toString(index++), modelKey);
+		}
+		if (linkType != null && !linkType.isBlank()) {
+			params.put(Integer.toString(index), linkType);
 		}
 
 		// Launch request
@@ -268,6 +273,33 @@ public class Neo4jConnector extends IConnectorDb {
 			int index = Integer.parseInt(entry.getKey());
 			statement.setObject(index, entry.getValue());
 		}
+	}
+
+	private String buildRelationProperties(String linkType) {
+		StringBuilder builder = new StringBuilder();
+		boolean first = true;
+		if (modelKey != null && !modelKey.isBlank()) {
+			builder.append("modelKey:?");
+			first = false;
+		}
+		if (linkType != null && !linkType.isBlank()) {
+			if (!first) {
+				builder.append(",");
+			}
+			builder.append("linkType:?");
+		}
+		return builder.toString();
+	}
+
+	private String normalizeRelationshipType(String linkType) {
+		if (linkType == null || linkType.isBlank()) {
+			return "KNOWS";
+		}
+		String sanitized = linkType.trim().replaceAll("[^A-Za-z0-9_]", "_");
+		if (sanitized.isEmpty()) {
+			return "KNOWS";
+		}
+		return sanitized.toUpperCase();
 	}
 
 	private String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {

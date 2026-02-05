@@ -6,6 +6,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.api.impl.ModelBasedImportAPI;
+import fr.expand.project.importdata.api.server.ImportApiServer;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.validation.ValidationResult;
 import fr.expand.project.importdata.model.Neo4jModelStore;
@@ -45,6 +46,20 @@ public class Launcher {
             // Run example mode
             if (args.length == 1 && args[0].equals("--example")) {
                 runExample();
+                return;
+            }
+
+            // Run API server
+            if (args.length >= 1 && args[0].equals("--api")) {
+                int port = 8080;
+                if (args.length >= 2) {
+                    try {
+                        port = Integer.parseInt(args[1]);
+                    } catch (NumberFormatException ignored) {
+                        port = 8080;
+                    }
+                }
+                ImportApiServer.start(port);
                 return;
             }
 
@@ -185,6 +200,7 @@ public class Launcher {
         System.out.println("  java -jar importpackage.jar <model.xml> <data.xml> [--validate-only]");
         System.out.println("  java -jar importpackage.jar --delete-model <modelName> [modelVersion]");
         System.out.println("  java -jar importpackage.jar --example");
+        System.out.println("  java -jar importpackage.jar --api [port]");
         System.out.println("  java -jar importpackage.jar --help");
         System.out.println("");
         System.out.println("Arguments:");
@@ -193,6 +209,7 @@ public class Launcher {
         System.out.println("  --validate-only  Only validate, do not import to database");
         System.out.println("  --delete-model   Delete a model and its associated data from the database");
         System.out.println("  --example        Run validation on bundled example files");
+        System.out.println("  --api            Start the HTTP API server (default port 8080)");
         System.out.println("  --help           Show this help message");
         System.out.println("");
         System.out.println("Examples:");
@@ -207,6 +224,9 @@ public class Launcher {
         System.out.println("");
         System.out.println("  # Test with example data");
         System.out.println("  java -jar importpackage.jar --example");
+        System.out.println("");
+        System.out.println("  # Start API server");
+        System.out.println("  java -jar importpackage.jar --api 8080");
     }
 
     private static void deleteModelAndData(String modelName, String modelVersion) {

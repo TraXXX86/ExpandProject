@@ -34,7 +34,7 @@ public class Neo4jModelStore implements AutoCloseable {
         this.driver = GraphDatabase.driver(uri, authToken);
     }
 
-    public String storeModel(DATAMODEL model) {
+    public String storeModel(DATAMODEL model, String modelXml) {
         if (model == null) {
             return null;
         }
@@ -49,10 +49,12 @@ public class Neo4jModelStore implements AutoCloseable {
                 base.put("modelKey", modelKey);
                 base.put("modelName", modelName);
                 base.put("modelVersion", modelVersion);
+                base.put("modelXml", modelXml == null ? "" : modelXml);
 
                 tx.run(
                     "MERGE (m:DataModel {key:$modelKey}) "
-                        + "SET m.name=$modelName, m.version=$modelVersion, m.updatedAt=datetime()",
+                        + "SET m.name=$modelName, m.version=$modelVersion, "
+                        + "m.xml=$modelXml, m.updatedAt=datetime()",
                     base
                 );
 
@@ -268,6 +270,56 @@ public class Neo4jModelStore implements AutoCloseable {
                 );
                 tx.run("MATCH (m:DataModel {key:$modelKey}) DETACH DELETE m", params);
                 return null;
+            });
+        }
+    }
+
+    public String loadModelXmlByKey(String modelKey) {
+        if (modelKey == null || modelKey.isBlank()) {
+            return null;
+        }
+        try (Session session = driver.session()) {
+            return session.executeRead(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                var result = tx.run("MATCH (m:DataModel {key:$modelKey}) RETURN m.xml AS xml", params);
+                if (!result.hasNext()) {
+                    return null;
+                }
+                var record = result.next();
+                return record.get("xml").isNull() ? null : record.get("xml").asString();
+            });
+        }
+    }
+
+    public DATAMODEL loadModelByKey(String modelKey) {
+        String xml = loadModelXmlByKey(modelKey);
+        if (xml == null || xml.isBlank()) {
+            return null;
+        }
+        try {
+            jakarta.xml.bind.JAXBContext jaxbContext = jakarta.xml.bind.JAXBContext.newInstance(DATAMODEL.class);
+            jakarta.xml.bind.Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            return (DATAMODEL) unmarshaller.unmarshal(new java.io.StringReader(xml));
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to parse model XML", e);
+        }
+    }
+
+    public java.util.List<Map<String, Object>> listModels() {
+        try (Session session = driver.session()) {
+            return session.executeRead(tx -> {
+                var result = tx.run("MATCH (m:DataModel) RETURN m.key AS key, m.name AS name, m.version AS version");
+                java.util.List<Map<String, Object>> models = new java.util.ArrayList<>();
+                while (result.hasNext()) {
+                    var record = result.next();
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("key", record.get("key").asString());
+                    row.put("name", record.get("name").asString());
+                    row.put("version", record.get("version").isNull() ? "" : record.get("version").asString());
+                    models.add(row);
+                }
+                return models;
             });
         }
     }
