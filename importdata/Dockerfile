@@ -1,4 +1,4 @@
-FROM maven:3.9.6-eclipse-temurin-11 AS build
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
 COPY pom.xml pom.xml
@@ -12,7 +12,7 @@ COPY model/src model/src
 
 RUN mvn -pl importdata -am package -DskipTests
 
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /workspace/importdata/target/expandproject-importdata.jar /app/expandproject-importdata.jar
 
