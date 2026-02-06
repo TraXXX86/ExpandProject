@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DATA_MODEL NAME="AutoRefurbModel" VERSION="1.0" DEFAULT_LANGUAGE="FR_fr">
+    <LANGUAGES>
+        <LANGUAGE CODE="FR_fr" LABEL="Français (France)"/>
+        <LANGUAGE CODE="EN_uk" LABEL="English (UK)"/>
+    </LANGUAGES>
+    <OBJECT_TYPES>
+        <!-- Définition du type CENTRE_RECONDITIONNEMENT -->
+        <OBJECT_TYPE NAME="CENTRE_RECONDITIONNEMENT">
+            <DESCRIPTION>Centre de reconditionnement automobile</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Nom du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="CODE_CENTRE" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Code interne du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Code centre"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Center code"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ADRESSE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Adresse postale</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Adresse"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Address"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="VILLE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Ville du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Ville"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="City"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PAYS" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Pays du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Pays"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Country"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="TELEPHONE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Numéro de téléphone</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Phone"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="EMAIL" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Email de contact</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Email"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Email"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="CAPACITE_VEHICULES" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Capacité de véhicules en parallèle</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Capacité véhicules"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Vehicle capacity"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_OUVERTURE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'ouverture du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'ouverture"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Opening date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="STATUT" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="ACTIF">
+                    <DESCRIPTION>Statut d'activité du centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Statut"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Status"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="CODE_CENTRE" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identite" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="CODE_CENTRE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="STATUT" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Contact" ORDER="2">
+                    <ATTRIBUTE_REF NAME="EMAIL" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="TELEPHONE" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Localisation" ORDER="3">
+                    <ATTRIBUTE_REF NAME="ADRESSE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="VILLE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="PAYS" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Operation" ORDER="4">
+                    <ATTRIBUTE_REF NAME="CAPACITE_VEHICULES" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="DATE_OUVERTURE" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+
+        <!-- Définition du type VEHICULE -->
+        <OBJECT_TYPE NAME="VEHICULE">
+            <DESCRIPTION>Véhicule pris en charge par le centre</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="VIN" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Numéro d'identification du véhicule</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="VIN"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="VIN"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="IMMATRICULATION" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Immatriculation</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Immatriculation"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Registration"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="MARQUE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Marque du véhicule</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Marque"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Brand"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="MODELE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Modèle du véhicule</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Modèle"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Model"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ANNEE" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Année de mise en circulation</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Année"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Year"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="KILOMETRAGE" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Kilométrage actuel</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Kilométrage"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Mileage"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ENERGIE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Type d'énergie</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Énergie"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Energy"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="COULEUR" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Couleur du véhicule</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Couleur"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Color"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_ENTREE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'entrée au centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'entrée"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Check-in date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="STATUT" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="EN_ATTENTE">
+                    <DESCRIPTION>Statut du véhicule dans le centre</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Statut"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Status"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="IMMATRICULATION" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="VIN" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identification" ORDER="1">
+                    <ATTRIBUTE_REF NAME="VIN" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="IMMATRICULATION" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="MARQUE" ORDER="3"/>
+                    <ATTRIBUTE_REF NAME="MODELE" ORDER="4"/>
+                    <ATTRIBUTE_REF NAME="ANNEE" ORDER="5"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Etat" ORDER="2">
+                    <ATTRIBUTE_REF NAME="KILOMETRAGE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="ENERGIE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="COULEUR" ORDER="3"/>
+                    <ATTRIBUTE_REF NAME="STATUT" ORDER="4"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Suivi" ORDER="3">
+                    <ATTRIBUTE_REF NAME="DATE_ENTREE" ORDER="1"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+
+        <!-- Définition du type MANDAT_REPARATION -->
+        <OBJECT_TYPE NAME="MANDAT_REPARATION">
+            <DESCRIPTION>Mandat de réparation associé à un véhicule</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="NUMERO" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Numéro de mandat</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Numéro"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Number"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_OUVERTURE" TYPE="DATE" REQUIRED="true">
+                    <DESCRIPTION>Date d'ouverture du mandat</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'ouverture"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Open date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_CLOTURE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date de clôture du mandat</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date de clôture"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Close date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PRIORITE" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="NORMALE">
+                    <DESCRIPTION>Niveau de priorité</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Priorité"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Priority"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="STATUT" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="OUVERT">
+                    <DESCRIPTION>Statut du mandat</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Statut"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Status"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DESCRIPTION" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Description de l'intervention</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Description"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Description"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="COUT_ESTIME" TYPE="DOUBLE" REQUIRED="false">
+                    <DESCRIPTION>Coût estimé</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Coût estimé"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Estimated cost"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="COUT_FINAL" TYPE="DOUBLE" REQUIRED="false">
+                    <DESCRIPTION>Coût final</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Coût final"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Final cost"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="GARANTIE" TYPE="BOOLEAN" REQUIRED="false">
+                    <DESCRIPTION>Garantie appliquée</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Garantie"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Warranty"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DUREE_PREVUE_JOURS" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Durée prévue en jours</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Durée prévue (jours)"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Planned duration (days)"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="NUMERO" ORDER="1"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Dossier" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NUMERO" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="STATUT" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="PRIORITE" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Planification" ORDER="2">
+                    <ATTRIBUTE_REF NAME="DATE_OUVERTURE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="DATE_CLOTURE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="DUREE_PREVUE_JOURS" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Financier" ORDER="3">
+                    <ATTRIBUTE_REF NAME="COUT_ESTIME" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="COUT_FINAL" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="GARANTIE" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Details" ORDER="4">
+                    <ATTRIBUTE_REF NAME="DESCRIPTION" ORDER="1"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+
+        <!-- Définition du type CLIENT -->
+        <OBJECT_TYPE NAME="CLIENT">
+            <DESCRIPTION>Client propriétaire du véhicule</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Nom du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Last name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PRENOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Prénom du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Prénom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="First name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="TYPE_CLIENT" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="PARTICULIER">
+                    <DESCRIPTION>Type de client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Type de client"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Customer type"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="EMAIL" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Email du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Email"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Email"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="TELEPHONE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Téléphone du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Phone"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ADRESSE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Adresse du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Adresse"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Address"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="VILLE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Ville du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Ville"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="City"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PAYS" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Pays du client</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Pays"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Country"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="PRENOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identite" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="PRENOM" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="TYPE_CLIENT" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Contact" ORDER="2">
+                    <ATTRIBUTE_REF NAME="EMAIL" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="TELEPHONE" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Localisation" ORDER="3">
+                    <ATTRIBUTE_REF NAME="ADRESSE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="VILLE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="PAYS" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+
+        <!-- Définition du type TECHNICIEN -->
+        <OBJECT_TYPE NAME="TECHNICIEN">
+            <DESCRIPTION>Technicien intervenant sur les mandats</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Nom du technicien</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Last name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PRENOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
+                    <DESCRIPTION>Prénom du technicien</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Prénom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="First name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="SPECIALITE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Spécialité principale</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Spécialité"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Specialty"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="NIVEAU" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="CONFIRME">
+                    <DESCRIPTION>Niveau de maîtrise</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Niveau"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Level"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_EMBAUCHE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'embauche</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'embauche"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Hire date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ACTIF" TYPE="BOOLEAN" REQUIRED="false" DEFAULT_VALUE="true">
+                    <DESCRIPTION>Technicien actif</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Actif"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Active"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="PRENOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identite" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="PRENOM" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Competences" ORDER="2">
+                    <ATTRIBUTE_REF NAME="SPECIALITE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="NIVEAU" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="RH" ORDER="3">
+                    <ATTRIBUTE_REF NAME="DATE_EMBAUCHE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="ACTIF" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+    </OBJECT_TYPES>
+
+    <LINK_TYPES>
+        <!-- Lien entre mandat et véhicule -->
+        <LINK_TYPE NAME="MANDAT_POUR_VEHICULE" DIRECTED="true">
+            <DESCRIPTION>Mandat associé au véhicule</DESCRIPTION>
+            <SOURCE_TYPES>
+                <TYPE_REF NAME="MANDAT_REPARATION"/>
+            </SOURCE_TYPES>
+            <TARGET_TYPES>
+                <TYPE_REF NAME="VEHICULE"/>
+            </TARGET_TYPES>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="TYPE_INTERVENTION" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Type d'intervention</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="KILOMETRAGE_ENTREE" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Kilométrage à l'entrée</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+        </LINK_TYPE>
+
+        <!-- Lien entre mandat et centre -->
+        <LINK_TYPE NAME="MANDAT_GERE_PAR_CENTRE" DIRECTED="true">
+            <DESCRIPTION>Mandat géré par un centre</DESCRIPTION>
+            <SOURCE_TYPES>
+                <TYPE_REF NAME="MANDAT_REPARATION"/>
+            </SOURCE_TYPES>
+            <TARGET_TYPES>
+                <TYPE_REF NAME="CENTRE_RECONDITIONNEMENT"/>
+            </TARGET_TYPES>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="DATE_AFFECTATION" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'affectation du mandat</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PRIORITE_CENTRE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Priorité côté centre</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+        </LINK_TYPE>
+
+        <!-- Lien entre mandat et client -->
+        <LINK_TYPE NAME="MANDAT_POUR_CLIENT" DIRECTED="true">
+            <DESCRIPTION>Mandat rattaché au client</DESCRIPTION>
+            <SOURCE_TYPES>
+                <TYPE_REF NAME="MANDAT_REPARATION"/>
+            </SOURCE_TYPES>
+            <TARGET_TYPES>
+                <TYPE_REF NAME="CLIENT"/>
+            </TARGET_TYPES>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="REFERENCE_CLIENT" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Référence client interne</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+        </LINK_TYPE>
+
+        <!-- Lien entre véhicule et client -->
+        <LINK_TYPE NAME="VEHICULE_APPARTIENT_CLIENT" DIRECTED="true">
+            <DESCRIPTION>Propriété du véhicule par un client</DESCRIPTION>
+            <SOURCE_TYPES>
+                <TYPE_REF NAME="VEHICULE"/>
+            </SOURCE_TYPES>
+            <TARGET_TYPES>
+                <TYPE_REF NAME="CLIENT"/>
+            </TARGET_TYPES>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="DATE_ACQUISITION" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'acquisition</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+        </LINK_TYPE>
+
+        <!-- Lien entre mandat et technicien -->
+        <LINK_TYPE NAME="MANDAT_ASSIGNE_TECHNICIEN" DIRECTED="true">
+            <DESCRIPTION>Mandat assigné à un technicien</DESCRIPTION>
+            <SOURCE_TYPES>
+                <TYPE_REF NAME="MANDAT_REPARATION"/>
+            </SOURCE_TYPES>
+            <TARGET_TYPES>
+                <TYPE_REF NAME="TECHNICIEN"/>
+            </TARGET_TYPES>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="ROLE" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="TECHNICIEN">
+                    <DESCRIPTION>Rôle sur le mandat</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="HEURES_ESTIMEES" TYPE="DOUBLE" REQUIRED="false">
+                    <DESCRIPTION>Heures estimées</DESCRIPTION>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+        </LINK_TYPE>
+    </LINK_TYPES>
+</DATA_MODEL>

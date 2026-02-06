@@ -1,6 +1,6 @@
 <template>
   <v-app class="app-shell">
-    <v-app-bar flat height="72" color="transparent">
+    <v-app-bar height="72" color="surface" class="app-header" elevate-on-scroll>
       <v-container class="d-flex align-center justify-space-between">
         <div class="d-flex align-center" style="gap: 12px;">
           <v-avatar color="primary" size="40">
@@ -13,6 +13,18 @@
         </div>
         <div class="d-flex align-center" style="gap: 8px;">
           <v-select
+            v-if="state.modelOptions.length"
+            v-model="state.selectedModelKey"
+            :items="state.modelOptions"
+            label="Modèle"
+            density="compact"
+            variant="outlined"
+            hide-details
+            clearable
+            :loading="state.isLoadingModels"
+            class="model-select"
+          />
+          <v-select
             v-if="state.modelLanguages.length"
             v-model="state.displayLanguage"
             :items="state.modelLanguages"
@@ -22,8 +34,6 @@
             hide-details
             class="language-select"
           />
-          <v-chip color="secondary" variant="tonal">XML</v-chip>
-          <v-chip color="primary" variant="tonal">Validation</v-chip>
           <v-chip :color="state.neo4jChipColor" variant="tonal">
             Neo4j {{ state.neo4jChipLabel }}
           </v-chip>
