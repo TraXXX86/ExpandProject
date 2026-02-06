@@ -1,58 +1,378 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<DATA_MODEL NAME="SocialNetworkModel" VERSION="1.0">
+<DATA_MODEL NAME="SocialNetworkModel" VERSION="1.2" DEFAULT_LANGUAGE="FR_fr">
+    <LANGUAGES>
+        <LANGUAGE CODE="FR_fr" LABEL="Français (France)"/>
+        <LANGUAGE CODE="FR_ca" LABEL="Français (Canada)"/>
+        <LANGUAGE CODE="EN_uk" LABEL="English (UK)"/>
+    </LANGUAGES>
     <OBJECT_TYPES>
         <!-- Définition du type PERSONNE -->
         <OBJECT_TYPE NAME="PERSONNE">
             <DESCRIPTION>Représente une personne dans le réseau social</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
-                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true">
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
                     <DESCRIPTION>Nom de famille de la personne</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Last name"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
-                <ATTRIBUTE_DEFINITION NAME="PRENOM" TYPE="STRING" REQUIRED="true">
+                <ATTRIBUTE_DEFINITION NAME="PRENOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
                     <DESCRIPTION>Prénom de la personne</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Prénom"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Prénom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="First name"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PSEUDO" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Nom public affiché sur la plateforme</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Pseudo"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Pseudo"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Username"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_NAISSANCE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date de naissance</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date de naissance"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Date de naissance"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Birth date"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
                 <ATTRIBUTE_DEFINITION NAME="AGE" TYPE="INTEGER" REQUIRED="false">
                     <DESCRIPTION>Âge de la personne</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Âge"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Âge"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Age"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
-                <ATTRIBUTE_DEFINITION NAME="EMAIL" TYPE="STRING" REQUIRED="false">
+                <ATTRIBUTE_DEFINITION NAME="EMAIL" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
                     <DESCRIPTION>Adresse email</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Email"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Courriel"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Email"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="TELEPHONE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Numéro de téléphone</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Phone"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="VILLE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Ville de résidence</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Ville"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Ville"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="City"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PAYS" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Pays de résidence</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Pays"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Pays"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Country"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PROFESSION" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Profession actuelle</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Profession"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Profession"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Job title"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="BIO" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Biographie courte</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Biographie"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Biographie"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Bio"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="LANGUE" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Langue principale</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Langue"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Langue"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Language"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="STATUT" TYPE="STRING" REQUIRED="false" DEFAULT_VALUE="ACTIF">
+                    <DESCRIPTION>Statut du compte</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Statut"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Statut"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Status"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
                 <ATTRIBUTE_DEFINITION NAME="DATE_INSCRIPTION" TYPE="DATE" REQUIRED="false">
                     <DESCRIPTION>Date d'inscription sur la plateforme</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'inscription"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Date d'inscription"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Signup date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DERNIERE_CONNEXION" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Dernière date de connexion</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Dernière connexion"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Dernière connexion"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Last login"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="COMPTE_VERIFIE" TYPE="BOOLEAN" REQUIRED="false">
+                    <DESCRIPTION>Compte vérifié ou non</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Compte vérifié"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Compte vérifié"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Verified account"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="SCORE_REPUTATION" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Score de réputation interne</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Score de réputation"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Score de réputation"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Reputation score"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
             </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="PRENOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identite" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="PRENOM" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="PSEUDO" ORDER="3"/>
+                    <ATTRIBUTE_REF NAME="DATE_NAISSANCE" ORDER="4"/>
+                    <ATTRIBUTE_REF NAME="AGE" ORDER="5"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Contact" ORDER="2">
+                    <ATTRIBUTE_REF NAME="EMAIL" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="TELEPHONE" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Localisation" ORDER="3">
+                    <ATTRIBUTE_REF NAME="VILLE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="PAYS" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Profil" ORDER="4">
+                    <ATTRIBUTE_REF NAME="PROFESSION" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="BIO" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="LANGUE" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Compte" ORDER="5">
+                    <ATTRIBUTE_REF NAME="DATE_INSCRIPTION" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="DERNIERE_CONNEXION" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="STATUT" ORDER="3"/>
+                    <ATTRIBUTE_REF NAME="COMPTE_VERIFIE" ORDER="4"/>
+                    <ATTRIBUTE_REF NAME="SCORE_REPUTATION" ORDER="5"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
         </OBJECT_TYPE>
-        
+
         <!-- Définition du type ENTREPRISE -->
         <OBJECT_TYPE NAME="ENTREPRISE">
             <DESCRIPTION>Représente une entreprise</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
-                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true">
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
                     <DESCRIPTION>Nom de l'entreprise</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Name"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
-                <ATTRIBUTE_DEFINITION NAME="SECTEUR" TYPE="STRING" REQUIRED="false">
+                <ATTRIBUTE_DEFINITION NAME="SIRET" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Numéro SIRET</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="SIRET"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="SIRET"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="SIRET"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_CREATION" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date de création</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date de création"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Date de création"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Creation date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="SECTEUR" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
                     <DESCRIPTION>Secteur d'activité</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Secteur"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Secteur"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Industry"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
                 <ATTRIBUTE_DEFINITION NAME="EFFECTIF" TYPE="INTEGER" REQUIRED="false">
                     <DESCRIPTION>Nombre d'employés</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Effectif"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Effectif"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Headcount"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="ADRESSE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Adresse du siège</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Adresse"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Adresse"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Address"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="VILLE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Ville du siège</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Ville"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Ville"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="City"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="PAYS" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Pays du siège</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Pays"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Pays"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Country"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="SITE_WEB" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Site web</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Site web"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Site web"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Website"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="EMAIL_CONTACT" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Email de contact</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Email de contact"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Courriel de contact"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Contact email"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="TELEPHONE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Téléphone de contact</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Téléphone"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Phone"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
             </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="SIRET" ORDER="2"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Identite" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="SIRET" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="DATE_CREATION" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Organisation" ORDER="2">
+                    <ATTRIBUTE_REF NAME="SECTEUR" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="EFFECTIF" ORDER="2"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Localisation" ORDER="3">
+                    <ATTRIBUTE_REF NAME="ADRESSE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="VILLE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="PAYS" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Contact" ORDER="4">
+                    <ATTRIBUTE_REF NAME="SITE_WEB" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="EMAIL_CONTACT" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="TELEPHONE" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
         </OBJECT_TYPE>
-        
+
         <!-- Définition du type COMPETENCE -->
         <OBJECT_TYPE NAME="COMPETENCE">
             <DESCRIPTION>Représente une compétence professionnelle</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
-                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true">
+                <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
                     <DESCRIPTION>Nom de la compétence</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Nom"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Nom"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Name"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
-                <ATTRIBUTE_DEFINITION NAME="CATEGORIE" TYPE="STRING" REQUIRED="false">
+                <ATTRIBUTE_DEFINITION NAME="CATEGORIE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
                     <DESCRIPTION>Catégorie de la compétence</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Catégorie"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Catégorie"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Category"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DESCRIPTION" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Description de la compétence</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Description"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Description"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Description"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="CERTIFIANTE" TYPE="BOOLEAN" REQUIRED="false">
+                    <DESCRIPTION>Compétence certifiante</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Certifiante"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Certifiante"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Certifying"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="NIVEAU_MAX" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Niveau maximal attendu</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Niveau max"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Niveau max"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Max level"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DUREE_APPRENTISSAGE" TYPE="INTEGER" REQUIRED="false">
+                    <DESCRIPTION>Durée d'apprentissage (heures)</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Durée d'apprentissage"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Durée d'apprentissage"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Learning duration"/>
+                    </LABELS>
                 </ATTRIBUTE_DEFINITION>
             </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="General" ORDER="1">
+                    <ATTRIBUTE_REF NAME="NOM" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="CATEGORIE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="DESCRIPTION" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+                <ATTRIBUTE_GROUP NAME="Qualification" ORDER="2">
+                    <ATTRIBUTE_REF NAME="CERTIFIANTE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="NIVEAU_MAX" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="DUREE_APPRENTISSAGE" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
         </OBJECT_TYPE>
     </OBJECT_TYPES>
-    
+
     <LINK_TYPES>
         <!-- Lien CONNAIT entre personnes -->
         <LINK_TYPE NAME="CONNAIT" DIRECTED="false">
@@ -72,7 +392,7 @@
                 </ATTRIBUTE_DEFINITION>
             </ATTRIBUTE_DEFINITIONS>
         </LINK_TYPE>
-        
+
         <!-- Lien TRAVAILLE_POUR entre personne et entreprise -->
         <LINK_TYPE NAME="TRAVAILLE_POUR" DIRECTED="true">
             <DESCRIPTION>Relation d'emploi d'une personne vers une entreprise</DESCRIPTION>
@@ -94,7 +414,7 @@
                 </ATTRIBUTE_DEFINITION>
             </ATTRIBUTE_DEFINITIONS>
         </LINK_TYPE>
-        
+
         <!-- Lien POSSEDE_COMPETENCE entre personne et compétence -->
         <LINK_TYPE NAME="POSSEDE_COMPETENCE" DIRECTED="true">
             <DESCRIPTION>Compétence détenue par une personne</DESCRIPTION>

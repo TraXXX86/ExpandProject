@@ -6,13 +6,28 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:element name="DATA_MODEL">
         <xs:complexType>
             <xs:sequence>
+                <xs:element name="LANGUAGES" type="LANGUAGES" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="OBJECT_TYPES" type="OBJECT_TYPES" minOccurs="1" maxOccurs="1"/>
                 <xs:element name="LINK_TYPES" type="LINK_TYPES" minOccurs="1" maxOccurs="1"/>
             </xs:sequence>
             <xs:attribute name="NAME" type="xs:string" use="required"/>
             <xs:attribute name="VERSION" type="xs:string" use="optional"/>
+            <xs:attribute name="DEFAULT_LANGUAGE" type="xs:string" use="optional"/>
         </xs:complexType>
     </xs:element>
+
+    <!-- Languages Collection -->
+    <xs:complexType name="LANGUAGES">
+        <xs:sequence>
+            <xs:element name="LANGUAGE" type="LANGUAGE" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Language Definition -->
+    <xs:complexType name="LANGUAGE">
+        <xs:attribute name="CODE" type="xs:string" use="required"/>
+        <xs:attribute name="LABEL" type="xs:string" use="optional"/>
+    </xs:complexType>
     
     <!-- Object Types Collection -->
     <xs:complexType name="OBJECT_TYPES">
@@ -26,6 +41,8 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
         <xs:sequence>
             <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
             <xs:element name="ATTRIBUTE_DEFINITIONS" type="ATTRIBUTE_DEFINITIONS" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="REPRESENTATIVE_ATTRIBUTES" type="REPRESENTATIVE_ATTRIBUTES" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="ATTRIBUTE_GROUPS" type="ATTRIBUTE_GROUPS" minOccurs="0" maxOccurs="1"/>
         </xs:sequence>
         <xs:attribute name="NAME" type="xs:string" use="required"/>
         <xs:attribute name="PARENT" type="xs:string" use="optional"/>
@@ -37,16 +54,60 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
             <xs:element name="ATTRIBUTE_DEFINITION" type="ATTRIBUTE_DEFINITION" minOccurs="1" maxOccurs="unbounded"/>
         </xs:sequence>
     </xs:complexType>
+
+    <!-- Attribute Groups Collection -->
+    <xs:complexType name="ATTRIBUTE_GROUPS">
+        <xs:sequence>
+            <xs:element name="ATTRIBUTE_GROUP" type="ATTRIBUTE_GROUP" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Representative Attributes Collection -->
+    <xs:complexType name="REPRESENTATIVE_ATTRIBUTES">
+        <xs:sequence>
+            <xs:element name="ATTRIBUTE_REF" type="ATTRIBUTE_REF" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Attribute Group Definition -->
+    <xs:complexType name="ATTRIBUTE_GROUP">
+        <xs:sequence>
+            <xs:element name="ATTRIBUTE_REF" type="ATTRIBUTE_REF" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+        <xs:attribute name="ORDER" type="xs:int" use="optional"/>
+    </xs:complexType>
+
+    <!-- Attribute Reference in a Group -->
+    <xs:complexType name="ATTRIBUTE_REF">
+        <xs:attribute name="NAME" type="xs:string" use="required"/>
+        <xs:attribute name="ORDER" type="xs:int" use="optional"/>
+    </xs:complexType>
     
     <!-- Attribute Definition -->
     <xs:complexType name="ATTRIBUTE_DEFINITION">
         <xs:sequence>
             <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="LABELS" type="LABELS" minOccurs="0" maxOccurs="1"/>
         </xs:sequence>
         <xs:attribute name="NAME" type="xs:string" use="required"/>
         <xs:attribute name="TYPE" type="ATTRIBUTE_TYPE" use="optional" default="STRING"/>
         <xs:attribute name="REQUIRED" type="xs:boolean" use="optional" default="false"/>
         <xs:attribute name="DEFAULT_VALUE" type="xs:string" use="optional"/>
+        <xs:attribute name="SEARCHABLE" type="xs:boolean" use="optional" default="false"/>
+    </xs:complexType>
+
+    <!-- Attribute Labels Collection -->
+    <xs:complexType name="LABELS">
+        <xs:sequence>
+            <xs:element name="LABEL" type="LABEL" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Label Definition -->
+    <xs:complexType name="LABEL">
+        <xs:attribute name="LANGUAGE" type="xs:string" use="required"/>
+        <xs:attribute name="VALUE" type="xs:string" use="required"/>
     </xs:complexType>
     
     <!-- Attribute Data Types -->

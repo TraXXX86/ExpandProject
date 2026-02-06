@@ -22,6 +22,8 @@ import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
+import fr.expand.project.importdata.model.generated.ATTRIBUTEGROUP;
+import fr.expand.project.importdata.model.generated.ATTRIBUTEREF;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
 
@@ -81,6 +83,8 @@ public class ModelManager {
         currentModel = model;
         indexCurrentModel();
         validateInheritance(currentModel);
+        validateAttributeGroups(currentModel);
+        validateRepresentativeAttributes(currentModel);
         
         LOGGER.info("Model loaded successfully: " + model.getNAME() + " (version " + model.getVERSION() + ")");
         LOGGER.info("  - Object types: " + model.getOBJECTTYPES().getOBJECTTYPE().size());
@@ -120,6 +124,8 @@ public class ModelManager {
         currentModel = model;
         indexCurrentModel();
         validateInheritance(currentModel);
+        validateAttributeGroups(currentModel);
+        validateRepresentativeAttributes(currentModel);
         
         LOGGER.info("Model loaded successfully: " + model.getNAME());
         
@@ -144,6 +150,8 @@ public class ModelManager {
         currentModelXml = xmlContent;
         indexCurrentModel();
         validateInheritance(currentModel);
+        validateAttributeGroups(currentModel);
+        validateRepresentativeAttributes(currentModel);
 
         LOGGER.info("Model loaded successfully: " + model.getNAME() + " (version " + model.getVERSION() + ")");
         return model;
@@ -176,6 +184,8 @@ public class ModelManager {
             currentModelXml = null;
             indexCurrentModel();
             validateInheritance(currentModel);
+            validateAttributeGroups(currentModel);
+            validateRepresentativeAttributes(currentModel);
             LOGGER.info("Current model set to: " + modelName);
             return true;
         }
@@ -384,6 +394,74 @@ public class ModelManager {
             String typeName = objType.getNAME();
             if (typeName != null && hasInheritanceCycle(typeName, visiting, visited)) {
                 LOGGER.error("Inheritance cycle detected involving type: " + typeName);
+            }
+        }
+    }
+
+    private void validateAttributeGroups(DATAMODEL model) {
+        if (model == null || model.getOBJECTTYPES() == null || model.getOBJECTTYPES().getOBJECTTYPE() == null) {
+            return;
+        }
+
+        for (OBJECTTYPE objectType : model.getOBJECTTYPES().getOBJECTTYPE()) {
+            Map<String, ATTRIBUTEDEFINITION> definitions = getAttributeDefinitionMap(objectType);
+            if (objectType.getATTRIBUTEGROUPS() == null
+                || objectType.getATTRIBUTEGROUPS().getATTRIBUTEGROUP() == null) {
+                continue;
+            }
+
+            for (ATTRIBUTEGROUP group : objectType.getATTRIBUTEGROUPS().getATTRIBUTEGROUP()) {
+                String groupName = group.getNAME() == null ? "" : group.getNAME();
+                if (group.getATTRIBUTEREF() == null || group.getATTRIBUTEREF().isEmpty()) {
+                    LOGGER.warn("Empty attribute group '" + groupName + "' in type '" + objectType.getNAME() + "'");
+                    continue;
+                }
+
+                for (ATTRIBUTEREF ref : group.getATTRIBUTEREF()) {
+                    String attributeName = ref.getNAME();
+                    if (attributeName == null || attributeName.trim().isEmpty()) {
+                        LOGGER.error("Attribute group '" + groupName + "' in type '" + objectType.getNAME()
+                            + "' references an empty attribute name");
+                        continue;
+                    }
+                    if (!definitions.containsKey(attributeName)) {
+                        LOGGER.error("Attribute group '" + groupName + "' in type '" + objectType.getNAME()
+                            + "' references unknown attribute '" + attributeName + "'");
+                    }
+                }
+            }
+        }
+    }
+
+    private void validateRepresentativeAttributes(DATAMODEL model) {
+        if (model == null || model.getOBJECTTYPES() == null || model.getOBJECTTYPES().getOBJECTTYPE() == null) {
+            return;
+        }
+
+        for (OBJECTTYPE objectType : model.getOBJECTTYPES().getOBJECTTYPE()) {
+            Map<String, ATTRIBUTEDEFINITION> definitions = getAttributeDefinitionMap(objectType);
+            if (objectType.getREPRESENTATIVEATTRIBUTES() == null
+                || objectType.getREPRESENTATIVEATTRIBUTES().getATTRIBUTEREF() == null) {
+                continue;
+            }
+
+            List<ATTRIBUTEREF> refs = objectType.getREPRESENTATIVEATTRIBUTES().getATTRIBUTEREF();
+            if (refs.isEmpty()) {
+                LOGGER.warn("Empty representative attributes definition in type '" + objectType.getNAME() + "'");
+                continue;
+            }
+
+            for (ATTRIBUTEREF ref : refs) {
+                String attributeName = ref.getNAME();
+                if (attributeName == null || attributeName.trim().isEmpty()) {
+                    LOGGER.error("Representative attributes in type '" + objectType.getNAME()
+                        + "' references an empty attribute name");
+                    continue;
+                }
+                if (!definitions.containsKey(attributeName)) {
+                    LOGGER.error("Representative attributes in type '" + objectType.getNAME()
+                        + "' references unknown attribute '" + attributeName + "'");
+                }
             }
         }
     }

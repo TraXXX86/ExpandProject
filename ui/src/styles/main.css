@@ -141,3 +141,137 @@ body {
   font-size: 0.85rem;
   overflow-x: auto;
 }
+
+.navigate-layout {
+  align-items: stretch;
+}
+
+.nav-panel {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(18, 36, 58, 0.08);
+}
+
+.tree-section {
+  margin-top: 8px;
+}
+
+.tree-section-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #1c4e80;
+  margin-bottom: 0.5rem;
+}
+
+.tree-subtitle {
+  font-size: 0.85rem;
+  color: #4b5967;
+  margin-bottom: 0.5rem;
+}
+
+.tree-list {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  padding: 4px 8px;
+  border: 1px solid rgba(18, 36, 58, 0.08);
+}
+
+.identity-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(18, 36, 58, 0.08);
+}
+
+.identity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.identity-title {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #12243a;
+}
+
+.identity-subtitle {
+  font-size: 0.95rem;
+  color: #536170;
+}
+
+.identity-metrics {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  background: linear-gradient(140deg, rgba(241, 143, 1, 0.18), rgba(28, 78, 128, 0.08));
+  border: 1px solid rgba(18, 36, 58, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1c4e80;
+  font-weight: 600;
+}
+
+.metric-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #12243a;
+  margin-top: 2px;
+}
+
+.language-select {
+  min-width: 180px;
+}
+
+.identity-tabs {
+  background: rgba(18, 36, 58, 0.05);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.identity-tabs .v-tab {
+  text-transform: none;
+  font-weight: 600;
+}
+
+.model-tabs {
+  background: rgba(28, 78, 128, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.model-tabs .v-tab {
+  text-transform: none;
+  font-weight: 600;
+}
+
+.table-attributes {
+  color: #3b4652;
+  font-size: 0.9rem;
+}
+
+.table-detail-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(18, 36, 58, 0.08);
+}
+
+.attr-label {
+  font-weight: 600;
+  color: #12243a;
+}
+
+.attr-key {
+  font-size: 0.75rem;
+  color: #6c7a89;
+}

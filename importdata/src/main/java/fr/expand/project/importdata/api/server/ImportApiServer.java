@@ -28,6 +28,10 @@ import fr.expand.project.importdata.dto.generated.DATAS;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
+import fr.expand.project.importdata.model.generated.ATTRIBUTEGROUP;
+import fr.expand.project.importdata.model.generated.ATTRIBUTEREF;
+import fr.expand.project.importdata.model.generated.LABEL;
+import fr.expand.project.importdata.model.generated.LANGUAGE;
 import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
@@ -292,6 +296,18 @@ public class ImportApiServer {
         payload.put("key", modelKey);
         payload.put("name", model.getNAME());
         payload.put("version", model.getVERSION() == null ? "" : model.getVERSION());
+        payload.put("defaultLanguage", model.getDEFAULTLANGUAGE() == null ? "" : model.getDEFAULTLANGUAGE());
+
+        List<Map<String, Object>> languages = new ArrayList<>();
+        if (model.getLANGUAGES() != null && model.getLANGUAGES().getLANGUAGE() != null) {
+            for (LANGUAGE language : model.getLANGUAGES().getLANGUAGE()) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("code", language.getCODE() == null ? "" : language.getCODE());
+                row.put("label", language.getLABEL() == null ? "" : language.getLABEL());
+                languages.add(row);
+            }
+        }
+        payload.put("languages", languages);
 
         List<Map<String, Object>> objectTypes = new ArrayList<>();
         if (model.getOBJECTTYPES() != null && model.getOBJECTTYPES().getOBJECTTYPE() != null) {
@@ -313,12 +329,69 @@ public class ImportApiServer {
                         attr.put("type", attribute.getTYPE() == null ? "STRING" : attribute.getTYPE().value());
                         attr.put("required", attribute.isREQUIRED());
                         attr.put("defaultValue", attribute.getDEFAULTVALUE() == null ? "" : attribute.getDEFAULTVALUE());
+                        attr.put("searchable", Boolean.TRUE.equals(attribute.isSEARCHABLE()));
+                        Map<String, String> labels = new HashMap<>();
+                        if (attribute.getLABELS() != null && attribute.getLABELS().getLABEL() != null) {
+                            for (LABEL label : attribute.getLABELS().getLABEL()) {
+                                if (label.getLANGUAGE() != null && label.getVALUE() != null) {
+                                    labels.put(label.getLANGUAGE(), label.getVALUE());
+                                }
+                            }
+                        }
+                        attr.put("labels", labels);
                         attr.put("description",
                             attribute.getDESCRIPTION() == null ? "" : attribute.getDESCRIPTION());
                         attributes.add(attr);
                     }
                 }
                 row.put("attributes", attributes);
+
+                List<Map<String, Object>> representativeAttributes = new ArrayList<>();
+                if (objectType.getREPRESENTATIVEATTRIBUTES() != null
+                    && objectType.getREPRESENTATIVEATTRIBUTES().getATTRIBUTEREF() != null) {
+                    int representativeIndex = 0;
+                    for (ATTRIBUTEREF attributeRef : objectType.getREPRESENTATIVEATTRIBUTES().getATTRIBUTEREF()) {
+                        Map<String, Object> refRow = new HashMap<>();
+                        refRow.put("name", attributeRef.getNAME() == null ? "" : attributeRef.getNAME());
+                        refRow.put("index", representativeIndex++);
+                        if (attributeRef.getORDER() != null) {
+                            refRow.put("order", attributeRef.getORDER());
+                        }
+                        representativeAttributes.add(refRow);
+                    }
+                }
+                row.put("representativeAttributes", representativeAttributes);
+
+                List<Map<String, Object>> attributeGroups = new ArrayList<>();
+                if (objectType.getATTRIBUTEGROUPS() != null
+                    && objectType.getATTRIBUTEGROUPS().getATTRIBUTEGROUP() != null) {
+                    int groupIndex = 0;
+                    for (ATTRIBUTEGROUP group : objectType.getATTRIBUTEGROUPS().getATTRIBUTEGROUP()) {
+                        Map<String, Object> groupRow = new HashMap<>();
+                        groupRow.put("key", (group.getNAME() == null ? "groupe" : group.getNAME()) + "-" + groupIndex++);
+                        groupRow.put("name", group.getNAME() == null ? "" : group.getNAME());
+                        if (group.getORDER() != null) {
+                            groupRow.put("order", group.getORDER());
+                        }
+
+                        List<Map<String, Object>> groupAttributes = new ArrayList<>();
+                        if (group.getATTRIBUTEREF() != null) {
+                            int attributeIndex = 0;
+                            for (ATTRIBUTEREF attributeRef : group.getATTRIBUTEREF()) {
+                                Map<String, Object> refRow = new HashMap<>();
+                                refRow.put("name", attributeRef.getNAME() == null ? "" : attributeRef.getNAME());
+                                refRow.put("index", attributeIndex++);
+                                if (attributeRef.getORDER() != null) {
+                                    refRow.put("order", attributeRef.getORDER());
+                                }
+                                groupAttributes.add(refRow);
+                            }
+                        }
+                        groupRow.put("attributes", groupAttributes);
+                        attributeGroups.add(groupRow);
+                    }
+                }
+                row.put("attributeGroups", attributeGroups);
                 objectTypes.add(row);
             }
         }
@@ -360,6 +433,16 @@ public class ImportApiServer {
                         attr.put("type", attribute.getTYPE() == null ? "STRING" : attribute.getTYPE().value());
                         attr.put("required", attribute.isREQUIRED());
                         attr.put("defaultValue", attribute.getDEFAULTVALUE() == null ? "" : attribute.getDEFAULTVALUE());
+                        attr.put("searchable", Boolean.TRUE.equals(attribute.isSEARCHABLE()));
+                        Map<String, String> labels = new HashMap<>();
+                        if (attribute.getLABELS() != null && attribute.getLABELS().getLABEL() != null) {
+                            for (LABEL label : attribute.getLABELS().getLABEL()) {
+                                if (label.getLANGUAGE() != null && label.getVALUE() != null) {
+                                    labels.put(label.getLANGUAGE(), label.getVALUE());
+                                }
+                            }
+                        }
+                        attr.put("labels", labels);
                         attr.put("description",
                             attribute.getDESCRIPTION() == null ? "" : attribute.getDESCRIPTION());
                         attributes.add(attr);
