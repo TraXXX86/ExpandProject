@@ -33,7 +33,7 @@ OBJECT_TYPES contient une ou plusieurs balises OBJECT_TYPE.
 
 Attributs de OBJECT_TYPE :
 - NAME (obligatoire)
-- PARENT (optionnel, heritager)
+- PARENT (optionnel, heritage)
 
 Elements possibles dans OBJECT_TYPE :
 - DESCRIPTION (optionnel)
@@ -98,6 +98,7 @@ REPRESENTATIVE_ATTRIBUTES contient une ou plusieurs balises ATTRIBUTE_REF.
 
 Objectif :
 - definir les attributs principaux a afficher en priorite pour identifier un objet
+- ces attributs sont utilises dans l'IHM pour l'aperçu, les listes et les resultats de recherche
 
 Notes :
 - les references doivent exister dans ATTRIBUTE_DEFINITIONS
