@@ -182,6 +182,49 @@
             </ATTRIBUTE_GROUPS>
         </OBJECT_TYPE>
 
+        <!-- Définition du type EMPLOYE (hérite de PERSONNE) -->
+        <OBJECT_TYPE NAME="EMPLOYE" PARENT="PERSONNE">
+            <DESCRIPTION>Représente un employé dans une entreprise</DESCRIPTION>
+            <ATTRIBUTE_DEFINITIONS>
+                <ATTRIBUTE_DEFINITION NAME="POSTE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
+                    <DESCRIPTION>Intitulé du poste</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Poste"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Poste"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Job title"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="DATE_EMBAUCHE" TYPE="DATE" REQUIRED="false">
+                    <DESCRIPTION>Date d'embauche</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Date d'embauche"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Date d'embauche"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Hire date"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+                <ATTRIBUTE_DEFINITION NAME="NIVEAU" TYPE="STRING" REQUIRED="false">
+                    <DESCRIPTION>Niveau de l'employé</DESCRIPTION>
+                    <LABELS>
+                        <LABEL LANGUAGE="FR_fr" VALUE="Niveau"/>
+                        <LABEL LANGUAGE="FR_ca" VALUE="Niveau"/>
+                        <LABEL LANGUAGE="EN_uk" VALUE="Level"/>
+                    </LABELS>
+                </ATTRIBUTE_DEFINITION>
+            </ATTRIBUTE_DEFINITIONS>
+            <REPRESENTATIVE_ATTRIBUTES>
+                <ATTRIBUTE_REF NAME="PRENOM" ORDER="1"/>
+                <ATTRIBUTE_REF NAME="NOM" ORDER="2"/>
+                <ATTRIBUTE_REF NAME="POSTE" ORDER="3"/>
+            </REPRESENTATIVE_ATTRIBUTES>
+            <ATTRIBUTE_GROUPS>
+                <ATTRIBUTE_GROUP NAME="Profession" ORDER="1">
+                    <ATTRIBUTE_REF NAME="POSTE" ORDER="1"/>
+                    <ATTRIBUTE_REF NAME="DATE_EMBAUCHE" ORDER="2"/>
+                    <ATTRIBUTE_REF NAME="NIVEAU" ORDER="3"/>
+                </ATTRIBUTE_GROUP>
+            </ATTRIBUTE_GROUPS>
+        </OBJECT_TYPE>
+
         <!-- Définition du type ENTREPRISE -->
         <OBJECT_TYPE NAME="ENTREPRISE">
             <DESCRIPTION>Représente une entreprise</DESCRIPTION>

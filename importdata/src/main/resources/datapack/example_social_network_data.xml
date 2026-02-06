@@ -63,6 +63,18 @@
             <ATTRIBUTE KEY="SCORE_REPUTATION" VALUE="64"/>
         </OBJECT>
 
+        <OBJECT TYPE="EMPLOYE" ID="4">
+            <ATTRIBUTE KEY="NOM" VALUE="Bernard"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Camille"/>
+            <ATTRIBUTE KEY="PSEUDO" VALUE="cbernard"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="camille.bernard@email.com"/>
+            <ATTRIBUTE KEY="VILLE" VALUE="Lille"/>
+            <ATTRIBUTE KEY="PAYS" VALUE="France"/>
+            <ATTRIBUTE KEY="POSTE" VALUE="Architecte logiciel"/>
+            <ATTRIBUTE KEY="DATE_EMBAUCHE" VALUE="2022-05-01"/>
+            <ATTRIBUTE KEY="NIVEAU" VALUE="SENIOR"/>
+        </OBJECT>
+
         <!-- Entreprises -->
         <OBJECT TYPE="ENTREPRISE" ID="10">
             <ATTRIBUTE KEY="NOM" VALUE="TechCorp"/>

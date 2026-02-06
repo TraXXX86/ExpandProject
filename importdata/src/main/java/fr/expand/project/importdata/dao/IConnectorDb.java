@@ -6,7 +6,7 @@ import org.apache.logging.log4j.Logger;
 import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dto.DataPackObject;
 
-public abstract class IConnectorDb {
+public abstract class IConnectorDb implements AutoCloseable {
 
 	protected static final Logger LOGGER = LogManager.getLogger(IConnectorDb.class.toString());
 	protected String modelKey;
@@ -82,5 +82,10 @@ public abstract class IConnectorDb {
 
 	public String getModelKey() {
 		return modelKey;
+	}
+
+	@Override
+	public void close() {
+		closeConnection();
 	}
 }
