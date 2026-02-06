@@ -395,6 +395,67 @@
       </v-card>
     </v-col>
   </v-row>
+
+  <v-row class="mt-8">
+    <v-col cols="12">
+      <v-card class="card-animate delay-1" elevation="4" rounded="xl">
+        <v-card-title class="section-title">Edition XML</v-card-title>
+        <v-card-text>
+          <div class="text-medium-emphasis mb-4">
+            Modifiez le XML du modele puis enregistrez-le en base ou exportez-le.
+          </div>
+          <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
+            <v-btn
+              color="secondary"
+              variant="tonal"
+              :loading="state.isLoadingModelXml"
+              :disabled="!state.selectedModelKey"
+              @click="state.loadModelXml"
+            >
+              Charger le XML
+            </v-btn>
+            <v-btn
+              color="primary"
+              :loading="state.isSavingModelXml"
+              :disabled="!state.selectedModelKey || !state.modelXml"
+              @click="state.saveModelXml"
+            >
+              Sauvegarder
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              color="primary"
+              :disabled="!state.selectedModelKey"
+              @click="exportXml"
+            >
+              Exporter XML
+            </v-btn>
+          </div>
+
+          <v-textarea
+            v-model="state.modelXml"
+            class="mt-4"
+            label="XML du modele"
+            variant="outlined"
+            auto-grow
+            rows="12"
+            :disabled="!state.selectedModelKey"
+          />
+
+          <v-alert
+            v-if="state.modelXmlStatus"
+            class="mt-4"
+            :type="state.modelXmlStatus.type"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+          >
+            {{ state.modelXmlStatus.message }}
+          </v-alert>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
 </template>
 
 <script setup>
@@ -427,4 +488,26 @@ const representativeAttributes = computed(() => {
       label: state.getAttributeLabel(selected.name, attr.name) || attr.name
     }));
 });
+
+async function exportXml() {
+  if (!state.selectedModelKey) {
+    return;
+  }
+  if (!state.modelXml) {
+    await state.loadModelXml();
+  }
+  if (!state.modelXml) {
+    return;
+  }
+  const name = state.selectedModel?.name || 'modele';
+  const version = state.selectedModel?.version || '';
+  const fileName = version ? `${name}-v${version}.xml` : `${name}.xml`;
+  const blob = new Blob([state.modelXml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 </script>

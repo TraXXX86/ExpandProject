@@ -42,6 +42,7 @@
               <v-tab value="search">Recherche</v-tab>
               <v-tab value="import-model">Import modèle</v-tab>
               <v-tab value="import-data">Import données</v-tab>
+              <v-tab value="create">Création</v-tab>
               <v-tab value="model">Modèle</v-tab>
               <v-tab value="admin">Administration</v-tab>
             </v-tabs>
@@ -69,6 +70,10 @@
             <ImportDataPage :state="state" />
           </v-window-item>
 
+          <v-window-item value="create">
+            <CreatePage :state="state" />
+          </v-window-item>
+
           <v-window-item value="model">
             <ModelPage :state="state" />
           </v-window-item>
@@ -92,6 +97,7 @@ import ModelPage from './components/pages/ModelPage.vue';
 import NavigatePage from './components/pages/NavigatePage.vue';
 import SearchPage from './components/pages/SearchPage.vue';
 import TablePage from './components/pages/TablePage.vue';
+import CreatePage from './components/pages/CreatePage.vue';
 
 const state = reactive(useAppState());
 </script>

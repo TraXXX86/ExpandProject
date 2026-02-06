@@ -6,6 +6,7 @@ import static spark.Spark.get;
 import static spark.Spark.options;
 import static spark.Spark.port;
 import static spark.Spark.post;
+import static spark.Spark.put;
 import static spark.Spark.awaitInitialization;
 
 import java.io.InputStream;
@@ -24,7 +25,12 @@ import com.google.gson.GsonBuilder;
 
 import fr.expand.project.importdata.api.impl.ModelBasedImportAPI;
 import fr.expand.project.importdata.data.Neo4jDataStore;
+import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
+import fr.expand.project.importdata.dto.DataPackAttribute;
+import fr.expand.project.importdata.dto.DataPackObject;
 import fr.expand.project.importdata.dto.generated.DATAS;
+import fr.expand.project.importdata.dto.generated.OBJECT;
+import fr.expand.project.importdata.dto.generated.OBJECTS;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
@@ -36,6 +42,7 @@ import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
 import fr.expand.project.importdata.model.generated.TYPEREF;
+import fr.expand.project.importdata.validation.DataValidator;
 import fr.expand.project.importdata.validation.ValidationResult;
 
 public class ImportApiServer {
@@ -113,6 +120,53 @@ public class ImportApiServer {
                     return error(response, 404, "Modèle introuvable");
                 }
                 return GSON.toJson(buildModelDetails(modelKey, model));
+            }
+        });
+
+        get("/api/models/:key/xml", (request, response) -> {
+            String modelKey = request.params("key");
+            if (modelKey == null || modelKey.isBlank()) {
+                response.type("application/json");
+                return error(response, 400, "modelKey manquant");
+            }
+
+            try (Neo4jModelStore store = new Neo4jModelStore()) {
+                String xml = store.loadModelXmlByKey(modelKey);
+                if (xml == null || xml.isBlank()) {
+                    response.type("application/json");
+                    return error(response, 404, "Modèle introuvable");
+                }
+                response.type("application/xml");
+                return xml;
+            }
+        });
+
+        put("/api/models/:key", (request, response) -> {
+            response.type("application/json");
+            String modelKey = request.params("key");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            String xml = request.body();
+            if (xml == null || xml.isBlank()) {
+                return error(response, 400, "XML du modèle manquant");
+            }
+
+            try {
+                ModelManager modelManager = ModelManager.getInstance();
+                DATAMODEL model = modelManager.loadModelFromXml(xml);
+                try (Neo4jModelStore store = new Neo4jModelStore()) {
+                    String newKey = store.storeModel(model, xml);
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("key", newKey);
+                    payload.put("requestedKey", modelKey);
+                    payload.put("name", model.getNAME());
+                    payload.put("version", model.getVERSION() == null ? "" : model.getVERSION());
+                    payload.put("renamed", !modelKey.equals(newKey));
+                    return GSON.toJson(payload);
+                }
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la mise à jour du modèle: " + e.getMessage());
             }
         });
 
@@ -225,11 +279,172 @@ public class ImportApiServer {
                 return GSON.toJson(payload);
             }
         });
+
+        post("/api/objects", (request, response) -> {
+            response.type("application/json");
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+            String modelKey = getString(payload.get("modelKey"));
+            String type = getString(payload.get("type"));
+            Integer externalId = getInt(payload.get("id"));
+
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (type == null || type.isBlank()) {
+                return error(response, 400, "type manquant");
+            }
+
+            List<DataPackAttribute> attributes = readAttributes(payload.get("attributes"));
+
+            try (Neo4jModelStore store = new Neo4jModelStore()) {
+                String modelXml = store.loadModelXmlByKey(modelKey);
+                if (modelXml == null || modelXml.isBlank()) {
+                    return error(response, 404, "Modèle introuvable pour la clé fournie");
+                }
+                ModelManager.getInstance().loadModelFromXml(modelXml);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors du chargement du modèle: " + e.getMessage());
+            }
+
+            DATAS data = new DATAS();
+            OBJECTS objects = new OBJECTS();
+            data.setOBJECTS(objects);
+            OBJECT obj = new OBJECT();
+            obj.setID(externalId != null ? externalId : 0);
+            obj.setTYPE(type);
+            obj.getATTRIBUTE().addAll(attributes);
+            objects.getOBJECT().add(obj);
+
+            DataValidator validator = new DataValidator();
+            ValidationResult result = validator.validate(data);
+            if (!result.isValid()) {
+                response.status(400);
+                Map<String, Object> errorPayload = new HashMap<>();
+                errorPayload.put("valid", false);
+                errorPayload.put("errors", result.getErrors());
+                errorPayload.put("warnings", result.getWarnings());
+                return GSON.toJson(errorPayload);
+            }
+
+            try (CypherConnector connector = new CypherConnector()) {
+                connector.setModelKey(modelKey);
+                DataPackObject dataObject = new DataPackObject();
+                dataObject.setTYPE(type);
+                if (externalId != null && externalId > 0) {
+                    dataObject.setID(externalId);
+                }
+                dataObject.getATTRIBUTE().addAll(attributes);
+                int id = connector.writeObject(dataObject);
+                Map<String, Object> resultPayload = new HashMap<>();
+                resultPayload.put("status", "created");
+                resultPayload.put("id", id);
+                resultPayload.put("type", type);
+                resultPayload.put("warnings", result.getWarnings());
+                return GSON.toJson(resultPayload);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la création de l'objet: " + e.getMessage());
+            }
+        });
+
+        post("/api/links", (request, response) -> {
+            response.type("application/json");
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+            String modelKey = getString(payload.get("modelKey"));
+            String linkTypeName = getString(payload.get("type"));
+            Integer fromId = getInt(payload.get("fromId"));
+            Integer toId = getInt(payload.get("toId"));
+
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (linkTypeName == null || linkTypeName.isBlank()) {
+                return error(response, 400, "type manquant");
+            }
+            if (fromId == null || fromId <= 0 || toId == null || toId <= 0) {
+                return error(response, 400, "fromId/toId invalides");
+            }
+
+            LINKTYPE linkType;
+            try (Neo4jModelStore store = new Neo4jModelStore()) {
+                String modelXml = store.loadModelXmlByKey(modelKey);
+                if (modelXml == null || modelXml.isBlank()) {
+                    return error(response, 404, "Modèle introuvable pour la clé fournie");
+                }
+                ModelManager.getInstance().loadModelFromXml(modelXml);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors du chargement du modèle: " + e.getMessage());
+            }
+
+            ModelManager modelManager = ModelManager.getInstance();
+            linkType = modelManager.getLinkType(linkTypeName);
+            if (linkType == null) {
+                return error(response, 400, "Type de lien inconnu: " + linkTypeName);
+            }
+
+            Map<String, Object> source;
+            Map<String, Object> target;
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                source = store.loadObjectById(modelKey, fromId);
+                target = store.loadObjectById(modelKey, toId);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la recherche des objets: " + e.getMessage());
+            }
+
+            if (source == null || target == null) {
+                return error(response, 404, "Objet source ou cible introuvable");
+            }
+
+            String sourceType = source.get("type") == null ? "" : source.get("type").toString();
+            String targetType = target.get("type") == null ? "" : target.get("type").toString();
+
+            if (!isLinkTypeAllowed(modelManager, linkType, sourceType, true)) {
+                return error(response, 400, "Type source non autorisé pour ce lien");
+            }
+            if (!isLinkTypeAllowed(modelManager, linkType, targetType, false)) {
+                return error(response, 400, "Type cible non autorisé pour ce lien");
+            }
+
+            try (CypherConnector connector = new CypherConnector()) {
+                connector.setModelKey(modelKey);
+                DataPackObject objA = new DataPackObject();
+                objA.setID(fromId);
+                objA.setInternalId(fromId);
+                objA.setTYPE(sourceType);
+
+                DataPackObject objB = new DataPackObject();
+                objB.setID(toId);
+                objB.setInternalId(toId);
+                objB.setTYPE(targetType);
+
+                boolean directed = true;
+                try {
+                    directed = linkType.isDIRECTED();
+                } catch (Exception ignored) {
+                    directed = true;
+                }
+                connector.writeLink(objA, objB, directed, linkTypeName);
+
+                Map<String, Object> resultPayload = new HashMap<>();
+                resultPayload.put("status", "created");
+                resultPayload.put("type", linkTypeName);
+                resultPayload.put("fromId", fromId);
+                resultPayload.put("toId", toId);
+                return GSON.toJson(resultPayload);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la création du lien: " + e.getMessage());
+            }
+        });
     }
 
     private static void addCorsHeaders(spark.Response response) {
         response.raw().setHeader("Access-Control-Allow-Origin", "*");
-        response.raw().setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+        response.raw().setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
         response.raw().setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,Accept,Origin");
     }
 
@@ -289,6 +504,88 @@ public class ImportApiServer {
     private static String error(spark.Response response, int status, String message) {
         response.status(status);
         return GSON.toJson(Map.of("error", message));
+    }
+
+    private static Map<String, Object> readJsonBody(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = GSON.fromJson(body, Map.class);
+            return payload;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String getString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return value.toString();
+    }
+
+    private static Integer getInt(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static List<DataPackAttribute> readAttributes(Object value) {
+        List<DataPackAttribute> attributes = new ArrayList<>();
+        if (!(value instanceof List<?> list)) {
+            return attributes;
+        }
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            Object keyValue = map.get("key");
+            if (keyValue == null) {
+                continue;
+            }
+            String key = keyValue.toString();
+            String val = map.get("value") == null ? "" : map.get("value").toString();
+            attributes.add(new DataPackAttribute(key, val));
+        }
+        return attributes;
+    }
+
+    private static boolean isLinkTypeAllowed(ModelManager modelManager, LINKTYPE linkType, String candidateType, boolean source) {
+        if (candidateType == null || candidateType.isBlank() || linkType == null) {
+            return false;
+        }
+        List<TYPEREF> refs = null;
+        if (source) {
+            if (linkType.getSOURCETYPES() != null) {
+                refs = linkType.getSOURCETYPES().getTYPEREF();
+            }
+        } else {
+            if (linkType.getTARGETTYPES() != null) {
+                refs = linkType.getTARGETTYPES().getTYPEREF();
+            }
+        }
+        if (refs == null || refs.isEmpty()) {
+            return false;
+        }
+        for (TYPEREF ref : refs) {
+            if (ref == null || ref.getNAME() == null) {
+                continue;
+            }
+            if (modelManager.isTypeOrSubtype(candidateType, ref.getNAME())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, Object> buildModelDetails(String modelKey, DATAMODEL model) {

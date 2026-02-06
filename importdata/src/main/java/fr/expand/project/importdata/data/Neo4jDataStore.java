@@ -110,6 +110,50 @@ public class Neo4jDataStore implements AutoCloseable {
         }
     }
 
+    public Map<String, Object> loadObjectById(String modelKey, long objectId) {
+        if (modelKey == null || modelKey.isBlank() || objectId <= 0) {
+            return null;
+        }
+
+        try (Session session = driver.session()) {
+            return session.executeRead(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                params.put("objectId", objectId);
+                Result result = tx.run(
+                    "MATCH (n:DataObject {modelKey:$modelKey}) "
+                        + "WHERE id(n)=$objectId "
+                        + "RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props",
+                    params
+                );
+                if (!result.hasNext()) {
+                    return null;
+                }
+                Record record = result.next();
+                long id = record.get("id").asLong();
+                List<Object> labels = record.get("labels").asList();
+                String type = resolveType(labels);
+
+                Map<String, Object> props = new HashMap<>(record.get("props").asMap());
+                props.remove("modelKey");
+
+                List<Map<String, Object>> attributes = new ArrayList<>();
+                for (Map.Entry<String, Object> entry : props.entrySet()) {
+                    Map<String, Object> attribute = new HashMap<>();
+                    attribute.put("key", entry.getKey());
+                    attribute.put("value", entry.getValue() == null ? "" : entry.getValue().toString());
+                    attributes.add(attribute);
+                }
+
+                Map<String, Object> row = new HashMap<>();
+                row.put("id", id);
+                row.put("type", type);
+                row.put("attributes", attributes);
+                return row;
+            });
+        }
+    }
+
     @Override
     public void close() {
         if (driver != null) {

@@ -34,6 +34,19 @@ export function useAppState() {
   const tableSelectedObject = ref(null);
   const showTableDetailPanel = ref(true);
   const tableSelectedAttributeTab = ref(null);
+  const createObjectType = ref('');
+  const createObjectAttributes = ref({});
+  const createObjectStatus = ref(null);
+  const isCreatingObject = ref(false);
+  const createLinkType = ref('');
+  const createLinkSourceId = ref(null);
+  const createLinkTargetId = ref(null);
+  const createLinkStatus = ref(null);
+  const isCreatingLink = ref(false);
+  const modelXml = ref('');
+  const modelXmlStatus = ref(null);
+  const isLoadingModelXml = ref(false);
+  const isSavingModelXml = ref(false);
 
   const models = ref([]);
   const selectedModelKey = ref('');
@@ -64,6 +77,18 @@ export function useAppState() {
       title: model.version ? `${model.name} v${model.version}` : model.name,
       value: model.key
     }))
+  );
+
+  const createObjectTypeOptions = computed(() =>
+    modelDetails.value.objectTypes
+      .map((type) => ({ title: type.name, value: type.name }))
+      .sort((a, b) => a.title.localeCompare(b.title))
+  );
+
+  const createLinkTypeOptions = computed(() =>
+    modelDetails.value.linkTypes
+      .map((link) => ({ title: link.name, value: link.name }))
+      .sort((a, b) => a.title.localeCompare(b.title))
   );
 
   const selectedModel = computed(
@@ -569,6 +594,93 @@ export function useAppState() {
       });
   });
 
+  const modelTypeIndex = computed(() => {
+    const index = new Map();
+    modelDetails.value.objectTypes.forEach((type) => {
+      if (type.name) {
+        index.set(type.name, type);
+      }
+    });
+    return index;
+  });
+
+  const createObjectAttributeDefs = computed(() => {
+    if (!createObjectType.value) {
+      return [];
+    }
+    const chain = [];
+    const visited = new Set();
+    let current = modelTypeIndex.value.get(createObjectType.value);
+    while (current && current.name && !visited.has(current.name)) {
+      visited.add(current.name);
+      chain.push(current);
+      const parentName = current.parent;
+      if (!parentName) {
+        break;
+      }
+      current = modelTypeIndex.value.get(parentName);
+    }
+
+    const merged = new Map();
+    chain.reverse().forEach((type) => {
+      const attributes = Array.isArray(type.attributes) ? type.attributes : [];
+      attributes.forEach((attr) => {
+        if (attr && attr.name) {
+          merged.set(attr.name, attr);
+        }
+      });
+    });
+
+    return Array.from(merged.values())
+      .map((attr) => ({
+        ...attr,
+        label: formatAttributeLabel(attr.name, attr) || attr.name
+      }))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+  });
+
+  const createLinkDefinition = computed(
+    () => modelDetails.value.linkTypes.find((link) => link.name === createLinkType.value) || null
+  );
+
+  const createLinkSourceOptions = computed(() => {
+    if (!createLinkDefinition.value || !dataObjects.value.length) {
+      return [];
+    }
+    const allowed = Array.isArray(createLinkDefinition.value.sources)
+      ? createLinkDefinition.value.sources
+      : [];
+    if (!allowed.length) {
+      return [];
+    }
+    return dataObjects.value
+      .filter((object) => isTypeAllowed(object.type, allowed))
+      .map((object) => ({
+        title: formatObjectOptionLabel(object),
+        value: object.id
+      }))
+      .sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  });
+
+  const createLinkTargetOptions = computed(() => {
+    if (!createLinkDefinition.value || !dataObjects.value.length) {
+      return [];
+    }
+    const allowed = Array.isArray(createLinkDefinition.value.targets)
+      ? createLinkDefinition.value.targets
+      : [];
+    if (!allowed.length) {
+      return [];
+    }
+    return dataObjects.value
+      .filter((object) => isTypeAllowed(object.type, allowed))
+      .map((object) => ({
+        title: formatObjectOptionLabel(object),
+        value: object.id
+      }))
+      .sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  });
+
   const adminCommand = computed(() => {
     if (!adminModel.value) {
       return 'java -jar importpackage.jar --delete-model <modelName> [modelVersion]';
@@ -819,14 +931,20 @@ export function useAppState() {
 
   watch(
     () => selectedModelKey.value,
-    async (key) => {
+    async (key, previousKey) => {
       if (!key) {
         resetModelState();
         resetDataState();
+        resetCreateState();
+        resetModelEditorState();
         return;
       }
       await refreshModelDetails(key);
       await refreshData(key);
+      if (key !== previousKey) {
+        resetCreateState();
+        resetModelEditorState();
+      }
     }
   );
 
@@ -887,6 +1005,43 @@ export function useAppState() {
       tableSelectedAttributeTab.value = tabs[0]?.key || null;
     },
     { immediate: true }
+  );
+
+  watch(
+    () => createObjectAttributeDefs.value,
+    (defs) => {
+      const next = {};
+      defs.forEach((def) => {
+        if (!def || !def.name) {
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(createObjectAttributes.value, def.name)) {
+          next[def.name] = createObjectAttributes.value[def.name];
+        } else if (def.defaultValue) {
+          next[def.name] = def.defaultValue;
+        } else {
+          next[def.name] = '';
+        }
+      });
+      createObjectAttributes.value = next;
+    },
+    { immediate: true }
+  );
+
+  watch(
+    () => createObjectType.value,
+    () => {
+      createObjectStatus.value = null;
+    }
+  );
+
+  watch(
+    () => createLinkType.value,
+    () => {
+      createLinkSourceId.value = null;
+      createLinkTargetId.value = null;
+      createLinkStatus.value = null;
+    }
   );
 
   function handleModelFile(files) {
@@ -1093,6 +1248,183 @@ export function useAppState() {
     }
   }
 
+  async function createObject() {
+    if (!selectedModelKey.value) {
+      createObjectStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
+      return;
+    }
+    if (!createObjectType.value) {
+      createObjectStatus.value = { type: 'warning', message: "Sélectionnez un type d'objet." };
+      return;
+    }
+
+    const missingRequired = createObjectAttributeDefs.value.filter((def) => {
+      if (!def.required) {
+        return false;
+      }
+      const value = createObjectAttributes.value[def.name];
+      return value === undefined || value === null || String(value).trim() === '';
+    });
+
+    if (missingRequired.length) {
+      createObjectStatus.value = {
+        type: 'warning',
+        message: 'Renseignez tous les attributs obligatoires.'
+      };
+      return;
+    }
+
+    createObjectStatus.value = null;
+    isCreatingObject.value = true;
+    try {
+      const attributes = createObjectAttributeDefs.value
+        .map((def) => ({
+          key: def.name,
+          value: createObjectAttributes.value[def.name]
+        }))
+        .filter((attr) => attr.key && String(attr.value ?? '').trim() !== '');
+
+      const response = await fetch(`${apiBase}/api/objects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelKey: selectedModelKey.value,
+          type: createObjectType.value,
+          attributes
+        })
+      });
+
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(extractErrorMessage(payload, 'Erreur lors de la création.'));
+      }
+
+      createObjectStatus.value = {
+        type: 'success',
+        message: `Objet créé (ID #${payload?.id ?? 'OK'}).`
+      };
+      await refreshData(selectedModelKey.value);
+    } catch (error) {
+      createObjectStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isCreatingObject.value = false;
+    }
+  }
+
+  async function createLink() {
+    if (!selectedModelKey.value) {
+      createLinkStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
+      return;
+    }
+    if (!createLinkType.value) {
+      createLinkStatus.value = { type: 'warning', message: 'Sélectionnez un type de lien.' };
+      return;
+    }
+    if (!createLinkSourceId.value || !createLinkTargetId.value) {
+      createLinkStatus.value = { type: 'warning', message: 'Sélectionnez les deux objets.' };
+      return;
+    }
+
+    createLinkStatus.value = null;
+    isCreatingLink.value = true;
+    try {
+      const response = await fetch(`${apiBase}/api/links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelKey: selectedModelKey.value,
+          type: createLinkType.value,
+          fromId: createLinkSourceId.value,
+          toId: createLinkTargetId.value
+        })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(extractErrorMessage(payload, 'Erreur lors de la création du lien.'));
+      }
+
+      createLinkStatus.value = {
+        type: 'success',
+        message: 'Lien créé.'
+      };
+      await refreshData(selectedModelKey.value);
+    } catch (error) {
+      createLinkStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isCreatingLink.value = false;
+    }
+  }
+
+  async function loadModelXml() {
+    if (!selectedModelKey.value) {
+      modelXmlStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
+      return;
+    }
+    isLoadingModelXml.value = true;
+    modelXmlStatus.value = null;
+    try {
+      const response = await fetch(
+        `${apiBase}/api/models/${encodeURIComponent(selectedModelKey.value)}/xml`
+      );
+      const text = await response.text();
+      if (!response.ok) {
+        let message = text;
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed?.error || message;
+        } catch (err) {
+          // ignore JSON parse failure
+        }
+        throw new Error(message || 'Erreur lors du chargement du XML.');
+      }
+      modelXml.value = text;
+      modelXmlStatus.value = { type: 'success', message: 'XML chargé.' };
+    } catch (error) {
+      modelXmlStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isLoadingModelXml.value = false;
+    }
+  }
+
+  async function saveModelXml() {
+    if (!selectedModelKey.value) {
+      modelXmlStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
+      return;
+    }
+    if (!modelXml.value.trim()) {
+      modelXmlStatus.value = { type: 'warning', message: 'XML vide.' };
+      return;
+    }
+    isSavingModelXml.value = true;
+    modelXmlStatus.value = null;
+    try {
+      const response = await fetch(
+        `${apiBase}/api/models/${encodeURIComponent(selectedModelKey.value)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/xml' },
+          body: modelXml.value
+        }
+      );
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors de la sauvegarde du modèle.');
+      }
+      const renamed = Boolean(payload?.renamed);
+      modelXmlStatus.value = {
+        type: 'success',
+        message: renamed
+          ? `Modèle mis à jour (nouvelle clé ${payload?.key}).`
+          : 'Modèle mis à jour.'
+      };
+      await refreshModels(payload?.key || selectedModelKey.value);
+    } catch (error) {
+      modelXmlStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isSavingModelXml.value = false;
+    }
+  }
+
   async function deleteModel() {
     if (!adminModelKey.value) {
       adminStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
@@ -1133,6 +1465,25 @@ export function useAppState() {
     dataObjects.value = [];
     dataLinks.value = [];
     selectedObject.value = null;
+  }
+
+  function resetCreateState() {
+    createObjectType.value = '';
+    createObjectAttributes.value = {};
+    createObjectStatus.value = null;
+    isCreatingObject.value = false;
+    createLinkType.value = '';
+    createLinkSourceId.value = null;
+    createLinkTargetId.value = null;
+    createLinkStatus.value = null;
+    isCreatingLink.value = false;
+  }
+
+  function resetModelEditorState() {
+    modelXml.value = '';
+    modelXmlStatus.value = null;
+    isLoadingModelXml.value = false;
+    isSavingModelXml.value = false;
   }
 
   function selectObject(object) {
@@ -1467,12 +1818,68 @@ export function useAppState() {
     return values.join(' ');
   }
 
+  function formatObjectOptionLabel(object) {
+    if (!object) {
+      return '';
+    }
+    const label = getObjectPrimaryLabel(object);
+    const type = object.type || 'Objet';
+    const id = object.id ?? 'N/A';
+    if (label) {
+      return `${label} • ${type} #${id}`;
+    }
+    return `${type} #${id}`;
+  }
+
+  function isTypeOrSubtype(candidate, allowed) {
+    if (!candidate || !allowed) {
+      return false;
+    }
+    if (candidate === allowed) {
+      return true;
+    }
+    const visited = new Set();
+    let current = modelTypeIndex.value.get(candidate);
+    while (current && current.parent) {
+      const parent = current.parent;
+      if (!parent || visited.has(parent)) {
+        return false;
+      }
+      if (parent === allowed) {
+        return true;
+      }
+      visited.add(parent);
+      current = modelTypeIndex.value.get(parent);
+    }
+    return false;
+  }
+
+  function isTypeAllowed(candidate, allowedTypes) {
+    if (!candidate || !Array.isArray(allowedTypes) || !allowedTypes.length) {
+      return false;
+    }
+    return allowedTypes.some((allowed) => isTypeOrSubtype(candidate, allowed));
+  }
+
   async function readJson(response) {
     try {
       return await response.json();
     } catch (error) {
       return null;
     }
+  }
+
+  function extractErrorMessage(payload, fallback) {
+    if (payload?.error) {
+      return payload.error;
+    }
+    const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+    if (errors.length) {
+      return errors
+        .map((err) => err?.message || err?.toString?.() || 'Erreur de validation')
+        .join(' • ');
+    }
+    return fallback;
   }
 
   return {
@@ -1508,6 +1915,19 @@ export function useAppState() {
     tableSelectedObject,
     showTableDetailPanel,
     tableSelectedAttributeTab,
+    createObjectType,
+    createObjectAttributes,
+    createObjectStatus,
+    isCreatingObject,
+    createLinkType,
+    createLinkSourceId,
+    createLinkTargetId,
+    createLinkStatus,
+    isCreatingLink,
+    modelXml,
+    modelXmlStatus,
+    isLoadingModelXml,
+    isSavingModelXml,
     models,
     selectedModelKey,
     modelFile,
@@ -1521,6 +1941,8 @@ export function useAppState() {
     modelLanguages,
     defaultLanguage,
     modelOptions,
+    createObjectTypeOptions,
+    createLinkTypeOptions,
     selectedModel,
     adminModel,
     canUploadModel,
@@ -1538,6 +1960,10 @@ export function useAppState() {
     attributeTabs,
     tableAttributeTabs,
     objectTypeGroups,
+    createObjectAttributeDefs,
+    createLinkDefinition,
+    createLinkSourceOptions,
+    createLinkTargetOptions,
     adminCommand,
     graphNodes,
     graphEdges,
@@ -1559,6 +1985,7 @@ export function useAppState() {
     getRepresentativeAttributeKeys,
     getObjectPrimaryAttributes,
     getObjectPrimaryLabel,
+    formatObjectOptionLabel,
     handleModelFile,
     handleDataFile,
     refreshModels,
@@ -1567,6 +1994,10 @@ export function useAppState() {
     refreshData,
     uploadModel,
     uploadData,
+    createObject,
+    createLink,
+    loadModelXml,
+    saveModelXml,
     deleteModel,
     selectObject,
     selectObjectByKey,
