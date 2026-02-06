@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exemple de données conformes au modèle AutoRefurbModel -->
+<DATAS>
+    <OBJECTS>
+        <!-- Centres de reconditionnement -->
+        <OBJECT TYPE="CENTRE_RECONDITIONNEMENT" ID="100">
+            <ATTRIBUTE KEY="NOM" VALUE="Reconditionnement Auto Lyon"/>
+            <ATTRIBUTE KEY="CODE_CENTRE" VALUE="CR-LY-01"/>
+            <ATTRIBUTE KEY="ADRESSE" VALUE="18 avenue des Acacias"/>
+            <ATTRIBUTE KEY="VILLE" VALUE="Lyon"/>
+            <ATTRIBUTE KEY="PAYS" VALUE="France"/>
+            <ATTRIBUTE KEY="TELEPHONE" VALUE="0472001122"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="lyon@refurb-auto.example"/>
+            <ATTRIBUTE KEY="CAPACITE_VEHICULES" VALUE="45"/>
+            <ATTRIBUTE KEY="DATE_OUVERTURE" VALUE="2016-05-10"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="ACTIF"/>
+        </OBJECT>
+
+        <OBJECT TYPE="CENTRE_RECONDITIONNEMENT" ID="101">
+            <ATTRIBUTE KEY="NOM" VALUE="Reconditionnement Auto Lille"/>
+            <ATTRIBUTE KEY="CODE_CENTRE" VALUE="CR-LI-02"/>
+            <ATTRIBUTE KEY="ADRESSE" VALUE="4 rue des Ateliers"/>
+            <ATTRIBUTE KEY="VILLE" VALUE="Lille"/>
+            <ATTRIBUTE KEY="PAYS" VALUE="France"/>
+            <ATTRIBUTE KEY="TELEPHONE" VALUE="0320103344"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="lille@refurb-auto.example"/>
+            <ATTRIBUTE KEY="CAPACITE_VEHICULES" VALUE="30"/>
+            <ATTRIBUTE KEY="DATE_OUVERTURE" VALUE="2019-09-02"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="ACTIF"/>
+        </OBJECT>
+
+        <!-- Véhicules -->
+        <OBJECT TYPE="VEHICULE" ID="200">
+            <ATTRIBUTE KEY="VIN" VALUE="VF1AB123456789012"/>
+            <ATTRIBUTE KEY="IMMATRICULATION" VALUE="AA-123-BB"/>
+            <ATTRIBUTE KEY="MARQUE" VALUE="Renault"/>
+            <ATTRIBUTE KEY="MODELE" VALUE="Clio"/>
+            <ATTRIBUTE KEY="ANNEE" VALUE="2019"/>
+            <ATTRIBUTE KEY="KILOMETRAGE" VALUE="85000"/>
+            <ATTRIBUTE KEY="ENERGIE" VALUE="Essence"/>
+            <ATTRIBUTE KEY="COULEUR" VALUE="Blanc"/>
+            <ATTRIBUTE KEY="DATE_ENTREE" VALUE="2025-12-10"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="TERMINE"/>
+        </OBJECT>
+
+        <OBJECT TYPE="VEHICULE" ID="201">
+            <ATTRIBUTE KEY="VIN" VALUE="WVWZZZ1JZXW000001"/>
+            <ATTRIBUTE KEY="IMMATRICULATION" VALUE="BC-456-CD"/>
+            <ATTRIBUTE KEY="MARQUE" VALUE="Volkswagen"/>
+            <ATTRIBUTE KEY="MODELE" VALUE="Golf"/>
+            <ATTRIBUTE KEY="ANNEE" VALUE="2017"/>
+            <ATTRIBUTE KEY="KILOMETRAGE" VALUE="120000"/>
+            <ATTRIBUTE KEY="ENERGIE" VALUE="Diesel"/>
+            <ATTRIBUTE KEY="COULEUR" VALUE="Gris"/>
+            <ATTRIBUTE KEY="DATE_ENTREE" VALUE="2026-01-18"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="EN_COURS"/>
+        </OBJECT>
+
+        <OBJECT TYPE="VEHICULE" ID="202">
+            <ATTRIBUTE KEY="VIN" VALUE="JH4TB2H26CC000002"/>
+            <ATTRIBUTE KEY="IMMATRICULATION" VALUE="DE-789-EF"/>
+            <ATTRIBUTE KEY="MARQUE" VALUE="Honda"/>
+            <ATTRIBUTE KEY="MODELE" VALUE="Accord"/>
+            <ATTRIBUTE KEY="ANNEE" VALUE="2015"/>
+            <ATTRIBUTE KEY="KILOMETRAGE" VALUE="160000"/>
+            <ATTRIBUTE KEY="ENERGIE" VALUE="Hybride"/>
+            <ATTRIBUTE KEY="COULEUR" VALUE="Bleu"/>
+            <ATTRIBUTE KEY="DATE_ENTREE" VALUE="2026-01-25"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="EN_ATTENTE"/>
+        </OBJECT>
+
+        <!-- Clients -->
+        <OBJECT TYPE="CLIENT" ID="300">
+            <ATTRIBUTE KEY="NOM" VALUE="Martin"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Jean"/>
+            <ATTRIBUTE KEY="TYPE_CLIENT" VALUE="PARTICULIER"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="jean.martin@email.com"/>
+            <ATTRIBUTE KEY="TELEPHONE" VALUE="0611223344"/>
+            <ATTRIBUTE KEY="ADRESSE" VALUE="11 boulevard de la Republique"/>
+            <ATTRIBUTE KEY="VILLE" VALUE="Lyon"/>
+            <ATTRIBUTE KEY="PAYS" VALUE="France"/>
+        </OBJECT>
+
+        <OBJECT TYPE="CLIENT" ID="301">
+            <ATTRIBUTE KEY="NOM" VALUE="Lewis"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Sarah"/>
+            <ATTRIBUTE KEY="TYPE_CLIENT" VALUE="ENTREPRISE"/>
+            <ATTRIBUTE KEY="EMAIL" VALUE="sarah.lewis@fleet.example"/>
+            <ATTRIBUTE KEY="TELEPHONE" VALUE="0155667788"/>
+            <ATTRIBUTE KEY="ADRESSE" VALUE="75 avenue du Parc"/>
+            <ATTRIBUTE KEY="VILLE" VALUE="Paris"/>
+            <ATTRIBUTE KEY="PAYS" VALUE="France"/>
+        </OBJECT>
+
+        <!-- Techniciens -->
+        <OBJECT TYPE="TECHNICIEN" ID="400">
+            <ATTRIBUTE KEY="NOM" VALUE="Bernard"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Luc"/>
+            <ATTRIBUTE KEY="SPECIALITE" VALUE="Carrosserie"/>
+            <ATTRIBUTE KEY="NIVEAU" VALUE="SENIOR"/>
+            <ATTRIBUTE KEY="DATE_EMBAUCHE" VALUE="2021-04-01"/>
+            <ATTRIBUTE KEY="ACTIF" VALUE="true"/>
+        </OBJECT>
+
+        <OBJECT TYPE="TECHNICIEN" ID="401">
+            <ATTRIBUTE KEY="NOM" VALUE="Clarke"/>
+            <ATTRIBUTE KEY="PRENOM" VALUE="Emma"/>
+            <ATTRIBUTE KEY="SPECIALITE" VALUE="Mecanique"/>
+            <ATTRIBUTE KEY="NIVEAU" VALUE="CONFIRME"/>
+            <ATTRIBUTE KEY="DATE_EMBAUCHE" VALUE="2018-09-15"/>
+            <ATTRIBUTE KEY="ACTIF" VALUE="true"/>
+        </OBJECT>
+
+        <!-- Mandats de réparation -->
+        <OBJECT TYPE="MANDAT_REPARATION" ID="500">
+            <ATTRIBUTE KEY="NUMERO" VALUE="MR-2026-0001"/>
+            <ATTRIBUTE KEY="DATE_OUVERTURE" VALUE="2026-01-18"/>
+            <ATTRIBUTE KEY="PRIORITE" VALUE="HAUTE"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="EN_COURS"/>
+            <ATTRIBUTE KEY="DESCRIPTION" VALUE="Remplacement kit distribution"/>
+            <ATTRIBUTE KEY="COUT_ESTIME" VALUE="850.0"/>
+            <ATTRIBUTE KEY="GARANTIE" VALUE="true"/>
+            <ATTRIBUTE KEY="DUREE_PREVUE_JOURS" VALUE="3"/>
+        </OBJECT>
+
+        <OBJECT TYPE="MANDAT_REPARATION" ID="501">
+            <ATTRIBUTE KEY="NUMERO" VALUE="MR-2026-0002"/>
+            <ATTRIBUTE KEY="DATE_OUVERTURE" VALUE="2026-01-25"/>
+            <ATTRIBUTE KEY="PRIORITE" VALUE="NORMALE"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="OUVERT"/>
+            <ATTRIBUTE KEY="DESCRIPTION" VALUE="Peinture pare-chocs avant"/>
+            <ATTRIBUTE KEY="COUT_ESTIME" VALUE="450.0"/>
+            <ATTRIBUTE KEY="GARANTIE" VALUE="false"/>
+            <ATTRIBUTE KEY="DUREE_PREVUE_JOURS" VALUE="2"/>
+        </OBJECT>
+
+        <OBJECT TYPE="MANDAT_REPARATION" ID="502">
+            <ATTRIBUTE KEY="NUMERO" VALUE="MR-2025-0098"/>
+            <ATTRIBUTE KEY="DATE_OUVERTURE" VALUE="2025-12-12"/>
+            <ATTRIBUTE KEY="DATE_CLOTURE" VALUE="2025-12-20"/>
+            <ATTRIBUTE KEY="PRIORITE" VALUE="NORMALE"/>
+            <ATTRIBUTE KEY="STATUT" VALUE="CLOTURE"/>
+            <ATTRIBUTE KEY="DESCRIPTION" VALUE="Revision complete et freinage"/>
+            <ATTRIBUTE KEY="COUT_ESTIME" VALUE="1100.0"/>
+            <ATTRIBUTE KEY="COUT_FINAL" VALUE="1200.0"/>
+            <ATTRIBUTE KEY="GARANTIE" VALUE="true"/>
+            <ATTRIBUTE KEY="DUREE_PREVUE_JOURS" VALUE="7"/>
+        </OBJECT>
+    </OBJECTS>
+
+    <LINKS>
+        <!-- Mandats vers véhicules -->
+        <LINK TYPE="MANDAT_POUR_VEHICULE">
+            <ATTRIBUTE KEY="TYPE_INTERVENTION" VALUE="MECANIQUE"/>
+            <ATTRIBUTE KEY="KILOMETRAGE_ENTREE" VALUE="120000"/>
+            <OBJ_LINK_A ID="500" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="201" TYPE="VEHICULE"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_POUR_VEHICULE">
+            <ATTRIBUTE KEY="TYPE_INTERVENTION" VALUE="CARROSSERIE"/>
+            <ATTRIBUTE KEY="KILOMETRAGE_ENTREE" VALUE="160000"/>
+            <OBJ_LINK_A ID="501" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="202" TYPE="VEHICULE"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_POUR_VEHICULE">
+            <ATTRIBUTE KEY="TYPE_INTERVENTION" VALUE="REVISION"/>
+            <ATTRIBUTE KEY="KILOMETRAGE_ENTREE" VALUE="85000"/>
+            <OBJ_LINK_A ID="502" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="200" TYPE="VEHICULE"/>
+        </LINK>
+
+        <!-- Mandats gérés par les centres -->
+        <LINK TYPE="MANDAT_GERE_PAR_CENTRE">
+            <ATTRIBUTE KEY="DATE_AFFECTATION" VALUE="2026-01-18"/>
+            <ATTRIBUTE KEY="PRIORITE_CENTRE" VALUE="HAUTE"/>
+            <OBJ_LINK_A ID="500" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="101" TYPE="CENTRE_RECONDITIONNEMENT"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_GERE_PAR_CENTRE">
+            <ATTRIBUTE KEY="DATE_AFFECTATION" VALUE="2026-01-25"/>
+            <ATTRIBUTE KEY="PRIORITE_CENTRE" VALUE="NORMALE"/>
+            <OBJ_LINK_A ID="501" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="100" TYPE="CENTRE_RECONDITIONNEMENT"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_GERE_PAR_CENTRE">
+            <ATTRIBUTE KEY="DATE_AFFECTATION" VALUE="2025-12-12"/>
+            <ATTRIBUTE KEY="PRIORITE_CENTRE" VALUE="NORMALE"/>
+            <OBJ_LINK_A ID="502" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="100" TYPE="CENTRE_RECONDITIONNEMENT"/>
+        </LINK>
+
+        <!-- Mandats rattachés aux clients -->
+        <LINK TYPE="MANDAT_POUR_CLIENT">
+            <ATTRIBUTE KEY="REFERENCE_CLIENT" VALUE="FLEET-2026-01"/>
+            <OBJ_LINK_A ID="500" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="301" TYPE="CLIENT"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_POUR_CLIENT">
+            <ATTRIBUTE KEY="REFERENCE_CLIENT" VALUE="JM-2026-02"/>
+            <OBJ_LINK_A ID="501" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="300" TYPE="CLIENT"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_POUR_CLIENT">
+            <ATTRIBUTE KEY="REFERENCE_CLIENT" VALUE="JM-2025-12"/>
+            <OBJ_LINK_A ID="502" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="300" TYPE="CLIENT"/>
+        </LINK>
+
+        <!-- Véhicules appartenant aux clients -->
+        <LINK TYPE="VEHICULE_APPARTIENT_CLIENT">
+            <ATTRIBUTE KEY="DATE_ACQUISITION" VALUE="2023-06-12"/>
+            <OBJ_LINK_A ID="201" TYPE="VEHICULE"/>
+            <OBJ_LINK_B ID="301" TYPE="CLIENT"/>
+        </LINK>
+
+        <LINK TYPE="VEHICULE_APPARTIENT_CLIENT">
+            <ATTRIBUTE KEY="DATE_ACQUISITION" VALUE="2022-03-05"/>
+            <OBJ_LINK_A ID="202" TYPE="VEHICULE"/>
+            <OBJ_LINK_B ID="300" TYPE="CLIENT"/>
+        </LINK>
+
+        <LINK TYPE="VEHICULE_APPARTIENT_CLIENT">
+            <ATTRIBUTE KEY="DATE_ACQUISITION" VALUE="2019-06-20"/>
+            <OBJ_LINK_A ID="200" TYPE="VEHICULE"/>
+            <OBJ_LINK_B ID="300" TYPE="CLIENT"/>
+        </LINK>
+
+        <!-- Mandats assignés aux techniciens -->
+        <LINK TYPE="MANDAT_ASSIGNE_TECHNICIEN">
+            <ATTRIBUTE KEY="ROLE" VALUE="MECANICIEN"/>
+            <ATTRIBUTE KEY="HEURES_ESTIMEES" VALUE="12.5"/>
+            <OBJ_LINK_A ID="500" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="401" TYPE="TECHNICIEN"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_ASSIGNE_TECHNICIEN">
+            <ATTRIBUTE KEY="ROLE" VALUE="CARROSSIER"/>
+            <ATTRIBUTE KEY="HEURES_ESTIMEES" VALUE="8"/>
+            <OBJ_LINK_A ID="501" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="400" TYPE="TECHNICIEN"/>
+        </LINK>
+
+        <LINK TYPE="MANDAT_ASSIGNE_TECHNICIEN">
+            <ATTRIBUTE KEY="ROLE" VALUE="MECANICIEN"/>
+            <ATTRIBUTE KEY="HEURES_ESTIMEES" VALUE="16"/>
+            <OBJ_LINK_A ID="502" TYPE="MANDAT_REPARATION"/>
+            <OBJ_LINK_B ID="401" TYPE="TECHNICIEN"/>
+        </LINK>
+    </LINKS>
+</DATAS>
