@@ -5,10 +5,6 @@
       <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
         Visualisez les types, attributs et liens du modèle.
       </h2>
-      <p class="subhead">
-        Cette page synthétise la définition du modèle chargé pour vous permettre de comprendre
-        rapidement sa structure.
-      </p>
       <div class="d-flex align-center" style="gap: 8px; margin-top: 12px;">
         <v-chip v-if="state.selectedModel" color="primary" variant="tonal">
           {{ state.selectedModel.name }}<span v-if="state.selectedModel.version"> v{{ state.selectedModel.version }}</span>
@@ -208,8 +204,10 @@
             <v-list-item
               v-for="link in state.filteredModelLinks"
               :key="link.key"
-              :title="link.name"
-              :subtitle="link.directed ? 'Orienté' : 'Non orienté'"
+              :title="state.getLinkTypeLabel(link.name)"
+              :subtitle="state.getLinkTypeLabel(link.name) === link.name
+                ? (link.directed ? 'Orienté' : 'Non orienté')
+                : `Code: ${link.name} • ${link.directed ? 'Orienté' : 'Non orienté'}`"
               :active="state.selectedModelLink && state.selectedModelLink.key === link.key"
               @click="state.selectedModelLink = link"
             >
@@ -232,7 +230,14 @@
           <div v-if="state.selectedModelLink">
             <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
               <v-chip color="primary" variant="tonal">
-                {{ state.selectedModelLink.name }}
+                {{ state.getLinkTypeLabel(state.selectedModelLink.name) }}
+              </v-chip>
+              <v-chip
+                v-if="state.getLinkTypeLabel(state.selectedModelLink.name) !== state.selectedModelLink.name"
+                color="secondary"
+                variant="tonal"
+              >
+                Code: {{ state.selectedModelLink.name }}
               </v-chip>
               <v-chip color="secondary" variant="tonal">
                 {{ state.selectedModelLink.directed ? 'Orienté' : 'Non orienté' }}
@@ -243,6 +248,33 @@
             </div>
             <div v-if="state.selectedModelLink.description" class="mt-3 text-medium-emphasis">
               {{ state.selectedModelLink.description }}
+            </div>
+
+            <div class="mt-3 d-flex align-center flex-wrap" style="gap: 8px;">
+              <v-chip
+                v-if="state.selectedModelLink.labels && Object.keys(state.selectedModelLink.labels).length"
+                color="primary"
+                variant="tonal"
+                size="small"
+              >
+                Libellé générique: {{ state.getLinkTypeLabel(state.selectedModelLink.name) }}
+              </v-chip>
+              <v-chip
+                v-if="state.selectedModelLink.sourceLabels && Object.keys(state.selectedModelLink.sourceLabels).length"
+                color="secondary"
+                variant="tonal"
+                size="small"
+              >
+                Sortant: {{ state.getLinkTypeLabel(state.selectedModelLink.name, 'out') }}
+              </v-chip>
+              <v-chip
+                v-if="state.selectedModelLink.targetLabels && Object.keys(state.selectedModelLink.targetLabels).length"
+                color="secondary"
+                variant="tonal"
+                size="small"
+              >
+                Entrant: {{ state.getLinkTypeLabel(state.selectedModelLink.name, 'in') }}
+              </v-chip>
             </div>
 
             <v-divider class="my-4" />

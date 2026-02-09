@@ -13,7 +13,13 @@ export function useAppState() {
   const displayLanguage = ref('');
   const validateOnly = ref(false);
   const modelSummary = ref(null);
-  const modelDetails = ref({ objectTypes: [], linkTypes: [], languages: [], defaultLanguage: '' });
+  const modelDetails = ref({
+    objectTypes: [],
+    linkTypes: [],
+    languages: [],
+    defaultLanguage: '',
+    userPortalLabels: {}
+  });
   const selectedModelObject = ref(null);
   const selectedModelLink = ref(null);
   const modelObjectFilter = ref('');
@@ -25,11 +31,18 @@ export function useAppState() {
   const hasModel = ref(false);
   const selectedObject = ref(null);
   const objectFilter = ref('');
+  const rootObjectQuery = ref('');
+  const selectedRootObjectKey = ref('');
+  const treeLinkSelections = ref({});
+  const treeExpandedNodes = ref({});
+  const showCycleDetection = ref(true);
+  const explorerMaxDepth = 12;
   const status = ref(null);
   const healthStatus = ref({ api: 'unknown', neo4j: 'unknown', error: '' });
   const openGroups = ref([]);
   const openLinkGroups = ref([]);
   const selectedAttributeTab = ref(null);
+  const selectedLinkedRelationTab = ref(null);
   const selectedModelGroupTab = ref(null);
   const tableTypeFilter = ref([]);
   const tableSearch = ref('');
@@ -158,7 +171,13 @@ export function useAppState() {
 
   const createLinkTypeOptions = computed(() =>
     modelDetails.value.linkTypes
-      .map((link) => ({ title: link.name, value: link.name }))
+      .map((link) => {
+        const label = getLinkTypeLabel(link.name);
+        return {
+          title: label === link.name ? link.name : `${label} (${link.name})`,
+          value: link.name
+        };
+      })
       .sort((a, b) => a.title.localeCompare(b.title))
   );
 
@@ -226,9 +245,11 @@ export function useAppState() {
     if (!filter) {
       return modelDetails.value.linkTypes;
     }
-    return modelDetails.value.linkTypes.filter((link) =>
-      link.name.toLowerCase().includes(filter)
-    );
+    return modelDetails.value.linkTypes.filter((link) => {
+      const code = String(link.name || '').toLowerCase();
+      const label = String(getLinkTypeLabel(link.name) || '').toLowerCase();
+      return code.includes(filter) || label.includes(filter);
+    });
   });
 
   const modelGroupTabs = computed(() => {
@@ -318,6 +339,36 @@ export function useAppState() {
         || id.toLowerCase().includes(filter)
       );
     });
+  });
+
+  const rootObjectOptions = computed(() => {
+    const query = rootObjectQuery.value.trim().toLowerCase();
+    return dataObjects.value
+      .filter((object) => {
+        if (!query) {
+          return true;
+        }
+        const id = object.id !== null && object.id !== undefined ? String(object.id) : '';
+        const label = getObjectPrimaryLabel(object);
+        const primaryValues = getObjectPrimaryAttributes(object)
+          .map((attribute) => String(attribute.value || '').toLowerCase())
+          .join(' ');
+        const haystack = `${object.type} ${id} ${label} ${primaryValues}`.toLowerCase();
+        return haystack.includes(query);
+      })
+      .slice(0, 120)
+      .map((object) => ({
+        title: formatObjectOptionLabel(object),
+        value: object.idKey,
+        subtitle: `${object.type} • ID ${object.id ?? 'N/A'}`
+      }));
+  });
+
+  const selectedRootObject = computed(() => {
+    if (!selectedRootObjectKey.value) {
+      return null;
+    }
+    return objectIndex.value.get(selectedRootObjectKey.value) || null;
   });
 
   const tableTypeOptions = computed(() => {
@@ -908,39 +959,131 @@ export function useAppState() {
     return map;
   });
 
-  const linkedObjects = computed(() => {
-    if (!selectedObject.value) {
-      return [];
-    }
+  const relationsByObjectKey = computed(() => {
+    const map = new Map();
 
-    const relations = [];
-    const currentKey = selectedObject.value.idKey;
+    const appendRelation = (sourceKey, targetKey, link, direction) => {
+      if (!sourceKey || !targetKey) {
+        return;
+      }
+      const source = objectIndex.value.get(sourceKey);
+      const target = objectIndex.value.get(targetKey);
+      if (!source || !target) {
+        return;
+      }
 
-    dataLinks.value.forEach((link, index) => {
+      const key = `${link.key}:${direction}:${targetKey}`;
+      const list = map.get(sourceKey) || [];
+      list.push({
+        key,
+        type: link.type,
+        targetKey,
+        target,
+        direction,
+        directionLabel: directionToLabel(direction),
+        directionIcon: directionToIcon(direction),
+        targetLabel: formatObjectOptionLabel(target)
+      });
+      map.set(sourceKey, list);
+    };
+
+    dataLinks.value.forEach((link) => {
       const directed = isDirectedLink(link.type);
       const outDirection = directed ? 'out' : 'both';
       const inDirection = directed ? 'in' : 'both';
 
-      if (link.fromKey === currentKey) {
-        relations.push(buildRelation(link, outDirection, link.toKey, index));
+      if (link.fromKey && link.toKey && link.fromKey === link.toKey) {
+        appendRelation(link.fromKey, link.toKey, link, outDirection);
+        return;
       }
-      if (link.toKey === currentKey) {
-        relations.push(buildRelation(link, inDirection, link.fromKey, index));
-      }
+
+      appendRelation(link.fromKey, link.toKey, link, outDirection);
+      appendRelation(link.toKey, link.fromKey, link, inDirection);
     });
 
-    return relations
-      .map((relation) => {
-        const target = objectIndex.value.get(relation.targetKey);
-        if (!target) {
-          return null;
+    map.forEach((relations, sourceKey) => {
+      relations.sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type.localeCompare(b.type);
         }
-        return {
-          ...relation,
-          target
-        };
+        if (a.direction !== b.direction) {
+          return a.direction.localeCompare(b.direction);
+        }
+        const typeA = a.target.type || '';
+        const typeB = b.target.type || '';
+        if (typeA !== typeB) {
+          return typeA.localeCompare(typeB);
+        }
+        const idA = String(a.target.id ?? a.target.idKey);
+        const idB = String(b.target.id ?? b.target.idKey);
+        return idA.localeCompare(idB);
+      });
+      map.set(sourceKey, relations);
+    });
+
+    return map;
+  });
+
+  const explorerTree = computed(() => {
+    const rootKey = selectedRootObjectKey.value;
+    const root = rootKey ? objectIndex.value.get(rootKey) : null;
+    if (!rootKey || !root) {
+      return null;
+    }
+    return buildExplorerNode(rootKey, rootKey, 0, new Set([rootKey]));
+  });
+
+  const linkedObjects = computed(() => {
+    if (!selectedObject.value) {
+      return [];
+    }
+    return relationsByObjectKey.value.get(selectedObject.value.idKey) || [];
+  });
+
+  const linkedRelationTabs = computed(() => {
+    if (!linkedObjects.value.length) {
+      return [];
+    }
+
+    const map = new Map();
+    linkedObjects.value.forEach((relation) => {
+      const type = relation.type || 'Lien';
+      if (!map.has(type)) {
+        map.set(type, {
+          key: `link-type-${type}`,
+          type,
+          label: getLinkTypeLabel(type),
+          items: []
+        });
+      }
+      map.get(type).items.push(relation);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => {
+        const byLabel = String(a.label || '').localeCompare(String(b.label || ''));
+        if (byLabel !== 0) {
+          return byLabel;
+        }
+        return String(a.type || '').localeCompare(String(b.type || ''));
       })
-      .filter(Boolean);
+      .map((tab) => ({
+        ...tab,
+        count: tab.items.length,
+        items: tab.items.sort((a, b) => {
+          if (a.direction !== b.direction) {
+            return a.direction.localeCompare(b.direction);
+          }
+          const typeA = a.target.type || '';
+          const typeB = b.target.type || '';
+          if (typeA !== typeB) {
+            return typeA.localeCompare(typeB);
+          }
+          const idA = String(a.target.id ?? a.target.idKey);
+          const idB = String(b.target.id ?? b.target.idKey);
+          return idA.localeCompare(idB);
+        })
+      }));
   });
 
   const linkedGroups = computed(() => {
@@ -980,35 +1123,7 @@ export function useAppState() {
     if (!tableSelectedObject.value) {
       return [];
     }
-
-    const relations = [];
-    const currentKey = tableSelectedObject.value.idKey;
-
-    dataLinks.value.forEach((link, index) => {
-      const directed = isDirectedLink(link.type);
-      const outDirection = directed ? 'out' : 'both';
-      const inDirection = directed ? 'in' : 'both';
-
-      if (link.fromKey === currentKey) {
-        relations.push(buildRelation(link, outDirection, link.toKey, index));
-      }
-      if (link.toKey === currentKey) {
-        relations.push(buildRelation(link, inDirection, link.fromKey, index));
-      }
-    });
-
-    return relations
-      .map((relation) => {
-        const target = objectIndex.value.get(relation.targetKey);
-        if (!target) {
-          return null;
-        }
-        return {
-          ...relation,
-          target
-        };
-      })
-      .filter(Boolean);
+    return relationsByObjectKey.value.get(tableSelectedObject.value.idKey) || [];
   });
 
   onMounted(async () => {
@@ -1129,6 +1244,14 @@ export function useAppState() {
     () => attributeTabs.value,
     (tabs) => {
       selectedAttributeTab.value = tabs[0]?.key || null;
+    },
+    { immediate: true }
+  );
+
+  watch(
+    () => linkedRelationTabs.value,
+    (tabs) => {
+      selectedLinkedRelationTab.value = tabs[0]?.key || null;
     },
     { immediate: true }
   );
@@ -1774,7 +1897,16 @@ export function useAppState() {
       const linkTypes = payload?.linkTypes || [];
       const languages = Array.isArray(payload?.languages) ? payload.languages : [];
       const defaultLanguageValue = payload?.defaultLanguage || '';
-      modelDetails.value = { objectTypes, linkTypes, languages, defaultLanguage: defaultLanguageValue };
+      const userPortalLabels = payload?.userPortalLabels && typeof payload.userPortalLabels === 'object'
+        ? payload.userPortalLabels
+        : {};
+      modelDetails.value = {
+        objectTypes,
+        linkTypes,
+        languages,
+        defaultLanguage: defaultLanguageValue,
+        userPortalLabels
+      };
       const availableCodes = languages.map((language) => language.code).filter(Boolean);
       const fallbackLanguage = defaultLanguageValue || availableCodes[0] || '';
       if (!displayLanguage.value || (availableCodes.length && !availableCodes.includes(displayLanguage.value))) {
@@ -1832,6 +1964,10 @@ export function useAppState() {
       dataLinks.value = links;
       dataSummary.value = buildDataSummary(payload, objects, links);
       selectedObject.value = objects[0] ?? null;
+      selectedRootObjectKey.value = objects[0]?.idKey || '';
+      rootObjectQuery.value = '';
+      treeLinkSelections.value = {};
+      treeExpandedNodes.value = {};
       objectFilter.value = '';
     } catch (error) {
       resetDataState();
@@ -2186,7 +2322,13 @@ export function useAppState() {
 
   function resetModelState() {
     modelSummary.value = null;
-    modelDetails.value = { objectTypes: [], linkTypes: [], languages: [], defaultLanguage: '' };
+    modelDetails.value = {
+      objectTypes: [],
+      linkTypes: [],
+      languages: [],
+      defaultLanguage: '',
+      userPortalLabels: {}
+    };
     selectedModelObject.value = null;
     selectedModelLink.value = null;
     linkTypeInfo.value = {};
@@ -2199,6 +2341,10 @@ export function useAppState() {
     dataObjects.value = [];
     dataLinks.value = [];
     selectedObject.value = null;
+    selectedRootObjectKey.value = '';
+    rootObjectQuery.value = '';
+    treeLinkSelections.value = {};
+    treeExpandedNodes.value = {};
   }
 
   function resetCreateState() {
@@ -2222,6 +2368,164 @@ export function useAppState() {
 
   function selectObject(object) {
     selectedObject.value = object;
+  }
+
+  function setRootObjectByKey(key) {
+    if (!key) {
+      selectedRootObjectKey.value = '';
+      treeLinkSelections.value = {};
+      treeExpandedNodes.value = {};
+      return;
+    }
+    const target = objectIndex.value.get(String(key));
+    if (!target) {
+      return;
+    }
+    const isSameRoot = selectedRootObjectKey.value === target.idKey;
+    selectedRootObjectKey.value = target.idKey;
+    selectedObject.value = target;
+    if (!isSameRoot) {
+      treeLinkSelections.value = {};
+      treeExpandedNodes.value = {};
+    }
+  }
+
+  function resetExplorerTraversal() {
+    treeLinkSelections.value = {};
+    treeExpandedNodes.value = {};
+  }
+
+  function clearNodeSelections(pathPrefix = '') {
+    if (!pathPrefix) {
+      treeLinkSelections.value = {};
+      treeExpandedNodes.value = {};
+      return;
+    }
+    const next = {};
+    Object.entries(treeLinkSelections.value).forEach(([path, selected]) => {
+      if (!path.startsWith(pathPrefix)) {
+        next[path] = selected;
+      }
+    });
+    treeLinkSelections.value = next;
+    clearNodeExpansions(pathPrefix);
+  }
+
+  function clearNodeExpansions(pathPrefix = '') {
+    if (!pathPrefix) {
+      treeExpandedNodes.value = {};
+      return;
+    }
+    const next = {};
+    Object.entries(treeExpandedNodes.value).forEach(([path, expanded]) => {
+      if (!path.startsWith(pathPrefix)) {
+        next[path] = expanded;
+      }
+    });
+    treeExpandedNodes.value = next;
+  }
+
+  function isNodeExpanded(nodePath) {
+    return Boolean(treeExpandedNodes.value[nodePath]);
+  }
+
+  function toggleNodeExpanded(nodePath) {
+    if (!nodePath) {
+      return;
+    }
+    treeExpandedNodes.value = {
+      ...treeExpandedNodes.value,
+      [nodePath]: !treeExpandedNodes.value[nodePath]
+    };
+  }
+
+  function getObjectKeyFromNodePath(nodePath) {
+    if (!nodePath) {
+      return '';
+    }
+    const segments = String(nodePath).split('>');
+    const last = segments[segments.length - 1] || '';
+    if (!last.includes(':')) {
+      return last;
+    }
+    const parts = last.split(':');
+    return parts[parts.length - 1] || '';
+  }
+
+  function getNodeRelationsByPath(nodePath, objectKey = '') {
+    const resolvedObjectKey = objectKey ? String(objectKey) : getObjectKeyFromNodePath(nodePath);
+    if (!resolvedObjectKey) {
+      return [];
+    }
+    return relationsByObjectKey.value.get(resolvedObjectKey) || [];
+  }
+
+  function getNodeRelationTypes(nodePath, objectKey = '') {
+    return Array.from(
+      new Set(
+        getNodeRelationsByPath(nodePath, objectKey)
+          .map((relation) => relation.type)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }
+
+  function getSelectedNodeRelationTypes(nodePath, availableTypes) {
+    const selected = treeLinkSelections.value[nodePath];
+    if (Array.isArray(selected)) {
+      return selected;
+    }
+    return availableTypes;
+  }
+
+  function isNodeRelationSelected(nodePath, relationType, objectKey = '') {
+    if (!nodePath || !relationType) {
+      return false;
+    }
+    const availableTypes = getNodeRelationTypes(nodePath, objectKey);
+    if (!availableTypes.includes(relationType)) {
+      return false;
+    }
+    const selectedTypes = getSelectedNodeRelationTypes(nodePath, availableTypes);
+    return selectedTypes.includes(relationType);
+  }
+
+  function toggleNodeRelation(nodePath, relationType, checked, objectKey = '') {
+    if (!nodePath || !relationType) {
+      return;
+    }
+
+    const availableTypes = getNodeRelationTypes(nodePath, objectKey);
+    if (!availableTypes.includes(relationType)) {
+      return;
+    }
+
+    const current = new Set(getSelectedNodeRelationTypes(nodePath, availableTypes));
+    if (checked) {
+      current.add(relationType);
+    } else {
+      current.delete(relationType);
+    }
+
+    const nextSelected = Array.from(current).sort((a, b) => a.localeCompare(b));
+    const next = { ...treeLinkSelections.value };
+    const allSelected = nextSelected.length === availableTypes.length
+      && availableTypes.every((type) => current.has(type));
+
+    if (allSelected) {
+      delete next[nodePath];
+    } else {
+      next[nodePath] = nextSelected;
+    }
+
+    treeLinkSelections.value = next;
+
+    if (!checked) {
+      const relatedBranches = getNodeRelationsByPath(nodePath, objectKey)
+        .filter((relation) => relation.type === relationType)
+        .map((relation) => `${nodePath}>${relation.key}`);
+      relatedBranches.forEach((prefix) => clearNodeSelections(prefix));
+    }
   }
 
   function setCurrentPage(page) {
@@ -2346,14 +2650,14 @@ export function useAppState() {
   }
 
   function selectObjectByKey(key) {
-    const target = objectIndex.value.get(key);
+    const target = objectIndex.value.get(String(key));
     if (target) {
       selectedObject.value = target;
     }
   }
 
   function viewObjectFromTable(key) {
-    const target = objectIndex.value.get(key);
+    const target = objectIndex.value.get(String(key));
     if (target) {
       tableSelectedObject.value = target;
       showTableDetailPanel.value = true;
@@ -2364,7 +2668,7 @@ export function useAppState() {
     if (!tableSelectedObject.value) {
       return;
     }
-    selectObjectByKey(tableSelectedObject.value.idKey);
+    setRootObjectByKey(tableSelectedObject.value.idKey);
     currentPage.value = 'navigate';
   }
 
@@ -2400,6 +2704,83 @@ export function useAppState() {
     } catch (error) {
       adminStatus.value = { type: 'error', message: 'Impossible de copier la commande.' };
     }
+  }
+
+  function buildExplorerNode(objectKey, nodePath, depth, visitedKeys) {
+    const object = objectIndex.value.get(objectKey);
+    if (!object) {
+      return null;
+    }
+
+    const relations = relationsByObjectKey.value.get(objectKey) || [];
+    const availableTypes = Array.from(
+      new Set(relations.map((relation) => relation.type).filter(Boolean))
+    );
+    const selected = Array.isArray(treeLinkSelections.value[nodePath])
+      ? treeLinkSelections.value[nodePath]
+      : availableTypes;
+    const selectedSet = new Set(selected);
+    const depthLimitReached = depth >= explorerMaxDepth;
+
+    const children = relations
+      .filter((relation) => selectedSet.has(relation.type))
+      .map((relation) => {
+        const childPath = `${nodePath}>${relation.key}`;
+        if (depthLimitReached) {
+          return {
+            key: childPath,
+            edge: relation,
+            cycle: false,
+            depthLimit: true,
+            node: null
+          };
+        }
+        if (visitedKeys.has(relation.targetKey)) {
+          return {
+            key: childPath,
+            edge: relation,
+            cycle: true,
+            depthLimit: false,
+            node: null
+          };
+        }
+        const branchVisited = new Set(visitedKeys);
+        branchVisited.add(relation.targetKey);
+        return {
+          key: childPath,
+          edge: relation,
+          cycle: false,
+          depthLimit: false,
+          node: buildExplorerNode(relation.targetKey, childPath, depth + 1, branchVisited)
+        };
+      });
+
+    return {
+      key: `${nodePath}:${object.idKey}`,
+      nodePath,
+      depth,
+      object,
+      relations,
+      children,
+      visitedKeys: Array.from(visitedKeys)
+    };
+  }
+
+  function getExplorerSubtree(objectKey, nodePath, depth = 0, visitedKeys = []) {
+    const key = String(objectKey || '');
+    if (!key) {
+      return null;
+    }
+    const path = nodePath || key;
+    const visited = new Set(
+      Array.isArray(visitedKeys) && visitedKeys.length
+        ? visitedKeys.map((entry) => String(entry))
+        : [key]
+    );
+    if (!visited.has(key)) {
+      visited.add(key);
+    }
+    return buildExplorerNode(key, path, depth, visited);
   }
 
   function buildRelation(link, direction, targetKey, index) {
@@ -2652,6 +3033,78 @@ export function useAppState() {
     return label || attributeName || '';
   }
 
+  function getLinkTypeDefinition(linkTypeName) {
+    if (!linkTypeName) {
+      return null;
+    }
+    return modelDetails.value.linkTypes.find((link) => link.name === linkTypeName) || null;
+  }
+
+  function getLinkTypeLabel(linkTypeName, direction = 'both') {
+    if (!linkTypeName) {
+      return '';
+    }
+    const definition = getLinkTypeDefinition(linkTypeName);
+    if (!definition) {
+      return linkTypeName;
+    }
+
+    const sourceLabel = resolveAttributeLabel({
+      labels: definition.sourceLabels || {}
+    });
+    const targetLabel = resolveAttributeLabel({
+      labels: definition.targetLabels || {}
+    });
+    const commonLabel = resolveAttributeLabel({
+      labels: definition.labels || {}
+    });
+
+    if (direction === 'out' && sourceLabel) {
+      return sourceLabel;
+    }
+    if (direction === 'in' && targetLabel) {
+      return targetLabel;
+    }
+    if (commonLabel) {
+      return commonLabel;
+    }
+    if (direction === 'out' && sourceLabel) {
+      return sourceLabel;
+    }
+    if (direction === 'in' && targetLabel) {
+      return targetLabel;
+    }
+    return linkTypeName;
+  }
+
+  function getUserPortalTitle() {
+    const labels = modelDetails.value?.userPortalLabels || {};
+    const requested = displayLanguage.value;
+    const fallback = defaultLanguage.value;
+
+    if (requested && labels[requested]) {
+      return labels[requested];
+    }
+    if (fallback && labels[fallback]) {
+      return labels[fallback];
+    }
+
+    const firstLabel = Object.values(labels).find((value) => {
+      if (value === null || value === undefined) {
+        return false;
+      }
+      return String(value).trim().length > 0;
+    });
+    if (firstLabel) {
+      return String(firstLabel);
+    }
+
+    if (selectedModel.value?.name) {
+      return selectedModel.value.name;
+    }
+    return 'Portail métier';
+  }
+
   function getRepresentativeAttributeKeys(typeName) {
     if (!typeName) {
       return [];
@@ -2807,11 +3260,17 @@ export function useAppState() {
     hasModel,
     selectedObject,
     objectFilter,
+    rootObjectQuery,
+    selectedRootObjectKey,
+    treeLinkSelections,
+    treeExpandedNodes,
+    showCycleDetection,
     status,
     healthStatus,
     openGroups,
     openLinkGroups,
     selectedAttributeTab,
+    selectedLinkedRelationTab,
     selectedModelGroupTab,
     tableTypeFilter,
     tableSearch,
@@ -2860,6 +3319,8 @@ export function useAppState() {
     filteredModelLinks,
     modelGroupTabs,
     filteredObjects,
+    rootObjectOptions,
+    selectedRootObject,
     tableTypeOptions,
     filteredTableRows,
     selectedObjectType,
@@ -2884,12 +3345,17 @@ export function useAppState() {
     fullTextTypeOptions,
     fullTextResults,
     objectIndex,
+    relationsByObjectKey,
+    explorerTree,
     linkedObjects,
+    linkedRelationTabs,
     linkedGroups,
     tableSelectedLinks,
     formatAttributeLabel,
     getTypeIconName,
     getAttributeLabel,
+    getLinkTypeLabel,
+    getUserPortalTitle,
     getRepresentativeAttributeKeys,
     getObjectPrimaryAttributes,
     getObjectPrimaryLabel,
@@ -2920,6 +3386,15 @@ export function useAppState() {
     saveModelXml,
     deleteModel,
     selectObject,
+    setRootObjectByKey,
+    resetExplorerTraversal,
+    clearNodeSelections,
+    clearNodeExpansions,
+    isNodeRelationSelected,
+    toggleNodeRelation,
+    isNodeExpanded,
+    toggleNodeExpanded,
+    getExplorerSubtree,
     selectObjectByKey,
     viewObjectFromTable,
     openInExplorerFromTable,

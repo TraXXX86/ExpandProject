@@ -3,9 +3,6 @@
     <v-col cols="12" md="6">
       <div class="kicker">Import modèle</div>
       <h1 class="headline">Chargez et structurez vos modèles.</h1>
-      <p class="subhead">
-        Téléversez un fichier de modèle XML et synchronisez la base pour rendre la navigation disponible.
-      </p>
       <div class="d-flex flex-wrap" style="gap: 12px; margin-top: 24px;">
         <v-btn
           color="primary"

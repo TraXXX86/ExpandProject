@@ -5,6 +5,11 @@
         <LANGUAGE CODE="FR_ca" LABEL="Français (Canada)"/>
         <LANGUAGE CODE="EN_uk" LABEL="English (UK)"/>
     </LANGUAGES>
+    <USER_PORTAL_LABELS>
+        <LABEL LANGUAGE="FR_fr" VALUE="Portail Réseau Social"/>
+        <LABEL LANGUAGE="FR_ca" VALUE="Portail Réseau Social"/>
+        <LABEL LANGUAGE="EN_uk" VALUE="Social Network Portal"/>
+    </USER_PORTAL_LABELS>
     <OBJECT_TYPES>
         <!-- Définition du type PERSONNE -->
         <OBJECT_TYPE NAME="PERSONNE" ICON="person">
@@ -420,6 +425,11 @@
         <!-- Lien CONNAIT entre personnes -->
         <LINK_TYPE NAME="CONNAIT" DIRECTED="false">
             <DESCRIPTION>Relation d'amitié ou de connaissance entre deux personnes</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Connaît"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Connaît"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Knows"/>
+            </LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="PERSONNE"/>
             </SOURCE_TYPES>
@@ -439,6 +449,21 @@
         <!-- Lien TRAVAILLE_POUR entre personne et entreprise -->
         <LINK_TYPE NAME="TRAVAILLE_POUR" DIRECTED="true">
             <DESCRIPTION>Relation d'emploi d'une personne vers une entreprise</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Travaille pour"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Travaille pour"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Works for"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Travaille pour"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Travaille pour"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Works for"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Emploie"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Emploie"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Employs"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="PERSONNE"/>
             </SOURCE_TYPES>
@@ -461,6 +486,21 @@
         <!-- Lien POSSEDE_COMPETENCE entre personne et compétence -->
         <LINK_TYPE NAME="POSSEDE_COMPETENCE" DIRECTED="true">
             <DESCRIPTION>Compétence détenue par une personne</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Compétence"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Compétence"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Skill"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Possède compétence"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Possède compétence"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Has skill"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Est possédée par"/>
+                <LABEL LANGUAGE="FR_ca" VALUE="Est possédée par"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Is held by"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="PERSONNE"/>
             </SOURCE_TYPES>

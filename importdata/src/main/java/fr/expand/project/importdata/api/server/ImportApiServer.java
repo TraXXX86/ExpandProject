@@ -39,6 +39,7 @@ import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEGROUP;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEREF;
 import fr.expand.project.importdata.model.generated.LABEL;
+import fr.expand.project.importdata.model.generated.LABELS;
 import fr.expand.project.importdata.model.generated.LANGUAGE;
 import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
@@ -1303,6 +1304,7 @@ public class ImportApiServer {
         payload.put("name", model.getNAME());
         payload.put("version", model.getVERSION() == null ? "" : model.getVERSION());
         payload.put("defaultLanguage", model.getDEFAULTLANGUAGE() == null ? "" : model.getDEFAULTLANGUAGE());
+        payload.put("userPortalLabels", extractLabels(model.getUSERPORTALLABELS()));
 
         List<Map<String, Object>> languages = new ArrayList<>();
         if (model.getLANGUAGES() != null && model.getLANGUAGES().getLANGUAGE() != null) {
@@ -1412,6 +1414,9 @@ public class ImportApiServer {
                 row.put("name", linkType.getNAME());
                 row.put("directed", linkType.isDIRECTED());
                 row.put("description", linkType.getDESCRIPTION() == null ? "" : linkType.getDESCRIPTION());
+                row.put("labels", extractLabels(linkType.getLABELS()));
+                row.put("sourceLabels", extractLabels(linkType.getSOURCELABELS()));
+                row.put("targetLabels", extractLabels(linkType.getTARGETLABELS()));
 
                 List<String> sources = new ArrayList<>();
                 if (linkType.getSOURCETYPES() != null && linkType.getSOURCETYPES().getTYPEREF() != null) {
@@ -1469,5 +1474,18 @@ public class ImportApiServer {
         payload.put("linkTypes", linkTypes);
 
         return payload;
+    }
+
+    private static Map<String, String> extractLabels(LABELS labelsNode) {
+        Map<String, String> labels = new HashMap<>();
+        if (labelsNode == null || labelsNode.getLABEL() == null) {
+            return labels;
+        }
+        for (LABEL label : labelsNode.getLABEL()) {
+            if (label.getLANGUAGE() != null && label.getVALUE() != null) {
+                labels.put(label.getLANGUAGE(), label.getVALUE());
+            }
+        }
+        return labels;
     }
 }
