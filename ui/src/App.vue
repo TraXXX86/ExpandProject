@@ -15,8 +15,14 @@
           </v-chip>
         </div>
         <div class="d-flex align-center flex-wrap justify-end" style="gap: 8px;">
+          <v-chip v-if="state.isAuthenticated" color="primary" variant="tonal">
+            {{ state.accessProfile.displayName || state.accessProfile.username || 'Utilisateur' }}
+          </v-chip>
+          <v-chip v-if="state.authMeta.impersonating" color="warning" variant="tonal">
+            Impersonation: {{ state.authMeta.effectiveUsername }} (admin: {{ state.authMeta.actorUsername }})
+          </v-chip>
           <v-select
-            v-if="state.modelOptions.length && state.isPortalSelected"
+            v-if="state.modelOptions.length && state.isPortalSelected && state.isAuthenticated"
             v-model="state.selectedModelKey"
             :items="state.modelOptions"
             label="Modèle"
@@ -28,7 +34,7 @@
             class="model-select"
           />
           <v-select
-            v-if="state.modelLanguages.length && state.isPortalSelected"
+            v-if="state.modelLanguages.length && state.isPortalSelected && state.isAuthenticated"
             v-model="state.displayLanguage"
             :items="state.modelLanguages"
             label="Langue"
@@ -40,7 +46,7 @@
           <v-chip :color="state.neo4jChipColor" variant="tonal">
             Neo4j {{ state.neo4jChipLabel }}
           </v-chip>
-          <v-menu location="bottom end">
+          <v-menu v-if="state.isAuthenticated" location="bottom end">
             <template #activator="{ props }">
               <v-btn
                 v-bind="props"
@@ -48,11 +54,12 @@
                 variant="tonal"
                 prepend-icon="mdi-shield-crown-outline"
               >
-                Admin plateforme
+                {{ state.canManageAccess ? 'Admin plateforme' : 'Compte' }}
               </v-btn>
             </template>
             <v-list density="comfortable" min-width="310">
               <v-list-item
+                v-if="state.canManageAccess"
                 v-for="entry in platformAdminEntries"
                 :key="entry.key"
                 :prepend-icon="entry.icon"
@@ -60,7 +67,14 @@
                 :subtitle="entry.subtitle"
                 @click="openFromAdminMenu(entry)"
               />
-              <v-divider />
+              <v-divider v-if="state.canManageAccess" />
+              <v-list-item
+                v-if="state.canManageAccess && state.authMeta.impersonating"
+                prepend-icon="mdi-account-cancel-outline"
+                title="Arrêter l'impersonation"
+                subtitle="Revenir à votre session administrateur"
+                @click="state.stopImpersonation"
+              />
               <v-list-item
                 prepend-icon="mdi-access-point"
                 title="Rafraîchir le statut plateforme"
@@ -73,8 +87,23 @@
                 subtitle="Retour à l'écran de connexion"
                 @click="state.clearPortal"
               />
+              <v-list-item
+                prepend-icon="mdi-account-arrow-right-outline"
+                title="Se déconnecter"
+                subtitle="Fermer la session en cours"
+                @click="state.logout"
+              />
             </v-list>
           </v-menu>
+          <v-btn
+            v-else
+            color="primary"
+            variant="tonal"
+            prepend-icon="mdi-login"
+            @click="state.authStatus = null"
+          >
+            Connexion
+          </v-btn>
         </div>
       </v-container>
     </v-app-bar>
@@ -82,7 +111,57 @@
     <v-main>
       <div :class="['hero-bg', heroBgClass]" />
       <v-container class="py-6 hero-content">
-        <template v-if="!state.isPortalSelected">
+        <template v-if="!state.isAuthenticated">
+          <v-row class="justify-center">
+            <v-col cols="12" md="7" lg="5">
+              <v-card class="card-animate" elevation="6" rounded="xl">
+                <v-card-title class="section-title">Connexion</v-card-title>
+                <v-card-text>
+                  <div class="text-medium-emphasis mb-4">
+                    Connectez-vous avec votre compte plateforme.
+                    Le compte initial administrateur est <strong>admin / admin</strong>.
+                  </div>
+                  <v-text-field
+                    v-model="state.loginUsername"
+                    label="Login"
+                    prepend-icon="mdi-account"
+                    variant="outlined"
+                    density="comfortable"
+                  />
+                  <v-text-field
+                    v-model="state.loginPassword"
+                    label="Mot de passe"
+                    type="password"
+                    prepend-icon="mdi-lock-outline"
+                    variant="outlined"
+                    density="comfortable"
+                    @keyup.enter="state.login"
+                  />
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    :loading="state.isAuthenticating"
+                    @click="state.login"
+                  >
+                    Se connecter
+                  </v-btn>
+                  <v-alert
+                    v-if="state.authStatus"
+                    class="mt-4"
+                    :type="state.authStatus.type"
+                    variant="tonal"
+                    density="comfortable"
+                    border="start"
+                  >
+                    {{ state.authStatus.message }}
+                  </v-alert>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+
+        <template v-else-if="!state.isPortalSelected">
           <v-row class="mb-8">
             <v-col cols="12" md="7">
               <div class="kicker">Connexion</div>
@@ -96,6 +175,9 @@
               <v-card class="card-animate" elevation="4" rounded="xl">
                 <v-card-title class="section-title">Plateforme</v-card-title>
                 <v-card-text>
+                  <div v-if="state.accessProfile.username" class="text-medium-emphasis mb-2">
+                    Utilisateur actif: <strong>{{ state.accessProfile.displayName || state.accessProfile.username }}</strong>
+                  </div>
                   <div class="text-medium-emphasis">
                     Le menu <strong>Admin plateforme</strong> reste accessible en permanence depuis l'entête.
                   </div>
@@ -103,6 +185,16 @@
                   <v-chip :color="state.neo4jChipColor" variant="tonal">
                     Neo4j {{ state.neo4jChipLabel }}
                   </v-chip>
+                  <v-alert
+                    v-if="state.accessStatus"
+                    class="mt-4"
+                    :type="state.accessStatus.type"
+                    variant="tonal"
+                    density="comfortable"
+                    border="start"
+                  >
+                    {{ state.accessStatus.message }}
+                  </v-alert>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -124,7 +216,12 @@
                     <v-chip color="secondary" variant="tonal" class="ma-1">Recherche avancée</v-chip>
                     <v-chip color="accent" variant="tonal" class="ma-1">Exploration métier</v-chip>
                   </v-chip-group>
-                  <v-btn color="primary" size="large" @click="state.setPortal('user')">
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    :disabled="!state.canAccessUserPortal"
+                    @click="state.setPortal('user')"
+                  >
                     Entrer dans le portail métier
                   </v-btn>
                 </v-card-text>
@@ -145,7 +242,12 @@
                     <v-chip color="secondary" variant="tonal" class="ma-1">Maintenance</v-chip>
                     <v-chip color="accent" variant="tonal" class="ma-1">Administration</v-chip>
                   </v-chip-group>
-                  <v-btn color="primary" size="large" @click="state.setPortal('model-admin')">
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    :disabled="!state.canAccessModelAdminPortal"
+                    @click="state.setPortal('model-admin')"
+                  >
                     Entrer dans le portail administration
                   </v-btn>
                 </v-card-text>
@@ -177,15 +279,31 @@
                 </v-btn>
               </div>
 
-              <v-tabs v-model="state.currentPage" color="primary" align-tabs="start" class="portal-tabs">
+              <v-tabs
+                v-if="activeTabs.length"
+                v-model="state.currentPage"
+                color="primary"
+                align-tabs="start"
+                class="portal-tabs"
+              >
                 <v-tab v-for="tab in activeTabs" :key="tab.value" :value="tab.value">
                   {{ tab.title }}
                 </v-tab>
               </v-tabs>
+              <v-alert
+                v-else
+                class="mt-4"
+                type="warning"
+                variant="tonal"
+                density="comfortable"
+                border="start"
+              >
+                Aucun onglet n'est disponible pour ce modèle avec vos droits actuels.
+              </v-alert>
             </v-col>
           </v-row>
 
-          <v-window v-model="state.currentPage">
+          <v-window v-if="activeTabs.length" v-model="state.currentPage">
             <v-window-item value="navigate">
               <NavigatePage :state="state" />
             </v-window-item>
@@ -225,7 +343,7 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import { useAppState } from './composables/useAppState';
 import AdminPage from './components/pages/AdminPage.vue';
 import ImportDataPage from './components/pages/ImportDataPage.vue';
@@ -287,7 +405,33 @@ const platformAdminEntries = [
   }
 ];
 
-const activeTabs = computed(() => (state.isUserPortal ? userPortalTabs : modelAdminTabs));
+const activeTabs = computed(() => {
+  if (state.isUserPortal) {
+    return userPortalTabs.filter((tab) => {
+      if (['navigate', 'table', 'search'].includes(tab.value)) {
+        return state.canReadCurrentModelData;
+      }
+      if (['import-data', 'create'].includes(tab.value)) {
+        return state.canCreateCurrentModelData;
+      }
+      return true;
+    });
+  }
+  return modelAdminTabs;
+});
+
+watch(
+  () => activeTabs.value,
+  (tabs) => {
+    if (!tabs.length) {
+      return;
+    }
+    if (!tabs.find((tab) => tab.value === state.currentPage)) {
+      state.setCurrentPage(tabs[0].value);
+    }
+  },
+  { immediate: true }
+);
 
 const portalKicker = computed(() => (
   state.isUserPortal ? 'Portail métier' : 'Portail administration du modèle'

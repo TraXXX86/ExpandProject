@@ -135,15 +135,27 @@
               </div>
             </template>
             <template #item.actions="{ item }">
-              <v-btn
-                size="small"
-                color="primary"
-                variant="tonal"
-                prepend-icon="mdi-eye-outline"
-                @click="state.viewObjectFromTable(item.idKey)"
-              >
-                Voir
-              </v-btn>
+              <div class="d-flex align-center" style="gap: 6px;">
+                <v-btn
+                  size="small"
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="mdi-eye-outline"
+                  @click="state.viewObjectFromTable(item.idKey)"
+                >
+                  Voir
+                </v-btn>
+                <v-btn
+                  v-if="state.canDeleteCurrentModelData"
+                  size="small"
+                  color="error"
+                  variant="tonal"
+                  prepend-icon="mdi-delete-outline"
+                  @click="state.deleteObject(item)"
+                >
+                  Supprimer
+                </v-btn>
+              </div>
             </template>
             <template #no-data>
               <div class="text-medium-emphasis py-6">

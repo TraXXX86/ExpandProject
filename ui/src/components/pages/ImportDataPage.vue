@@ -6,6 +6,16 @@
       <p class="subhead">
         Chargez des fichiers de données XML pour alimenter le modèle sélectionné et explorez vos objets.
       </p>
+      <v-alert
+        v-if="!state.canCreateCurrentModelData"
+        class="mt-4"
+        type="warning"
+        variant="tonal"
+        density="comfortable"
+        border="start"
+      >
+        Votre profil n'a pas le droit CREATE sur ce modèle.
+      </v-alert>
     </v-col>
 
     <v-col cols="12" md="6">
@@ -61,7 +71,7 @@
               variant="tonal"
               color="secondary"
               size="large"
-              :disabled="!state.selectedModelKey"
+              :disabled="!state.selectedModelKey || !state.canReadCurrentModelData"
               @click="state.refreshData(state.selectedModelKey)"
             >
               Rafraîchir

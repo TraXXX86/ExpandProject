@@ -23,6 +23,8 @@ import javax.servlet.http.Part;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import fr.expand.project.importdata.access.AccessContext;
+import fr.expand.project.importdata.access.AccessControlStore;
 import fr.expand.project.importdata.api.impl.ModelBasedImportAPI;
 import fr.expand.project.importdata.data.Neo4jDataStore;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
@@ -100,18 +102,336 @@ public class ImportApiServer {
             return GSON.toJson(payload);
         });
 
+        post("/api/auth/login", (request, response) -> {
+            response.type("application/json");
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+            String username = sanitizeUsername(getString(payload.get("username")));
+            String password = getString(payload.get("password"));
+            if (username == null || username.isBlank() || password == null || password.isBlank()) {
+                return error(response, 400, "username/password manquants");
+            }
+
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                Map<String, Object> user = accessStore.authenticate(username, password);
+                if (user == null) {
+                    return error(response, 401, "Authentification invalide");
+                }
+                Map<String, Object> session = accessStore.createSession(username);
+                if (session == null) {
+                    return error(response, 500, "Impossible de créer la session");
+                }
+                AccessContext context = buildAccessContext(accessStore, session);
+                if (context == null) {
+                    return error(response, 500, "Impossible de charger le profil utilisateur");
+                }
+                return GSON.toJson(buildAuthPayload(context, accessStore));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur d'authentification: " + e.getMessage());
+            }
+        });
+
+        post("/api/auth/logout", (request, response) -> {
+            response.type("application/json");
+            String token = resolveSessionToken(request);
+            if (token == null || token.isBlank()) {
+                return GSON.toJson(Map.of("status", "logged-out"));
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                accessStore.deleteSession(token);
+                return GSON.toJson(Map.of("status", "logged-out"));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la déconnexion: " + e.getMessage());
+            }
+        });
+
+        get("/api/auth/me", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Session invalide");
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                return GSON.toJson(buildAuthPayload(context, accessStore));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors du chargement de la session: " + e.getMessage());
+            }
+        });
+
+        post("/api/auth/impersonate", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Session invalide");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Seul un administrateur peut impersonner");
+            }
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+            String targetUsername = sanitizeUsername(getString(payload.get("username")));
+            if (targetUsername == null || targetUsername.isBlank()) {
+                return error(response, 400, "username cible manquant");
+            }
+
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                boolean ok = accessStore.impersonateSession(context.getSessionToken(), targetUsername);
+                if (!ok) {
+                    return error(response, 400, "Impersonation impossible");
+                }
+                Map<String, Object> session = accessStore.loadSession(context.getSessionToken());
+                AccessContext refreshedContext = buildAccessContext(accessStore, session);
+                if (refreshedContext == null) {
+                    return error(response, 500, "Impossible de charger la session impersonée");
+                }
+                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de l'impersonation: " + e.getMessage());
+            }
+        });
+
+        post("/api/auth/impersonate/stop", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Session invalide");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Seul un administrateur peut arrêter l'impersonation");
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                boolean ok = accessStore.stopImpersonation(context.getSessionToken());
+                if (!ok) {
+                    return error(response, 400, "Aucune impersonation active");
+                }
+                Map<String, Object> session = accessStore.loadSession(context.getSessionToken());
+                AccessContext refreshedContext = buildAccessContext(accessStore, session);
+                if (refreshedContext == null) {
+                    return error(response, 500, "Impossible de charger la session");
+                }
+                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de l'arrêt de l'impersonation: " + e.getMessage());
+            }
+        });
+
+        get("/api/access/me", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Session invalide");
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                Map<String, Object> payload = accessStore.loadUserAccess(context.getUsername());
+                if (payload == null) {
+                    return error(response, 404, "Utilisateur introuvable");
+                }
+                payload.put("auth", buildAuthMeta(context));
+                return GSON.toJson(payload);
+            }
+        });
+
+        get("/api/access/users", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                if (context.isActorPlatformAdmin()) {
+                    return GSON.toJson(accessStore.listUsers());
+                }
+                Map<String, Object> self = accessStore.loadUser(context.getUsername());
+                if (self == null) {
+                    return GSON.toJson(List.of());
+                }
+                return GSON.toJson(List.of(self));
+            }
+        });
+
+        get("/api/access/users/:username/access", (request, response) -> {
+            response.type("application/json");
+            String username = sanitizeUsername(request.params("username"));
+            if (username == null || username.isBlank()) {
+                return error(response, 400, "username manquant");
+            }
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isActorPlatformAdmin() && !context.getUsername().equals(username)) {
+                return error(response, 403, "Accès refusé");
+            }
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                Map<String, Object> payload = accessStore.loadUserAccess(username);
+                if (payload == null) {
+                    return error(response, 404, "Utilisateur introuvable");
+                }
+                return GSON.toJson(payload);
+            }
+        });
+
+        post("/api/access/users", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Droits insuffisants");
+            }
+
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+
+            String username = sanitizeUsername(getString(payload.get("username")));
+            String displayName = getString(payload.get("displayName"));
+            if (username == null || username.isBlank()) {
+                return error(response, 400, "username manquant");
+            }
+
+            boolean portalUser = getBoolean(payload.get("portalUser"));
+            boolean portalModelAdmin = getBoolean(payload.get("portalModelAdmin"));
+            boolean platformAdmin = getBoolean(payload.get("platformAdmin"));
+            String password = getString(payload.get("password"));
+
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                accessStore.upsertUser(username, displayName, portalUser, portalModelAdmin, platformAdmin, password);
+                Map<String, Object> created = accessStore.loadUserAccess(username);
+                return GSON.toJson(created);
+            }
+        });
+
+        put("/api/access/users/:username", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Droits insuffisants");
+            }
+
+            String username = sanitizeUsername(request.params("username"));
+            if (username == null || username.isBlank()) {
+                return error(response, 400, "username manquant");
+            }
+
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+
+            String displayName = getString(payload.get("displayName"));
+            boolean portalUser = getBoolean(payload.get("portalUser"));
+            boolean portalModelAdmin = getBoolean(payload.get("portalModelAdmin"));
+            boolean platformAdmin = getBoolean(payload.get("platformAdmin"));
+            String password = getString(payload.get("password"));
+
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                if (accessStore.loadUser(username) == null) {
+                    return error(response, 404, "Utilisateur introuvable");
+                }
+                accessStore.upsertUser(username, displayName, portalUser, portalModelAdmin, platformAdmin, password);
+                Map<String, Object> updated = accessStore.loadUserAccess(username);
+                return GSON.toJson(updated);
+            }
+        });
+
+        delete("/api/access/users/:username", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Droits insuffisants");
+            }
+            String username = sanitizeUsername(request.params("username"));
+            if (username == null || username.isBlank()) {
+                return error(response, 400, "username manquant");
+            }
+
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                boolean deleted = accessStore.deleteUser(username);
+                if (!deleted) {
+                    return error(response, 400, "Suppression refusée ou utilisateur introuvable");
+                }
+                return GSON.toJson(Map.of("status", "deleted", "username", username));
+            }
+        });
+
+        put("/api/access/users/:username/permissions", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isActorPlatformAdmin()) {
+                return error(response, 403, "Droits insuffisants");
+            }
+
+            String username = sanitizeUsername(request.params("username"));
+            if (username == null || username.isBlank()) {
+                return error(response, 400, "username manquant");
+            }
+
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+
+            List<Map<String, Object>> permissions = readPermissionList(payload.get("permissions"));
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                if (accessStore.loadUser(username) == null) {
+                    return error(response, 404, "Utilisateur introuvable");
+                }
+                accessStore.replaceModelPermissions(username, permissions);
+                Map<String, Object> updated = accessStore.loadUserAccess(username);
+                return GSON.toJson(updated);
+            }
+        });
+
         get("/api/models", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
             try (Neo4jModelStore store = new Neo4jModelStore()) {
-                return GSON.toJson(store.listModels());
+                List<Map<String, Object>> models = store.listModels();
+                if (context.isPlatformAdmin()) {
+                    return GSON.toJson(models);
+                }
+                List<Map<String, Object>> filtered = new ArrayList<>();
+                for (Map<String, Object> model : models) {
+                    String modelKey = getString(model.get("key"));
+                    if (modelKey != null && context.canViewModel(modelKey)) {
+                        filtered.add(model);
+                    }
+                }
+                return GSON.toJson(filtered);
             }
         });
 
         get("/api/models/:key", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
             String modelKey = request.params("key");
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canViewModel(modelKey)) {
+                return error(response, 403, "Accès au modèle refusé");
             }
 
             try (Neo4jModelStore store = new Neo4jModelStore()) {
@@ -124,10 +444,23 @@ public class ImportApiServer {
         });
 
         get("/api/models/:key/xml", (request, response) -> {
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                response.type("application/json");
+                return error(response, 401, "Utilisateur inconnu");
+            }
             String modelKey = request.params("key");
             if (modelKey == null || modelKey.isBlank()) {
                 response.type("application/json");
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.isPortalModelAdmin()) {
+                response.type("application/json");
+                return error(response, 403, "Accès portail administration refusé");
+            }
+            if (!context.canViewModel(modelKey)) {
+                response.type("application/json");
+                return error(response, 403, "Accès au modèle refusé");
             }
 
             try (Neo4jModelStore store = new Neo4jModelStore()) {
@@ -143,9 +476,19 @@ public class ImportApiServer {
 
         put("/api/models/:key", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalModelAdmin()) {
+                return error(response, 403, "Accès portail administration refusé");
+            }
             String modelKey = request.params("key");
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canViewModel(modelKey)) {
+                return error(response, 403, "Accès au modèle refusé");
             }
             String xml = request.body();
             if (xml == null || xml.isBlank()) {
@@ -172,6 +515,13 @@ public class ImportApiServer {
 
         post("/api/models", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalModelAdmin()) {
+                return error(response, 403, "Accès portail administration refusé");
+            }
             try {
                 String xml = readMultipartText(request.raw(), "modelFile");
                 if (xml == null || xml.isBlank()) {
@@ -191,9 +541,19 @@ public class ImportApiServer {
 
         delete("/api/models/:key", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalModelAdmin()) {
+                return error(response, 403, "Accès portail administration refusé");
+            }
             String modelKey = request.params("key");
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canViewModel(modelKey)) {
+                return error(response, 403, "Accès au modèle refusé");
             }
             try (Neo4jModelStore store = new Neo4jModelStore()) {
                 store.deleteModelAndDataByKey(modelKey);
@@ -204,6 +564,13 @@ public class ImportApiServer {
         post("/api/data", (request, response) -> {
             response.type("application/json");
             try {
+                AccessContext context = resolveAccessContext(request, response);
+                if (context == null) {
+                    return error(response, 401, "Utilisateur inconnu");
+                }
+                if (!context.isPortalUser()) {
+                    return error(response, 403, "Accès portail métier refusé");
+                }
                 configureMultipart(request.raw());
                 String modelKey = readMultipartField(request.raw(), "modelKey");
                 if (modelKey == null || modelKey.isBlank()) {
@@ -216,6 +583,9 @@ public class ImportApiServer {
                 boolean validateOnly = Boolean.parseBoolean(validateOnlyValue);
                 if (modelKey == null || modelKey.isBlank()) {
                     return error(response, 400, "modelKey manquant");
+                }
+                if (!context.canCreateData(modelKey)) {
+                    return error(response, 403, "Droit CREATE refusé pour ce modèle");
                 }
 
                 String xml = readMultipartText(request.raw(), "dataFile");
@@ -252,9 +622,19 @@ public class ImportApiServer {
 
         get("/api/data", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
             String modelKey = request.queryParams("modelKey");
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
             }
 
             try (Neo4jDataStore store = new Neo4jDataStore()) {
@@ -282,6 +662,13 @@ public class ImportApiServer {
 
         post("/api/objects", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
             Map<String, Object> payload = readJsonBody(request.body());
             if (payload == null) {
                 return error(response, 400, "Corps JSON manquant");
@@ -292,6 +679,9 @@ public class ImportApiServer {
 
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canCreateData(modelKey)) {
+                return error(response, 403, "Droit CREATE refusé pour ce modèle");
             }
             if (type == null || type.isBlank()) {
                 return error(response, 400, "type manquant");
@@ -349,8 +739,154 @@ public class ImportApiServer {
             }
         });
 
+        put("/api/objects/:id", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+
+            Long objectId = getLong(request.params("id"));
+            if (objectId == null || objectId <= 0) {
+                return error(response, 400, "id objet invalide");
+            }
+
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+
+            String modelKey = getString(payload.get("modelKey"));
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canUpdateData(modelKey)) {
+                return error(response, 403, "Droit UPDATE refusé pour ce modèle");
+            }
+
+            List<DataPackAttribute> incomingAttributes = readAttributes(payload.get("attributes"));
+            Map<String, Object> incomingAttributeMap = attributesToMap(incomingAttributes);
+
+            try (Neo4jDataStore dataStore = new Neo4jDataStore();
+                Neo4jModelStore modelStore = new Neo4jModelStore()) {
+                Map<String, Object> existingObject = dataStore.loadObjectById(modelKey, objectId);
+                if (existingObject == null) {
+                    return error(response, 404, "Objet introuvable");
+                }
+
+                String existingType = getString(existingObject.get("type"));
+                String requestedType = getString(payload.get("type"));
+                if (requestedType != null && !requestedType.isBlank() && !requestedType.equals(existingType)) {
+                    return error(response, 400, "Le type de l'objet ne peut pas être modifié");
+                }
+
+                Map<String, Object> mergedAttributes = new HashMap<>();
+                if (existingObject.get("attributes") instanceof List<?> currentAttributes) {
+                    for (Object currentAttribute : currentAttributes) {
+                        if (!(currentAttribute instanceof Map<?, ?> attrMap)) {
+                            continue;
+                        }
+                        Object keyValue = attrMap.get("key");
+                        if (keyValue == null) {
+                            continue;
+                        }
+                        mergedAttributes.put(keyValue.toString(), getString(attrMap.get("value")));
+                    }
+                }
+                mergedAttributes.putAll(incomingAttributeMap);
+
+                String modelXml = modelStore.loadModelXmlByKey(modelKey);
+                if (modelXml == null || modelXml.isBlank()) {
+                    return error(response, 404, "Modèle introuvable pour la clé fournie");
+                }
+                ModelManager.getInstance().loadModelFromXml(modelXml);
+
+                DATAS data = new DATAS();
+                OBJECTS objects = new OBJECTS();
+                data.setOBJECTS(objects);
+                OBJECT obj = new OBJECT();
+                obj.setID(objectId.intValue());
+                obj.setTYPE(existingType);
+                obj.getATTRIBUTE().addAll(readAttributesFromMap(mergedAttributes));
+                objects.getOBJECT().add(obj);
+
+                DataValidator validator = new DataValidator();
+                ValidationResult validationResult = validator.validate(data);
+                if (!validationResult.isValid()) {
+                    response.status(400);
+                    Map<String, Object> errorPayload = new HashMap<>();
+                    errorPayload.put("valid", false);
+                    errorPayload.put("errors", validationResult.getErrors());
+                    errorPayload.put("warnings", validationResult.getWarnings());
+                    return GSON.toJson(errorPayload);
+                }
+
+                boolean updated = dataStore.updateObject(modelKey, objectId, mergedAttributes);
+                if (!updated) {
+                    return error(response, 404, "Objet introuvable");
+                }
+
+                Map<String, Object> resultPayload = new HashMap<>();
+                resultPayload.put("status", "updated");
+                resultPayload.put("id", objectId);
+                resultPayload.put("type", existingType);
+                resultPayload.put("warnings", validationResult.getWarnings());
+                return GSON.toJson(resultPayload);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la mise à jour de l'objet: " + e.getMessage());
+            }
+        });
+
+        delete("/api/objects/:id", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+
+            Long objectId = getLong(request.params("id"));
+            if (objectId == null || objectId <= 0) {
+                return error(response, 400, "id objet invalide");
+            }
+
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                Map<String, Object> payload = readJsonBody(request.body());
+                modelKey = payload == null ? null : getString(payload.get("modelKey"));
+            }
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canDeleteData(modelKey)) {
+                return error(response, 403, "Droit DELETE refusé pour ce modèle");
+            }
+
+            try (Neo4jDataStore dataStore = new Neo4jDataStore()) {
+                boolean deleted = dataStore.deleteObject(modelKey, objectId);
+                if (!deleted) {
+                    return error(response, 404, "Objet introuvable");
+                }
+                return GSON.toJson(Map.of("status", "deleted", "id", objectId, "modelKey", modelKey));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la suppression de l'objet: " + e.getMessage());
+            }
+        });
+
         post("/api/links", (request, response) -> {
             response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
             Map<String, Object> payload = readJsonBody(request.body());
             if (payload == null) {
                 return error(response, 400, "Corps JSON manquant");
@@ -362,6 +898,9 @@ public class ImportApiServer {
 
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canCreateData(modelKey)) {
+                return error(response, 403, "Droit CREATE refusé pour ce modèle");
             }
             if (linkTypeName == null || linkTypeName.isBlank()) {
                 return error(response, 400, "type manquant");
@@ -445,7 +984,10 @@ public class ImportApiServer {
     private static void addCorsHeaders(spark.Response response) {
         response.raw().setHeader("Access-Control-Allow-Origin", "*");
         response.raw().setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-        response.raw().setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,Accept,Origin");
+        response.raw().setHeader(
+            "Access-Control-Allow-Headers",
+            "Content-Type,Authorization,Accept,Origin,X-Session-Token"
+        );
     }
 
     private static String readMultipartText(javax.servlet.http.HttpServletRequest request, String partName)
@@ -540,6 +1082,33 @@ public class ImportApiServer {
         }
     }
 
+    private static Long getLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static boolean getBoolean(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.intValue() != 0;
+        }
+        return Boolean.parseBoolean(value.toString());
+    }
+
     private static List<DataPackAttribute> readAttributes(Object value) {
         List<DataPackAttribute> attributes = new ArrayList<>();
         if (!(value instanceof List<?> list)) {
@@ -558,6 +1127,146 @@ public class ImportApiServer {
             attributes.add(new DataPackAttribute(key, val));
         }
         return attributes;
+    }
+
+    private static List<DataPackAttribute> readAttributesFromMap(Map<String, Object> attributes) {
+        List<DataPackAttribute> rows = new ArrayList<>();
+        if (attributes == null) {
+            return rows;
+        }
+        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            rows.add(new DataPackAttribute(key, entry.getValue() == null ? "" : entry.getValue().toString()));
+        }
+        return rows;
+    }
+
+    private static Map<String, Object> attributesToMap(List<DataPackAttribute> attributes) {
+        Map<String, Object> map = new HashMap<>();
+        if (attributes == null) {
+            return map;
+        }
+        for (DataPackAttribute attribute : attributes) {
+            if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+                continue;
+            }
+            map.put(attribute.getKEY(), attribute.getVALUE() == null ? "" : attribute.getVALUE());
+        }
+        return map;
+    }
+
+    private static List<Map<String, Object>> readPermissionList(Object value) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (!(value instanceof List<?> list)) {
+            return rows;
+        }
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            String modelKey = map.get("modelKey") == null ? null : map.get("modelKey").toString();
+            if (modelKey == null || modelKey.isBlank()) {
+                continue;
+            }
+            Map<String, Object> row = new HashMap<>();
+            row.put("modelKey", modelKey);
+            row.put("visible", getBoolean(map.get("visible")));
+            row.put("canRead", getBoolean(map.get("canRead")));
+            row.put("canCreate", getBoolean(map.get("canCreate")));
+            row.put("canUpdate", getBoolean(map.get("canUpdate")));
+            row.put("canDelete", getBoolean(map.get("canDelete")));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static String sanitizeUsername(String username) {
+        if (username == null) {
+            return null;
+        }
+        String value = username.trim();
+        if (value.isBlank()) {
+            return null;
+        }
+        if (!value.matches("[A-Za-z0-9._-]+")) {
+            return null;
+        }
+        return value;
+    }
+
+    private static AccessContext resolveAccessContext(spark.Request request, spark.Response response) {
+        String token = resolveSessionToken(request);
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try (AccessControlStore accessStore = new AccessControlStore()) {
+            Map<String, Object> session = accessStore.loadSession(token);
+            return buildAccessContext(accessStore, session);
+        } catch (Exception e) {
+            response.status(500);
+            return null;
+        }
+    }
+
+    private static AccessContext buildAccessContext(AccessControlStore accessStore, Map<String, Object> session) {
+        if (accessStore == null || session == null) {
+            return null;
+        }
+        String token = getString(session.get("token"));
+        String actorUsername = sanitizeUsername(getString(session.get("actorUsername")));
+        String effectiveUsername = sanitizeUsername(getString(session.get("effectiveUsername")));
+        if (token == null || token.isBlank() || actorUsername == null || effectiveUsername == null) {
+            return null;
+        }
+
+        Map<String, Object> actorUser = accessStore.loadUser(actorUsername);
+        Map<String, Object> effectiveUser = accessStore.loadUser(effectiveUsername);
+        if (actorUser == null || effectiveUser == null) {
+            return null;
+        }
+
+        List<Map<String, Object>> permissions = accessStore.listModelPermissions(effectiveUsername);
+        boolean impersonating = getBoolean(session.get("impersonating"));
+        long expiresAt = getLong(session.get("expiresAt")) == null ? 0L : getLong(session.get("expiresAt"));
+
+        return new AccessContext(token, actorUser, effectiveUser, permissions, impersonating, expiresAt);
+    }
+
+    private static String resolveSessionToken(spark.Request request) {
+        String authHeader = request.headers("Authorization");
+        String token = AccessContext.extractBearerToken(authHeader);
+        if (token != null && !token.isBlank()) {
+            return token;
+        }
+        String fallback = request.headers("X-Session-Token");
+        if (fallback == null || fallback.isBlank()) {
+            return null;
+        }
+        return fallback.trim();
+    }
+
+    private static Map<String, Object> buildAuthPayload(AccessContext context, AccessControlStore accessStore) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("token", context.getSessionToken());
+        payload.put("auth", buildAuthMeta(context));
+        payload.put("user", accessStore.loadUser(context.getUsername()));
+        payload.put("permissions", accessStore.listModelPermissions(context.getUsername()));
+        return payload;
+    }
+
+    private static Map<String, Object> buildAuthMeta(AccessContext context) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("actorUsername", context.getActorUsername());
+        meta.put("actorDisplayName", context.getActorDisplayName());
+        meta.put("effectiveUsername", context.getUsername());
+        meta.put("effectiveDisplayName", context.getDisplayName());
+        meta.put("impersonating", context.isImpersonating());
+        meta.put("actorPlatformAdmin", context.isActorPlatformAdmin());
+        meta.put("expiresAt", context.getExpiresAt());
+        return meta;
     }
 
     private static boolean isLinkTypeAllowed(ModelManager modelManager, LINKTYPE linkType, String candidateType, boolean source) {

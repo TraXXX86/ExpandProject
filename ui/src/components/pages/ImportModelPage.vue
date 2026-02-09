@@ -7,7 +7,13 @@
         Téléversez un fichier de modèle XML et synchronisez la base pour rendre la navigation disponible.
       </p>
       <div class="d-flex flex-wrap" style="gap: 12px; margin-top: 24px;">
-        <v-btn color="primary" size="large" prepend-icon="mdi-database-refresh" @click="state.refreshModels()">
+        <v-btn
+          color="primary"
+          size="large"
+          prepend-icon="mdi-database-refresh"
+          :disabled="!state.canAccessModelAdminPortal"
+          @click="state.refreshModels()"
+        >
           Rafraîchir la base
         </v-btn>
         <v-btn
@@ -15,7 +21,8 @@
           color="primary"
           size="large"
           prepend-icon="mdi-graph-outline"
-        @click="state.setCurrentPage('model')"
+          :disabled="!state.canAccessModelAdminPortal"
+          @click="state.setCurrentPage('model')"
         >
           Visualiser le modèle
         </v-btn>

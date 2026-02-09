@@ -2,6 +2,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 
 export function useAppState() {
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+  const storedToken = typeof window !== 'undefined'
+    ? window.localStorage.getItem('expand.authToken')
+    : '';
 
   const currentPage = ref('navigate');
   const activePortal = ref('');
@@ -59,6 +62,51 @@ export function useAppState() {
   const isLoadingModel = ref(false);
   const isLoadingData = ref(false);
 
+  const authToken = ref(storedToken || '');
+  const isAuthenticated = ref(Boolean(authToken.value));
+  const isAuthenticating = ref(false);
+  const authStatus = ref(null);
+  const loginUsername = ref('admin');
+  const loginPassword = ref('admin');
+  const authMeta = ref({
+    actorUsername: '',
+    actorDisplayName: '',
+    effectiveUsername: '',
+    effectiveDisplayName: '',
+    impersonating: false,
+    actorPlatformAdmin: false,
+    expiresAt: 0
+  });
+
+  const users = ref([]);
+  const accessProfile = ref({
+    username: '',
+    displayName: '',
+    portalUser: false,
+    portalModelAdmin: false,
+    platformAdmin: false
+  });
+  const accessPermissions = ref([]);
+  const accessStatus = ref(null);
+  const isLoadingUsers = ref(false);
+
+  const adminAccessUserKey = ref('');
+  const adminAccessStatus = ref(null);
+  const isSavingAccessUser = ref(false);
+  const isSavingAccessPermissions = ref(false);
+  const isDeletingAccessUser = ref(false);
+  const newAccessUsername = ref('');
+  const newAccessDisplayName = ref('');
+  const adminAccessForm = ref({
+    username: '',
+    displayName: '',
+    password: '',
+    portalUser: true,
+    portalModelAdmin: false,
+    platformAdmin: false
+  });
+  const adminAccessPermissions = ref([]);
+
   const adminModelKey = ref('');
   const adminCommandVisible = ref(false);
   const adminStatus = ref(null);
@@ -81,6 +129,26 @@ export function useAppState() {
       value: model.key
     }))
   );
+
+  const userOptions = computed(() =>
+    users.value.map((user) => ({
+      title: user.displayName ? `${user.displayName} (${user.username})` : user.username,
+      value: user.username
+    }))
+  );
+
+  const isPlatformAdmin = computed(() => Boolean(accessProfile.value.platformAdmin));
+  const canAccessUserPortal = computed(() => Boolean(accessProfile.value.portalUser || isPlatformAdmin.value));
+  const canAccessModelAdminPortal = computed(
+    () => Boolean(accessProfile.value.portalModelAdmin || isPlatformAdmin.value)
+  );
+
+  const selectedModelPermission = computed(() => getModelPermission(selectedModelKey.value));
+  const canReadCurrentModelData = computed(() => canReadModelData(selectedModelKey.value));
+  const canCreateCurrentModelData = computed(() => canCreateModelData(selectedModelKey.value));
+  const canUpdateCurrentModelData = computed(() => canUpdateModelData(selectedModelKey.value));
+  const canDeleteCurrentModelData = computed(() => canDeleteModelData(selectedModelKey.value));
+  const canManageAccess = computed(() => Boolean(authMeta.value.actorPlatformAdmin));
 
   const createObjectTypeOptions = computed(() =>
     modelDetails.value.objectTypes
@@ -116,9 +184,11 @@ export function useAppState() {
     return 'Connexion';
   });
 
-  const canUploadModel = computed(() => Boolean(getFirstFile(modelFile.value)));
+  const canUploadModel = computed(
+    () => Boolean(getFirstFile(modelFile.value) && canAccessModelAdminPortal.value)
+  );
   const canUploadData = computed(
-    () => Boolean(getFirstFile(dataFile.value) && selectedModelKey.value)
+    () => Boolean(getFirstFile(dataFile.value) && selectedModelKey.value && canCreateCurrentModelData.value)
   );
 
   const neo4jChipLabel = computed(() => {
@@ -941,9 +1011,16 @@ export function useAppState() {
       .filter(Boolean);
   });
 
-  onMounted(() => {
-    refreshHealth();
-    refreshModels();
+  onMounted(async () => {
+    const authenticated = await refreshSession();
+    if (!authenticated) {
+      return;
+    }
+    await refreshUsers();
+    await refreshCurrentAccess();
+    await refreshHealth();
+    await refreshModels();
+    ensurePortalAccess();
   });
 
   watch(
@@ -983,12 +1060,47 @@ export function useAppState() {
     (list) => {
       if (!list.length) {
         adminModelKey.value = '';
+        adminAccessPermissions.value = [];
         return;
       }
       const exists = list.some((model) => model.key === adminModelKey.value);
       if (!exists) {
         adminModelKey.value = list[0].key;
       }
+      syncAdminPermissionRows();
+    }
+  );
+
+  watch(
+    () => users.value,
+    (list) => {
+      if (!list.length) {
+        adminAccessUserKey.value = '';
+        return;
+      }
+      if (!list.find((user) => user.username === adminAccessUserKey.value)) {
+        adminAccessUserKey.value = list[0].username;
+      }
+    },
+    { immediate: true }
+  );
+
+  watch(
+    () => adminAccessUserKey.value,
+    async (username) => {
+      if (!username) {
+        adminAccessForm.value = {
+          username: '',
+          displayName: '',
+          password: '',
+          portalUser: true,
+          portalModelAdmin: false,
+          platformAdmin: false
+        };
+        adminAccessPermissions.value = [];
+        return;
+      }
+      await loadAdminAccessUser(username);
     }
   );
 
@@ -1082,12 +1194,536 @@ export function useAppState() {
     dataFile.value = Array.isArray(files) ? files[0] : files;
   }
 
+  function apiFetch(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (authToken.value) {
+      headers.set('Authorization', `Bearer ${authToken.value}`);
+    }
+    return fetch(`${apiBase}${path}`, {
+      ...options,
+      headers
+    });
+  }
+
+  function resetAuthState(message = '') {
+    authToken.value = '';
+    isAuthenticated.value = false;
+    authMeta.value = {
+      actorUsername: '',
+      actorDisplayName: '',
+      effectiveUsername: '',
+      effectiveDisplayName: '',
+      impersonating: false,
+      actorPlatformAdmin: false,
+      expiresAt: 0
+    };
+    accessProfile.value = {
+      username: '',
+      displayName: '',
+      portalUser: false,
+      portalModelAdmin: false,
+      platformAdmin: false
+    };
+    accessPermissions.value = [];
+    users.value = [];
+    adminAccessUserKey.value = '';
+    activePortal.value = '';
+    resetModelState();
+    resetDataState();
+    resetCreateState();
+    resetModelEditorState();
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('expand.authToken');
+    }
+    if (message) {
+      authStatus.value = { type: 'warning', message };
+    }
+  }
+
+  async function login() {
+    const username = String(loginUsername.value || '').trim();
+    const password = String(loginPassword.value || '');
+    if (!username || !password) {
+      authStatus.value = { type: 'warning', message: 'Renseignez votre login et mot de passe.' };
+      return false;
+    }
+
+    isAuthenticating.value = true;
+    authStatus.value = null;
+    try {
+      const response = await fetch(`${apiBase}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Connexion refusée');
+      }
+
+      authToken.value = payload?.token || '';
+      isAuthenticated.value = Boolean(authToken.value);
+      if (typeof window !== 'undefined' && authToken.value) {
+        window.localStorage.setItem('expand.authToken', authToken.value);
+      }
+
+      await applyAuthPayload(payload);
+      await refreshUsers();
+      await refreshHealth();
+      await refreshModels();
+      ensurePortalAccess();
+
+      authStatus.value = { type: 'success', message: 'Connexion réussie.' };
+      return true;
+    } catch (error) {
+      resetAuthState();
+      authStatus.value = { type: 'error', message: error.message };
+      return false;
+    } finally {
+      isAuthenticating.value = false;
+    }
+  }
+
+  async function logout() {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      // ignore
+    }
+    resetAuthState();
+    authStatus.value = { type: 'info', message: 'Déconnecté.' };
+  }
+
+  async function refreshSession() {
+    if (!authToken.value) {
+      resetAuthState();
+      return false;
+    }
+    try {
+      const response = await apiFetch('/api/auth/me');
+      const payload = await readJson(response);
+      if (!response.ok) {
+        resetAuthState();
+        return false;
+      }
+      isAuthenticated.value = true;
+      await applyAuthPayload(payload);
+      return true;
+    } catch (error) {
+      resetAuthState();
+      return false;
+    }
+  }
+
+  async function applyAuthPayload(payload) {
+    authMeta.value = {
+      actorUsername: payload?.auth?.actorUsername || '',
+      actorDisplayName: payload?.auth?.actorDisplayName || '',
+      effectiveUsername: payload?.auth?.effectiveUsername || '',
+      effectiveDisplayName: payload?.auth?.effectiveDisplayName || '',
+      impersonating: Boolean(payload?.auth?.impersonating),
+      actorPlatformAdmin: Boolean(payload?.auth?.actorPlatformAdmin),
+      expiresAt: Number(payload?.auth?.expiresAt || 0)
+    };
+    accessProfile.value = {
+      username: payload?.user?.username || '',
+      displayName: payload?.user?.displayName || '',
+      portalUser: Boolean(payload?.user?.portalUser),
+      portalModelAdmin: Boolean(payload?.user?.portalModelAdmin),
+      platformAdmin: Boolean(payload?.user?.platformAdmin)
+    };
+    accessPermissions.value = Array.isArray(payload?.permissions) ? payload.permissions : [];
+  }
+
+  async function refreshUsers() {
+    if (!isAuthenticated.value) {
+      users.value = [];
+      return;
+    }
+    isLoadingUsers.value = true;
+    accessStatus.value = null;
+    try {
+      const response = await apiFetch('/api/access/users');
+      const payload = await readJson(response);
+      if (!response.ok) {
+        if (response.status === 401) {
+          resetAuthState('Session expirée, reconnectez-vous.');
+          return;
+        }
+        throw new Error(payload?.error || 'Erreur lors du chargement des utilisateurs');
+      }
+      users.value = Array.isArray(payload) ? payload : [];
+      if (!users.value.length) {
+        accessStatus.value = { type: 'warning', message: "Aucun utilisateur n'est configuré." };
+      }
+    } catch (error) {
+      users.value = [];
+      accessStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isLoadingUsers.value = false;
+    }
+  }
+
+  async function refreshCurrentAccess() {
+    if (!isAuthenticated.value) {
+      accessProfile.value = {
+        username: '',
+        displayName: '',
+        portalUser: false,
+        portalModelAdmin: false,
+        platformAdmin: false
+      };
+      accessPermissions.value = [];
+      return;
+    }
+    accessStatus.value = null;
+    try {
+      const response = await apiFetch('/api/access/me');
+      const payload = await readJson(response);
+      if (!response.ok) {
+        if (response.status === 401) {
+          resetAuthState('Session expirée, reconnectez-vous.');
+          return;
+        }
+        throw new Error(payload?.error || 'Erreur lors du chargement des droits');
+      }
+      authMeta.value = {
+        actorUsername: payload?.auth?.actorUsername || authMeta.value.actorUsername,
+        actorDisplayName: payload?.auth?.actorDisplayName || authMeta.value.actorDisplayName,
+        effectiveUsername: payload?.auth?.effectiveUsername || payload?.user?.username || '',
+        effectiveDisplayName: payload?.auth?.effectiveDisplayName || payload?.user?.displayName || '',
+        impersonating: Boolean(payload?.auth?.impersonating),
+        actorPlatformAdmin: Boolean(payload?.auth?.actorPlatformAdmin ?? authMeta.value.actorPlatformAdmin),
+        expiresAt: Number(payload?.auth?.expiresAt || authMeta.value.expiresAt || 0)
+      };
+      accessProfile.value = {
+        username: payload?.user?.username || '',
+        displayName: payload?.user?.displayName || '',
+        portalUser: Boolean(payload?.user?.portalUser),
+        portalModelAdmin: Boolean(payload?.user?.portalModelAdmin),
+        platformAdmin: Boolean(payload?.user?.platformAdmin)
+      };
+      accessPermissions.value = Array.isArray(payload?.permissions) ? payload.permissions : [];
+    } catch (error) {
+      accessProfile.value = {
+        username: '',
+        displayName: '',
+        portalUser: false,
+        portalModelAdmin: false,
+        platformAdmin: false
+      };
+      accessPermissions.value = [];
+      accessStatus.value = { type: 'error', message: error.message };
+    }
+  }
+
+  async function impersonateUser(username) {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    if (!username) {
+      adminAccessStatus.value = { type: 'warning', message: 'Sélectionnez un utilisateur.' };
+      return;
+    }
+
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch('/api/auth/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Impersonation impossible');
+      }
+      await applyAuthPayload(payload);
+      await refreshModels();
+      ensurePortalAccess();
+      adminAccessStatus.value = { type: 'success', message: `Impersonation de ${username} activée.` };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    }
+  }
+
+  async function stopImpersonation() {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch('/api/auth/impersonate/stop', { method: 'POST' });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Impossible d'arrêter l'impersonation");
+      }
+      await applyAuthPayload(payload);
+      await refreshModels();
+      ensurePortalAccess();
+      adminAccessStatus.value = { type: 'success', message: 'Impersonation arrêtée.' };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    }
+  }
+
+  function syncAdminPermissionRows() {
+    const byModelKey = new Map();
+    adminAccessPermissions.value.forEach((permission) => {
+      if (permission?.modelKey) {
+        byModelKey.set(permission.modelKey, permission);
+      }
+    });
+
+    adminAccessPermissions.value = models.value.map((model) => {
+      const existing = byModelKey.get(model.key);
+      return {
+        modelKey: model.key,
+        modelName: model.name,
+        modelVersion: model.version || '',
+        visible: Boolean(existing?.visible),
+        canRead: Boolean(existing?.canRead),
+        canCreate: Boolean(existing?.canCreate),
+        canUpdate: Boolean(existing?.canUpdate),
+        canDelete: Boolean(existing?.canDelete)
+      };
+    });
+  }
+
+  async function loadAdminAccessUser(username) {
+    if (!username) {
+      return;
+    }
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch(`/api/access/users/${encodeURIComponent(username)}/access`);
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Impossible de charger les droits de l'utilisateur.");
+      }
+
+      adminAccessForm.value = {
+        username: payload?.user?.username || username,
+        displayName: payload?.user?.displayName || '',
+        password: '',
+        portalUser: Boolean(payload?.user?.portalUser),
+        portalModelAdmin: Boolean(payload?.user?.portalModelAdmin),
+        platformAdmin: Boolean(payload?.user?.platformAdmin)
+      };
+
+      const permissionByModel = new Map();
+      const permissions = Array.isArray(payload?.permissions) ? payload.permissions : [];
+      permissions.forEach((permission) => {
+        if (permission?.modelKey) {
+          permissionByModel.set(permission.modelKey, permission);
+        }
+      });
+
+      adminAccessPermissions.value = models.value.map((model) => {
+        const entry = permissionByModel.get(model.key);
+        return {
+          modelKey: model.key,
+          modelName: model.name,
+          modelVersion: model.version || '',
+          visible: Boolean(entry?.visible),
+          canRead: Boolean(entry?.canRead),
+          canCreate: Boolean(entry?.canCreate),
+          canUpdate: Boolean(entry?.canUpdate),
+          canDelete: Boolean(entry?.canDelete)
+        };
+      });
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    }
+  }
+
+  async function createAccessUser() {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    const username = String(newAccessUsername.value || '').trim();
+    if (!username) {
+      adminAccessStatus.value = { type: 'warning', message: 'Renseignez un identifiant utilisateur.' };
+      return;
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(username)) {
+      adminAccessStatus.value = {
+        type: 'warning',
+        message: "L'identifiant doit contenir uniquement lettres/chiffres et . _ -"
+      };
+      return;
+    }
+
+    isSavingAccessUser.value = true;
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch('/api/access/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          displayName: String(newAccessDisplayName.value || '').trim(),
+          password: username,
+          portalUser: true,
+          portalModelAdmin: false,
+          platformAdmin: false
+        })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erreur lors de la création de l'utilisateur");
+      }
+
+      newAccessUsername.value = '';
+      newAccessDisplayName.value = '';
+      await refreshUsers();
+      adminAccessUserKey.value = payload?.user?.username || username;
+      adminAccessStatus.value = { type: 'success', message: 'Utilisateur créé.' };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isSavingAccessUser.value = false;
+    }
+  }
+
+  async function saveAccessUser() {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    const username = adminAccessForm.value.username;
+    if (!username) {
+      adminAccessStatus.value = { type: 'warning', message: 'Sélectionnez un utilisateur.' };
+      return;
+    }
+    isSavingAccessUser.value = true;
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch(`/api/access/users/${encodeURIComponent(username)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: adminAccessForm.value.displayName,
+          portalUser: Boolean(adminAccessForm.value.portalUser),
+          portalModelAdmin: Boolean(adminAccessForm.value.portalModelAdmin),
+          platformAdmin: Boolean(adminAccessForm.value.platformAdmin),
+          password: String(adminAccessForm.value.password || '').trim() || undefined
+        })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erreur lors de la mise à jour de l'utilisateur");
+      }
+
+      await refreshUsers();
+      await refreshCurrentAccess();
+      ensurePortalAccess();
+      adminAccessForm.value.password = '';
+      adminAccessStatus.value = { type: 'success', message: 'Profil utilisateur mis à jour.' };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isSavingAccessUser.value = false;
+    }
+  }
+
+  async function saveAccessPermissions() {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    if (!adminAccessForm.value.username) {
+      adminAccessStatus.value = { type: 'warning', message: 'Sélectionnez un utilisateur.' };
+      return;
+    }
+    isSavingAccessPermissions.value = true;
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch(
+        `/api/access/users/${encodeURIComponent(adminAccessForm.value.username)}/permissions`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            permissions: adminAccessPermissions.value.map((permission) => ({
+              modelKey: permission.modelKey,
+              visible: Boolean(permission.visible),
+              canRead: Boolean(permission.canRead),
+              canCreate: Boolean(permission.canCreate),
+              canUpdate: Boolean(permission.canUpdate),
+              canDelete: Boolean(permission.canDelete)
+            }))
+          })
+        }
+      );
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors de la sauvegarde des permissions');
+      }
+      await refreshUsers();
+      await refreshCurrentAccess();
+      await refreshModels();
+      ensurePortalAccess();
+      adminAccessStatus.value = { type: 'success', message: 'Permissions enregistrées.' };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isSavingAccessPermissions.value = false;
+    }
+  }
+
+  async function deleteAccessUser() {
+    if (!canManageAccess.value) {
+      adminAccessStatus.value = { type: 'warning', message: 'Accès réservé à un administrateur plateforme.' };
+      return;
+    }
+    const username = adminAccessForm.value.username;
+    if (!username) {
+      adminAccessStatus.value = { type: 'warning', message: 'Sélectionnez un utilisateur.' };
+      return;
+    }
+    if (username === 'admin') {
+      adminAccessStatus.value = { type: 'warning', message: "Le compte 'admin' ne peut pas être supprimé." };
+      return;
+    }
+
+    isDeletingAccessUser.value = true;
+    adminAccessStatus.value = null;
+    try {
+      const response = await apiFetch(`/api/access/users/${encodeURIComponent(username)}`, {
+        method: 'DELETE'
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erreur lors de la suppression de l'utilisateur");
+      }
+      await refreshUsers();
+      await refreshCurrentAccess();
+      await refreshModels();
+      ensurePortalAccess();
+      adminAccessStatus.value = { type: 'success', message: 'Utilisateur supprimé.' };
+    } catch (error) {
+      adminAccessStatus.value = { type: 'error', message: error.message };
+    } finally {
+      isDeletingAccessUser.value = false;
+    }
+  }
+
   async function refreshModels(preferredKey) {
+    if (!isAuthenticated.value) {
+      models.value = [];
+      selectedModelKey.value = '';
+      resetModelState();
+      resetDataState();
+      return;
+    }
     isLoadingModels.value = true;
     status.value = null;
     refreshHealth();
     try {
-      const response = await fetch(`${apiBase}/api/models`);
+      const response = await apiFetch('/api/models');
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors du chargement des modèles');
@@ -1101,6 +1737,7 @@ export function useAppState() {
         nextKey = list[0]?.key || '';
       }
       selectedModelKey.value = nextKey;
+      syncAdminPermissionRows();
 
       if (nextKey && nextKey === currentKey) {
         await refreshModelDetails(nextKey);
@@ -1122,9 +1759,13 @@ export function useAppState() {
   }
 
   async function refreshModelDetails(modelKey) {
+    if (modelKey && !canViewModel(modelKey)) {
+      resetModelState();
+      return;
+    }
     isLoadingModel.value = true;
     try {
-      const response = await fetch(`${apiBase}/api/models/${encodeURIComponent(modelKey)}`);
+      const response = await apiFetch(`/api/models/${encodeURIComponent(modelKey)}`);
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors du chargement du modèle');
@@ -1157,7 +1798,7 @@ export function useAppState() {
 
   async function refreshHealth() {
     try {
-      const response = await fetch(`${apiBase}/api/health?deep=true`);
+      const response = await apiFetch('/api/health?deep=true');
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'API indisponible');
@@ -1173,11 +1814,13 @@ export function useAppState() {
   }
 
   async function refreshData(modelKey) {
+    if (modelKey && !canReadModelData(modelKey)) {
+      resetDataState();
+      return;
+    }
     isLoadingData.value = true;
     try {
-      const response = await fetch(
-        `${apiBase}/api/data?modelKey=${encodeURIComponent(modelKey)}`
-      );
+      const response = await apiFetch(`/api/data?modelKey=${encodeURIComponent(modelKey)}`);
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors du chargement des données');
@@ -1199,6 +1842,10 @@ export function useAppState() {
   }
 
   async function uploadModel() {
+    if (!canAccessModelAdminPortal.value) {
+      status.value = { type: 'warning', message: 'Accès au portail administration requis.' };
+      return;
+    }
     const file = getFirstFile(modelFile.value);
     if (!file) {
       status.value = { type: 'warning', message: 'Sélectionnez un fichier modèle.' };
@@ -1209,7 +1856,7 @@ export function useAppState() {
     try {
       const formData = new FormData();
       formData.append('modelFile', file);
-      const response = await fetch(`${apiBase}/api/models`, {
+      const response = await apiFetch('/api/models', {
         method: 'POST',
         body: formData
       });
@@ -1230,6 +1877,10 @@ export function useAppState() {
   }
 
   async function uploadData() {
+    if (!canCreateCurrentModelData.value) {
+      status.value = { type: 'warning', message: 'Droit CREATE manquant pour ce modèle.' };
+      return;
+    }
     const file = getFirstFile(dataFile.value);
     if (!file) {
       status.value = { type: 'warning', message: 'Sélectionnez un fichier de données.' };
@@ -1246,7 +1897,7 @@ export function useAppState() {
       formData.append('dataFile', file);
       formData.append('modelKey', selectedModelKey.value);
       formData.append('validateOnly', String(validateOnly.value));
-      const response = await fetch(`${apiBase}/api/data`, {
+      const response = await apiFetch('/api/data', {
         method: 'POST',
         body: formData
       });
@@ -1279,6 +1930,10 @@ export function useAppState() {
   }
 
   async function createObject() {
+    if (!canCreateCurrentModelData.value) {
+      createObjectStatus.value = { type: 'warning', message: 'Droit CREATE manquant pour ce modèle.' };
+      return;
+    }
     if (!selectedModelKey.value) {
       createObjectStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
       return;
@@ -1314,7 +1969,7 @@ export function useAppState() {
         }))
         .filter((attr) => attr.key && String(attr.value ?? '').trim() !== '');
 
-      const response = await fetch(`${apiBase}/api/objects`, {
+      const response = await apiFetch('/api/objects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1342,6 +1997,10 @@ export function useAppState() {
   }
 
   async function createLink() {
+    if (!canCreateCurrentModelData.value) {
+      createLinkStatus.value = { type: 'warning', message: 'Droit CREATE manquant pour ce modèle.' };
+      return;
+    }
     if (!selectedModelKey.value) {
       createLinkStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
       return;
@@ -1358,7 +2017,7 @@ export function useAppState() {
     createLinkStatus.value = null;
     isCreatingLink.value = true;
     try {
-      const response = await fetch(`${apiBase}/api/links`, {
+      const response = await apiFetch('/api/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1385,7 +2044,50 @@ export function useAppState() {
     }
   }
 
+  async function deleteObject(object) {
+    if (!object || object.id === null || object.id === undefined) {
+      return;
+    }
+    if (!selectedModelKey.value) {
+      status.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
+      return;
+    }
+    if (!canDeleteCurrentModelData.value) {
+      status.value = { type: 'warning', message: 'Droit DELETE manquant pour ce modèle.' };
+      return;
+    }
+
+    status.value = null;
+    isLoadingData.value = true;
+    try {
+      const response = await apiFetch(
+        `/api/objects/${encodeURIComponent(object.id)}?modelKey=${encodeURIComponent(selectedModelKey.value)}`,
+        { method: 'DELETE' }
+      );
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erreur lors de la suppression de l'objet");
+      }
+      status.value = { type: 'success', message: `Objet #${object.id} supprimé.` };
+      await refreshData(selectedModelKey.value);
+      if (selectedObject.value?.id === object.id) {
+        selectedObject.value = null;
+      }
+      if (tableSelectedObject.value?.id === object.id) {
+        tableSelectedObject.value = null;
+      }
+    } catch (error) {
+      status.value = { type: 'error', message: error.message };
+    } finally {
+      isLoadingData.value = false;
+    }
+  }
+
   async function loadModelXml() {
+    if (!canAccessModelAdminPortal.value) {
+      modelXmlStatus.value = { type: 'warning', message: 'Accès au portail administration requis.' };
+      return;
+    }
     if (!selectedModelKey.value) {
       modelXmlStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
       return;
@@ -1393,9 +2095,7 @@ export function useAppState() {
     isLoadingModelXml.value = true;
     modelXmlStatus.value = null;
     try {
-      const response = await fetch(
-        `${apiBase}/api/models/${encodeURIComponent(selectedModelKey.value)}/xml`
-      );
+      const response = await apiFetch(`/api/models/${encodeURIComponent(selectedModelKey.value)}/xml`);
       const text = await response.text();
       if (!response.ok) {
         let message = text;
@@ -1417,6 +2117,10 @@ export function useAppState() {
   }
 
   async function saveModelXml() {
+    if (!canAccessModelAdminPortal.value) {
+      modelXmlStatus.value = { type: 'warning', message: 'Accès au portail administration requis.' };
+      return;
+    }
     if (!selectedModelKey.value) {
       modelXmlStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
       return;
@@ -1428,14 +2132,11 @@ export function useAppState() {
     isSavingModelXml.value = true;
     modelXmlStatus.value = null;
     try {
-      const response = await fetch(
-        `${apiBase}/api/models/${encodeURIComponent(selectedModelKey.value)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/xml' },
-          body: modelXml.value
-        }
-      );
+      const response = await apiFetch(`/api/models/${encodeURIComponent(selectedModelKey.value)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/xml' },
+        body: modelXml.value
+      });
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors de la sauvegarde du modèle.');
@@ -1456,16 +2157,19 @@ export function useAppState() {
   }
 
   async function deleteModel() {
+    if (!canAccessModelAdminPortal.value) {
+      adminStatus.value = { type: 'warning', message: 'Accès au portail administration requis.' };
+      return;
+    }
     if (!adminModelKey.value) {
       adminStatus.value = { type: 'warning', message: 'Sélectionnez un modèle.' };
       return;
     }
     adminStatus.value = null;
     try {
-      const response = await fetch(
-        `${apiBase}/api/models/${encodeURIComponent(adminModelKey.value)}`,
-        { method: 'DELETE' }
-      );
+      const response = await apiFetch(`/api/models/${encodeURIComponent(adminModelKey.value)}`, {
+        method: 'DELETE'
+      });
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors de la suppression du modèle');
@@ -1532,6 +2236,17 @@ export function useAppState() {
     if (!normalized) {
       return;
     }
+    if (normalized === 'user' && !canAccessUserPortal.value) {
+      status.value = { type: 'warning', message: 'Accès au portail métier non autorisé pour ce profil.' };
+      return;
+    }
+    if (normalized === 'model-admin' && !canAccessModelAdminPortal.value) {
+      status.value = {
+        type: 'warning',
+        message: "Accès au portail administration du modèle non autorisé pour ce profil."
+      };
+      return;
+    }
     activePortal.value = normalized;
     const pages = getPortalPages(normalized);
     if (preferredPage && pages.includes(preferredPage)) {
@@ -1575,6 +2290,59 @@ export function useAppState() {
       return 'model';
     }
     return 'navigate';
+  }
+
+  function getModelPermission(modelKey) {
+    if (!modelKey) {
+      return null;
+    }
+    if (isPlatformAdmin.value) {
+      return {
+        modelKey,
+        visible: true,
+        canRead: true,
+        canCreate: true,
+        canUpdate: true,
+        canDelete: true
+      };
+    }
+    return accessPermissions.value.find((permission) => permission.modelKey === modelKey) || null;
+  }
+
+  function canViewModel(modelKey) {
+    const permission = getModelPermission(modelKey);
+    return Boolean(permission?.visible);
+  }
+
+  function canReadModelData(modelKey) {
+    const permission = getModelPermission(modelKey);
+    return Boolean(permission?.visible && permission?.canRead);
+  }
+
+  function canCreateModelData(modelKey) {
+    const permission = getModelPermission(modelKey);
+    return Boolean(permission?.visible && permission?.canCreate);
+  }
+
+  function canUpdateModelData(modelKey) {
+    const permission = getModelPermission(modelKey);
+    return Boolean(permission?.visible && permission?.canUpdate);
+  }
+
+  function canDeleteModelData(modelKey) {
+    const permission = getModelPermission(modelKey);
+    return Boolean(permission?.visible && permission?.canDelete);
+  }
+
+  function ensurePortalAccess() {
+    if (activePortal.value === 'user' && !canAccessUserPortal.value) {
+      activePortal.value = '';
+      status.value = { type: 'warning', message: 'Votre profil ne permet pas l’accès au portail métier.' };
+    }
+    if (activePortal.value === 'model-admin' && !canAccessModelAdminPortal.value) {
+      activePortal.value = '';
+      status.value = { type: 'warning', message: "Votre profil ne permet pas l’accès au portail administration." };
+    }
   }
 
   function selectObjectByKey(key) {
@@ -1988,8 +2756,38 @@ export function useAppState() {
 
   return {
     apiBase,
+    authToken,
+    isAuthenticated,
+    isAuthenticating,
+    authStatus,
+    loginUsername,
+    loginPassword,
+    authMeta,
     currentPage,
     activePortal,
+    users,
+    userOptions,
+    accessProfile,
+    accessStatus,
+    isLoadingUsers,
+    canAccessUserPortal,
+    canAccessModelAdminPortal,
+    isPlatformAdmin,
+    canManageAccess,
+    selectedModelPermission,
+    canReadCurrentModelData,
+    canCreateCurrentModelData,
+    canUpdateCurrentModelData,
+    canDeleteCurrentModelData,
+    adminAccessUserKey,
+    adminAccessStatus,
+    isSavingAccessUser,
+    isSavingAccessPermissions,
+    isDeletingAccessUser,
+    newAccessUsername,
+    newAccessDisplayName,
+    adminAccessForm,
+    adminAccessPermissions,
     isPortalSelected,
     isUserPortal,
     isModelAdminPortal,
@@ -2099,6 +2897,8 @@ export function useAppState() {
     handleModelFile,
     handleDataFile,
     refreshModels,
+    refreshUsers,
+    refreshCurrentAccess,
     refreshModelDetails,
     refreshHealth,
     refreshData,
@@ -2106,6 +2906,16 @@ export function useAppState() {
     uploadData,
     createObject,
     createLink,
+    deleteObject,
+    createAccessUser,
+    saveAccessUser,
+    saveAccessPermissions,
+    deleteAccessUser,
+    impersonateUser,
+    stopImpersonation,
+    login,
+    logout,
+    refreshSession,
     loadModelXml,
     saveModelXml,
     deleteModel,
