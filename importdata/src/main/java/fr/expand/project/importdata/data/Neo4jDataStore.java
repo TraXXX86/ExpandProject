@@ -154,6 +154,63 @@ public class Neo4jDataStore implements AutoCloseable {
         }
     }
 
+    public boolean updateObject(String modelKey, long objectId, Map<String, Object> attributes) {
+        if (modelKey == null || modelKey.isBlank() || objectId <= 0) {
+            return false;
+        }
+        if (attributes == null || attributes.isEmpty()) {
+            return true;
+        }
+
+        Map<String, Object> sanitizedAttributes = new HashMap<>();
+        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank() || "modelKey".equals(key)) {
+                continue;
+            }
+            sanitizedAttributes.put(key, entry.getValue() == null ? "" : entry.getValue().toString());
+        }
+
+        try (Session session = driver.session()) {
+            return session.executeWrite(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                params.put("objectId", objectId);
+                params.put("attributes", sanitizedAttributes);
+                var result = tx.run(
+                    "MATCH (n:DataObject {modelKey:$modelKey}) "
+                        + "WHERE id(n)=$objectId "
+                        + "SET n += $attributes "
+                        + "RETURN id(n) AS id",
+                    params
+                );
+                return result.hasNext();
+            });
+        }
+    }
+
+    public boolean deleteObject(String modelKey, long objectId) {
+        if (modelKey == null || modelKey.isBlank() || objectId <= 0) {
+            return false;
+        }
+        try (Session session = driver.session()) {
+            return session.executeWrite(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                params.put("objectId", objectId);
+                var result = tx.run(
+                    "MATCH (n:DataObject {modelKey:$modelKey}) "
+                        + "WHERE id(n)=$objectId "
+                        + "WITH n LIMIT 1 "
+                        + "DETACH DELETE n "
+                        + "RETURN 1 AS deleted",
+                    params
+                );
+                return result.hasNext();
+            });
+        }
+    }
+
     @Override
     public void close() {
         if (driver != null) {

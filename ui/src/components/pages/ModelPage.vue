@@ -414,7 +414,7 @@
               color="secondary"
               variant="tonal"
               :loading="state.isLoadingModelXml"
-              :disabled="!state.selectedModelKey"
+              :disabled="!state.selectedModelKey || !state.canAccessModelAdminPortal"
               @click="state.loadModelXml"
             >
               Charger le XML
@@ -422,7 +422,7 @@
             <v-btn
               color="primary"
               :loading="state.isSavingModelXml"
-              :disabled="!state.selectedModelKey || !state.modelXml"
+              :disabled="!state.selectedModelKey || !state.modelXml || !state.canAccessModelAdminPortal"
               @click="state.saveModelXml"
             >
               Sauvegarder
@@ -430,7 +430,7 @@
             <v-btn
               variant="tonal"
               color="primary"
-              :disabled="!state.selectedModelKey"
+              :disabled="!state.selectedModelKey || !state.canAccessModelAdminPortal"
               @click="exportXml"
             >
               Exporter XML
@@ -444,7 +444,7 @@
             variant="outlined"
             auto-grow
             rows="12"
-            :disabled="!state.selectedModelKey"
+            :disabled="!state.selectedModelKey || !state.canAccessModelAdminPortal"
           />
 
           <v-alert

@@ -7,6 +7,16 @@
         Les formulaires s'appuient sur le modele charge pour guider les types autorises et
         les attributs obligatoires.
       </p>
+      <v-alert
+        v-if="!state.canCreateCurrentModelData"
+        class="mt-4"
+        type="warning"
+        variant="tonal"
+        density="comfortable"
+        border="start"
+      >
+        Votre profil n'a pas le droit CREATE sur ce modèle.
+      </v-alert>
     </v-col>
     <v-col cols="12" md="6">
       <v-card class="card-animate" elevation="6" rounded="xl">
@@ -30,7 +40,7 @@
               variant="tonal"
               color="secondary"
               size="large"
-              :disabled="!state.selectedModelKey"
+              :disabled="!state.selectedModelKey || !state.canReadCurrentModelData"
               @click="state.refreshData(state.selectedModelKey)"
             >
               Rafraichir les donnees
@@ -88,7 +98,7 @@
               color="primary"
               size="large"
               :loading="state.isCreatingObject"
-              :disabled="!state.createObjectType || !state.selectedModelKey"
+              :disabled="!state.createObjectType || !state.selectedModelKey || !state.canCreateCurrentModelData"
               @click="state.createObject"
             >
               Creer l'objet
@@ -179,7 +189,7 @@
                 variant="outlined"
                 density="comfortable"
                 clearable
-                :disabled="!state.createLinkType"
+                :disabled="!state.createLinkType || !state.canCreateCurrentModelData"
               />
             </v-col>
             <v-col cols="12" md="6">
@@ -191,7 +201,7 @@
                 variant="outlined"
                 density="comfortable"
                 clearable
-                :disabled="!state.createLinkType"
+                :disabled="!state.createLinkType || !state.canCreateCurrentModelData"
               />
             </v-col>
           </v-row>
@@ -201,7 +211,7 @@
               color="primary"
               size="large"
               :loading="state.isCreatingLink"
-              :disabled="!state.createLinkType || !state.createLinkSourceId || !state.createLinkTargetId"
+              :disabled="!state.createLinkType || !state.createLinkSourceId || !state.createLinkTargetId || !state.canCreateCurrentModelData"
               @click="state.createLink"
             >
               Creer le lien
