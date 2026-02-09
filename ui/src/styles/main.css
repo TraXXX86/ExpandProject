@@ -322,6 +322,165 @@ body {
   border: 1px solid rgba(18, 36, 58, 0.08);
 }
 
+.explorer-root-hint {
+  margin-top: 10px;
+  font-size: 0.86rem;
+  color: #4f5e6d;
+}
+
+.explorer-tree-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.explorer-node {
+  position: relative;
+}
+
+.explorer-node-card {
+  border-color: rgba(18, 36, 58, 0.16) !important;
+  background: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
+}
+
+.explorer-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+}
+
+.explorer-expand-btn {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+}
+
+.explorer-expand-placeholder {
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+
+.explorer-node-icon {
+  margin-right: 0;
+  color: #17446a;
+}
+
+.explorer-node-primary {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.explorer-primary-value {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  background: rgba(20, 59, 96, 0.1);
+  color: #12324f;
+  padding: 2px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.explorer-primary-empty {
+  color: #5a6978;
+  font-size: 0.82rem;
+}
+
+.explorer-context-menu {
+  position: fixed;
+  min-width: 280px;
+  max-width: 420px;
+  max-height: 360px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(18, 36, 58, 0.2);
+  box-shadow: 0 14px 26px rgba(18, 36, 58, 0.18);
+  border-radius: 10px;
+  z-index: 4000;
+  padding: 8px;
+}
+
+.explorer-context-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #1c4e80;
+  margin-bottom: 6px;
+}
+
+.explorer-context-list {
+  display: grid;
+  gap: 4px;
+}
+
+.explorer-context-item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 4px 8px;
+  align-items: start;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.explorer-context-item:hover {
+  background: rgba(18, 36, 58, 0.06);
+}
+
+.explorer-context-item input {
+  margin-top: 3px;
+}
+
+.explorer-context-item-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #12324f;
+}
+
+.explorer-context-item-target {
+  font-size: 0.77rem;
+  color: #5a6978;
+  grid-column: 2;
+}
+
+.explorer-context-empty {
+  color: #5a6978;
+  font-size: 0.82rem;
+}
+
+.explorer-children {
+  margin-top: 8px;
+}
+
+.explorer-child {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 1px dashed rgba(18, 36, 58, 0.22);
+  margin-top: 8px;
+}
+
+.explorer-branch-label {
+  font-size: 0.77rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #32516e;
+  margin-bottom: 4px;
+}
+
+.explorer-branch-item + .explorer-branch-item {
+  margin-top: 6px;
+}
+
+.explorer-cycle-note {
+  font-size: 0.8rem;
+  color: #7b5a31;
+}
+
 .identity-panel {
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(18, 36, 58, 0.08);
@@ -346,35 +505,6 @@ body {
   color: #536170;
 }
 
-.identity-metrics {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.metric-card {
-  background: linear-gradient(140deg, rgba(241, 143, 1, 0.18), rgba(28, 78, 128, 0.08));
-  border: 1px solid rgba(18, 36, 58, 0.08);
-  border-radius: 14px;
-  padding: 12px 14px;
-}
-
-.metric-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #1c4e80;
-  font-weight: 600;
-}
-
-.metric-value {
-  font-size: 1.45rem;
-  font-weight: 700;
-  color: #12243a;
-  margin-top: 2px;
-}
-
 .language-select {
   min-width: 180px;
 }
@@ -388,6 +518,26 @@ body {
 .identity-tabs .v-tab {
   text-transform: none;
   font-weight: 600;
+}
+
+.identity-linked-list {
+  display: grid;
+  gap: 8px;
+}
+
+.identity-linked-item {
+  text-align: left;
+  width: 100%;
+  border: 1px solid rgba(18, 36, 58, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.identity-linked-item:hover {
+  border-color: rgba(28, 78, 128, 0.38);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .model-tabs {

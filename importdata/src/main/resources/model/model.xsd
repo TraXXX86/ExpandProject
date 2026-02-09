@@ -7,6 +7,7 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="LANGUAGES" type="LANGUAGES" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="USER_PORTAL_LABELS" type="LABELS" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="OBJECT_TYPES" type="OBJECT_TYPES" minOccurs="1" maxOccurs="1"/>
                 <xs:element name="LINK_TYPES" type="LINK_TYPES" minOccurs="1" maxOccurs="1"/>
             </xs:sequence>
@@ -133,6 +134,9 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:complexType name="LINK_TYPE">
         <xs:sequence>
             <xs:element name="DESCRIPTION" type="xs:string" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="LABELS" type="LABELS" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="SOURCE_LABELS" type="LABELS" minOccurs="0" maxOccurs="1"/>
+            <xs:element name="TARGET_LABELS" type="LABELS" minOccurs="0" maxOccurs="1"/>
             <xs:element name="SOURCE_TYPES" type="ALLOWED_TYPES" minOccurs="1" maxOccurs="1"/>
             <xs:element name="TARGET_TYPES" type="ALLOWED_TYPES" minOccurs="1" maxOccurs="1"/>
             <xs:element name="ATTRIBUTE_DEFINITIONS" type="ATTRIBUTE_DEFINITIONS" minOccurs="0" maxOccurs="1"/>

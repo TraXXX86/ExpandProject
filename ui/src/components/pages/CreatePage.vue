@@ -3,10 +3,6 @@
     <v-col cols="12" md="6">
       <div class="kicker">Creation</div>
       <h1 class="headline">Creez des objets et des liens.</h1>
-      <p class="subhead">
-        Les formulaires s'appuient sur le modele charge pour guider les types autorises et
-        les attributs obligatoires.
-      </p>
       <v-alert
         v-if="!state.canCreateCurrentModelData"
         class="mt-4"

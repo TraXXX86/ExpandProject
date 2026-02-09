@@ -5,10 +5,6 @@
       <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
         Recherche plein texte sur les attributs.
       </h2>
-      <p class="subhead">
-        Les attributs recherchables sont définis dans le modèle via l'attribut SEARCHABLE.
-        Les attributs représentatifs servent d'aperçu pour identifier les objets.
-      </p>
     </v-col>
   </v-row>
 
@@ -83,7 +79,7 @@
                 color="primary"
                 variant="tonal"
                 prepend-icon="mdi-open-in-new"
-                @click="state.selectObjectByKey(item.idKey); state.setCurrentPage('navigate')"
+                @click="state.setRootObjectByKey(item.idKey); state.setCurrentPage('navigate')"
               >
                 Ouvrir
               </v-btn>

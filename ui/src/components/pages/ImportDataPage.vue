@@ -3,9 +3,6 @@
     <v-col cols="12" md="6">
       <div class="kicker">Import données</div>
       <h1 class="headline">Importez et validez les données.</h1>
-      <p class="subhead">
-        Chargez des fichiers de données XML pour alimenter le modèle sélectionné et explorez vos objets.
-      </p>
       <v-alert
         v-if="!state.canCreateCurrentModelData"
         class="mt-4"

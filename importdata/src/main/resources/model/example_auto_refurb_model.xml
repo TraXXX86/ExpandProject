@@ -4,6 +4,10 @@
         <LANGUAGE CODE="FR_fr" LABEL="Français (France)"/>
         <LANGUAGE CODE="EN_uk" LABEL="English (UK)"/>
     </LANGUAGES>
+    <USER_PORTAL_LABELS>
+        <LABEL LANGUAGE="FR_fr" VALUE="Portail Reconditionnement Auto"/>
+        <LABEL LANGUAGE="EN_uk" VALUE="Auto Refurbishment Portal"/>
+    </USER_PORTAL_LABELS>
     <OBJECT_TYPES>
         <!-- Définition du type CENTRE_RECONDITIONNEMENT -->
         <OBJECT_TYPE NAME="CENTRE_RECONDITIONNEMENT" ICON="warehouse">
@@ -460,6 +464,18 @@
         <!-- Lien entre mandat et véhicule -->
         <LINK_TYPE NAME="MANDAT_POUR_VEHICULE" DIRECTED="true">
             <DESCRIPTION>Mandat associé au véhicule</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Mandat véhicule"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Vehicle work order"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Concerne véhicule"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Targets vehicle"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="A pour mandat"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Has work order"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="MANDAT_REPARATION"/>
             </SOURCE_TYPES>
@@ -479,6 +495,18 @@
         <!-- Lien entre mandat et centre -->
         <LINK_TYPE NAME="MANDAT_GERE_PAR_CENTRE" DIRECTED="true">
             <DESCRIPTION>Mandat géré par un centre</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Mandat centre"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Center work order"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Géré par centre"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Managed by center"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Gère mandat"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Manages work order"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="MANDAT_REPARATION"/>
             </SOURCE_TYPES>
@@ -498,6 +526,18 @@
         <!-- Lien entre mandat et client -->
         <LINK_TYPE NAME="MANDAT_POUR_CLIENT" DIRECTED="true">
             <DESCRIPTION>Mandat rattaché au client</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Mandat client"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Client work order"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Concerne client"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Targets client"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="A pour mandat"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Has work order"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="MANDAT_REPARATION"/>
             </SOURCE_TYPES>
@@ -514,6 +554,18 @@
         <!-- Lien entre véhicule et client -->
         <LINK_TYPE NAME="VEHICULE_APPARTIENT_CLIENT" DIRECTED="true">
             <DESCRIPTION>Propriété du véhicule par un client</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Propriété véhicule"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Vehicle ownership"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Appartient à client"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Belongs to client"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Possède véhicule"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Owns vehicle"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="VEHICULE"/>
             </SOURCE_TYPES>
@@ -530,6 +582,18 @@
         <!-- Lien entre mandat et technicien -->
         <LINK_TYPE NAME="MANDAT_ASSIGNE_TECHNICIEN" DIRECTED="true">
             <DESCRIPTION>Mandat assigné à un technicien</DESCRIPTION>
+            <LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Affectation technicien"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Technician assignment"/>
+            </LABELS>
+            <SOURCE_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Assigné à technicien"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Assigned to technician"/>
+            </SOURCE_LABELS>
+            <TARGET_LABELS>
+                <LABEL LANGUAGE="FR_fr" VALUE="Intervient sur mandat"/>
+                <LABEL LANGUAGE="EN_uk" VALUE="Works on work order"/>
+            </TARGET_LABELS>
             <SOURCE_TYPES>
                 <TYPE_REF NAME="MANDAT_REPARATION"/>
             </SOURCE_TYPES>

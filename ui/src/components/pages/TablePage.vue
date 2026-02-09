@@ -5,9 +5,6 @@
       <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
         Listez les objets et filtrez rapidement.
       </h2>
-      <p class="subhead">
-        Appliquez des filtres par type, identifiant ou attributs pour retrouver vos objets en un instant.
-      </p>
     </v-col>
   </v-row>
 

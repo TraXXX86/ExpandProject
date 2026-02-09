@@ -5,9 +5,6 @@
       <h2 class="headline" style="font-size: clamp(1.6rem, 2.5vw, 2.4rem);">
         Gérez les modèles, les utilisateurs et leurs droits.
       </h2>
-      <p class="subhead">
-        Le portail administration permet de gérer la maintenance du modèle et la matrice d'accès par utilisateur.
-      </p>
     </v-col>
   </v-row>
 

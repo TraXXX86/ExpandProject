@@ -7,12 +7,9 @@
             <v-icon icon="mdi-database-eye-outline" color="white" />
           </v-avatar>
           <div>
-            <div class="text-subtitle-1 font-weight-bold">ExpandProject Studio</div>
-            <div class="text-caption text-medium-emphasis">IHM connectée à l'API d'import</div>
+            <div class="text-subtitle-1 font-weight-bold">{{ headerTitle }}</div>
+            <div class="text-caption text-medium-emphasis">{{ headerSubtitle }}</div>
           </div>
-          <v-chip color="primary" variant="tonal" size="small">
-            {{ state.portalLabel }}
-          </v-chip>
         </div>
         <div class="d-flex align-center flex-wrap justify-end" style="gap: 8px;">
           <v-chip v-if="state.isAuthenticated" color="primary" variant="tonal">
@@ -262,12 +259,6 @@
               <div class="d-flex align-start justify-space-between flex-wrap" style="gap: 14px;">
                 <div>
                   <div class="kicker">{{ portalKicker }}</div>
-                  <h2 class="headline" style="font-size: clamp(1.6rem, 2.4vw, 2.3rem); margin-bottom: 0.4rem;">
-                    {{ portalTitle }}
-                  </h2>
-                  <p class="subhead" style="max-width: 40rem;">
-                    {{ portalDescription }}
-                  </p>
                 </div>
                 <v-btn
                   variant="tonal"
@@ -288,6 +279,9 @@
               >
                 <v-tab v-for="tab in activeTabs" :key="tab.value" :value="tab.value">
                   {{ tab.title }}
+                  <v-tooltip v-if="tab.tooltip" activator="parent" location="bottom">
+                    {{ tab.tooltip }}
+                  </v-tooltip>
                 </v-tab>
               </v-tabs>
               <v-alert
@@ -357,17 +351,49 @@ import CreatePage from './components/pages/CreatePage.vue';
 const state = reactive(useAppState());
 
 const userPortalTabs = [
-  { title: 'Explorer', value: 'navigate' },
-  { title: 'Recherche avancée', value: 'table' },
-  { title: 'Recherche', value: 'search' },
-  { title: 'Import données', value: 'import-data' },
-  { title: 'Création', value: 'create' }
+  {
+    title: 'Explorer',
+    value: 'navigate',
+    tooltip: "Explorer les objets de manière récursive en choisissant les liens à parcourir."
+  },
+  {
+    title: 'Recherche avancée',
+    value: 'table',
+    tooltip: "Lister les objets et filtrer par type, identifiant ou attributs."
+  },
+  {
+    title: 'Recherche',
+    value: 'search',
+    tooltip: 'Lancer une recherche plein texte sur les attributs marqués SEARCHABLE.'
+  },
+  {
+    title: 'Import données',
+    value: 'import-data',
+    tooltip: 'Importer ou valider un fichier XML de données pour le modèle sélectionné.'
+  },
+  {
+    title: 'Création',
+    value: 'create',
+    tooltip: 'Créer des objets et des liens en respectant les contraintes du modèle.'
+  }
 ];
 
 const modelAdminTabs = [
-  { title: 'Modèle', value: 'model' },
-  { title: 'Import modèle', value: 'import-model' },
-  { title: 'Administration', value: 'admin' }
+  {
+    title: 'Modèle',
+    value: 'model',
+    tooltip: 'Consulter les types, attributs et liens définis dans le modèle.'
+  },
+  {
+    title: 'Import modèle',
+    value: 'import-model',
+    tooltip: 'Charger ou mettre à jour le modèle XML en base.'
+  },
+  {
+    title: 'Administration',
+    value: 'admin',
+    tooltip: "Gérer la suppression du modèle, les utilisateurs et leurs droits d'accès."
+  }
 ];
 
 const platformAdminEntries = [
@@ -437,18 +463,6 @@ const portalKicker = computed(() => (
   state.isUserPortal ? 'Portail métier' : 'Portail administration du modèle'
 ));
 
-const portalTitle = computed(() => (
-  state.isUserPortal
-    ? 'Usage des données applicatives'
-    : 'Administration du modèle de données'
-));
-
-const portalDescription = computed(() => (
-  state.isUserPortal
-    ? "Espace dédié aux équipes métiers pour consulter et manipuler les données de l'application."
-    : 'Espace dédié aux administrateurs pour maintenir et faire évoluer la structure du modèle.'
-));
-
 const portalThemeClass = computed(() => {
   if (state.isUserPortal) {
     return 'portal-user-theme';
@@ -457,6 +471,27 @@ const portalThemeClass = computed(() => {
     return 'portal-admin-theme';
   }
   return 'portal-neutral-theme';
+});
+
+const headerTitle = computed(() => {
+  if (state.isUserPortal) {
+    return state.getUserPortalTitle();
+  }
+  return 'ExpandProject Studio';
+});
+
+const headerSubtitle = computed(() => {
+  if (state.isUserPortal) {
+    if (!state.selectedModel) {
+      return 'Portail métier';
+    }
+    const version = state.selectedModel.version ? ` v${state.selectedModel.version}` : '';
+    return `${state.selectedModel.name}${version}`;
+  }
+  if (state.isModelAdminPortal) {
+    return 'Portail administration du modèle';
+  }
+  return "IHM connectée à l'API d'import";
 });
 
 const heroBgClass = computed(() => {
