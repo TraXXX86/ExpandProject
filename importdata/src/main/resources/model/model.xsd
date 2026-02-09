@@ -46,6 +46,7 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema">
         </xs:sequence>
         <xs:attribute name="NAME" type="xs:string" use="required"/>
         <xs:attribute name="PARENT" type="xs:string" use="optional"/>
+        <xs:attribute name="ICON" type="xs:string" use="optional"/>
     </xs:complexType>
     
     <!-- Attribute Definitions Collection -->

@@ -58,6 +58,9 @@
           >
             <template #item.type="{ item }">
               <v-chip color="primary" variant="tonal" size="small">
+                <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+                  {{ state.getTypeIconName(item.type) }}
+                </span>
                 {{ item.type }}
               </v-chip>
             </template>

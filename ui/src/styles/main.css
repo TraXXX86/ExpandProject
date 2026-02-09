@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0');
 
 :root {
   font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
@@ -20,10 +21,68 @@ body {
   background: transparent;
 }
 
+.portal-neutral-theme {
+  --v-theme-primary: 28, 78, 128;
+  --v-theme-secondary: 241, 143, 1;
+  --v-theme-accent: 46, 139, 87;
+  --portal-header-bg: linear-gradient(135deg, rgba(248, 246, 242, 0.96), rgba(242, 240, 235, 0.96));
+  --portal-header-shadow: 0 6px 18px rgba(18, 36, 58, 0.08);
+  --portal-header-border: rgba(18, 36, 58, 0.08);
+  --portal-kicker: #1c4e80;
+  --portal-card-bg: rgba(255, 255, 255, 0.9);
+  --portal-card-border: rgba(18, 36, 58, 0.08);
+  --portal-tabs-bg: rgba(18, 36, 58, 0.05);
+  --portal-tabs-border: rgba(18, 36, 58, 0.1);
+  --portal-tab-selected-bg: rgba(28, 78, 128, 0.14);
+  --portal-tab-selected-color: #12243a;
+  --portal-title: #12243a;
+  --portal-subtitle: #3b4652;
+  --portal-section-title: #1c4e80;
+}
+
+.portal-user-theme {
+  --v-theme-primary: 26, 88, 121;
+  --v-theme-secondary: 54, 133, 104;
+  --v-theme-accent: 177, 131, 72;
+  --portal-header-bg: linear-gradient(135deg, rgba(225, 241, 249, 0.96), rgba(232, 247, 241, 0.96));
+  --portal-header-shadow: 0 8px 22px rgba(26, 88, 121, 0.18);
+  --portal-header-border: rgba(26, 88, 121, 0.32);
+  --portal-kicker: #145678;
+  --portal-card-bg: linear-gradient(165deg, rgba(225, 239, 246, 0.9), rgba(237, 248, 242, 0.9));
+  --portal-card-border: rgba(26, 88, 121, 0.26);
+  --portal-tabs-bg: rgba(26, 88, 121, 0.18);
+  --portal-tabs-border: rgba(26, 88, 121, 0.3);
+  --portal-tab-selected-bg: rgba(26, 88, 121, 0.3);
+  --portal-tab-selected-color: #0f3f5a;
+  --portal-title: #133f58;
+  --portal-subtitle: #355468;
+  --portal-section-title: #145678;
+}
+
+.portal-admin-theme {
+  --v-theme-primary: 97, 74, 54;
+  --v-theme-secondary: 38, 95, 105;
+  --v-theme-accent: 141, 106, 77;
+  --portal-header-bg: linear-gradient(135deg, rgba(247, 236, 227, 0.96), rgba(236, 242, 246, 0.96));
+  --portal-header-shadow: 0 8px 22px rgba(97, 74, 54, 0.18);
+  --portal-header-border: rgba(97, 74, 54, 0.34);
+  --portal-kicker: #6c4f36;
+  --portal-card-bg: linear-gradient(165deg, rgba(245, 236, 228, 0.9), rgba(232, 241, 244, 0.9));
+  --portal-card-border: rgba(97, 74, 54, 0.28);
+  --portal-tabs-bg: rgba(97, 74, 54, 0.2);
+  --portal-tabs-border: rgba(97, 74, 54, 0.32);
+  --portal-tab-selected-bg: rgba(97, 74, 54, 0.3);
+  --portal-tab-selected-color: #4e3725;
+  --portal-title: #4c3523;
+  --portal-subtitle: #5f5043;
+  --portal-section-title: #6c4f36;
+}
+
 .app-header {
-  background: rgba(246, 244, 240, 0.94) !important;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(18, 36, 58, 0.08);
+  background: var(--portal-header-bg) !important;
+  backdrop-filter: blur(12px) saturate(1.15);
+  border-bottom: 1px solid var(--portal-header-border);
+  box-shadow: var(--portal-header-shadow);
 }
 
 .model-select,
@@ -34,12 +93,29 @@ body {
 .hero-bg {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-bg-neutral {
   background:
     radial-gradient(circle at 15% 20%, rgba(241, 143, 1, 0.15), transparent 55%),
     radial-gradient(circle at 80% 10%, rgba(28, 78, 128, 0.2), transparent 60%),
     radial-gradient(circle at 70% 80%, rgba(46, 139, 87, 0.18), transparent 65%);
-  pointer-events: none;
-  z-index: 0;
+}
+
+.hero-bg-user {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(26, 88, 121, 0.28), transparent 52%),
+    radial-gradient(circle at 80% 15%, rgba(54, 133, 104, 0.26), transparent 56%),
+    radial-gradient(circle at 70% 84%, rgba(177, 131, 72, 0.22), transparent 60%);
+}
+
+.hero-bg-admin {
+  background:
+    radial-gradient(circle at 16% 18%, rgba(97, 74, 54, 0.28), transparent 50%),
+    radial-gradient(circle at 82% 13%, rgba(38, 95, 105, 0.28), transparent 56%),
+    radial-gradient(circle at 72% 84%, rgba(141, 106, 77, 0.24), transparent 60%);
 }
 
 .hero-content {
@@ -51,7 +127,7 @@ body {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   font-size: 0.75rem;
-  color: #1c4e80;
+  color: var(--portal-kicker);
   font-weight: 600;
 }
 
@@ -59,13 +135,13 @@ body {
   font-size: clamp(2rem, 3vw, 3.25rem);
   font-weight: 700;
   margin: 0.75rem 0 1rem;
-  color: #12243a;
+  color: var(--portal-title);
 }
 
 .subhead {
   font-size: 1.05rem;
   line-height: 1.6;
-  color: #3b4652;
+  color: var(--portal-subtitle);
   max-width: 30rem;
 }
 
@@ -87,6 +163,44 @@ body {
   animation-delay: 0.3s;
 }
 
+.portal-entry {
+  height: 100%;
+  border: 1px solid rgba(18, 36, 58, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.portal-entry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(18, 36, 58, 0.1);
+}
+
+.portal-entry-user {
+  background: linear-gradient(160deg, rgba(26, 88, 121, 0.1), rgba(54, 133, 104, 0.08));
+}
+
+.portal-entry-admin {
+  background: linear-gradient(160deg, rgba(97, 74, 54, 0.1), rgba(38, 95, 105, 0.08));
+}
+
+.portal-tabs {
+  background: var(--portal-tabs-bg);
+  border: 1px solid var(--portal-tabs-border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-top: 16px;
+}
+
+.portal-tabs .v-tab {
+  text-transform: none;
+  font-weight: 600;
+}
+
+.portal-tabs .v-tab.v-tab--selected {
+  background: var(--portal-tab-selected-bg);
+  color: var(--portal-tab-selected-color);
+  border-radius: 9px;
+}
+
 @keyframes rise {
   to {
     opacity: 1;
@@ -101,6 +215,19 @@ body {
   font-weight: 600;
 }
 
+.type-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+  font-variation-settings: 'FILL' 0, 'wght' 450, 'GRAD' 0, 'opsz' 24;
+}
+
+.type-icon-chip {
+  font-size: 1rem;
+  margin-right: 0.25rem;
+}
+
 .file-hint {
   font-size: 0.9rem;
   color: #5d6c7b;
@@ -109,6 +236,13 @@ body {
 .section-title {
   font-weight: 600;
   letter-spacing: 0.02em;
+  color: var(--portal-section-title);
+}
+
+.portal-user-theme .hero-content .v-card,
+.portal-admin-theme .hero-content .v-card {
+  background: var(--portal-card-bg);
+  border: 1px solid var(--portal-card-border);
 }
 
 .model-graph {
@@ -285,4 +419,11 @@ body {
 .attr-key {
   font-size: 0.75rem;
   color: #6c7a89;
+}
+
+@media (max-width: 960px) {
+  .model-select,
+  .language-select {
+    min-width: 132px;
+  }
 }

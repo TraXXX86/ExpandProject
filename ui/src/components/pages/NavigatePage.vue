@@ -21,6 +21,9 @@
           {{ state.dataSummary.linkCount }} liens
         </v-chip>
         <v-chip v-if="state.selectedObject" color="primary" variant="tonal">
+          <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+            {{ state.getTypeIconName(state.selectedObject.type) }}
+          </span>
           Sélection: {{ state.selectedObject.type }} (ID {{ state.selectedObject.id ?? 'N/A' }})
         </v-chip>
       </div>
@@ -66,7 +69,9 @@
                     :subtitle="`${group.count} objets`"
                   >
                     <template #prepend>
-                      <v-icon icon="mdi-shape-outline" />
+                      <span class="material-symbols-outlined type-icon" aria-hidden="true">
+                        {{ state.getTypeIconName(group.type) }}
+                      </span>
                     </template>
                   </v-list-item>
                 </template>
