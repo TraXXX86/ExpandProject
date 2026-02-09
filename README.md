@@ -202,7 +202,7 @@ Définit les types d'objets et de liens autorisés :
 <?xml version="1.0" encoding="UTF-8"?>
 <DATA_MODEL NAME="MonModele" VERSION="1.0">
     <OBJECT_TYPES>
-        <OBJECT_TYPE NAME="PERSONNE">
+        <OBJECT_TYPE NAME="PERSONNE" ICON="person">
             <DESCRIPTION>Représente une personne</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true">
@@ -213,7 +213,7 @@ Définit les types d'objets et de liens autorisés :
             </ATTRIBUTE_DEFINITIONS>
         </OBJECT_TYPE>
         
-        <OBJECT_TYPE NAME="ENTREPRISE">
+        <OBJECT_TYPE NAME="ENTREPRISE" ICON="apartment">
             <DESCRIPTION>Représente une entreprise</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true"/>

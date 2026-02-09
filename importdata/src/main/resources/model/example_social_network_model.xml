@@ -7,7 +7,7 @@
     </LANGUAGES>
     <OBJECT_TYPES>
         <!-- Définition du type PERSONNE -->
-        <OBJECT_TYPE NAME="PERSONNE">
+        <OBJECT_TYPE NAME="PERSONNE" ICON="person">
             <DESCRIPTION>Représente une personne dans le réseau social</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -183,7 +183,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type EMPLOYE (hérite de PERSONNE) -->
-        <OBJECT_TYPE NAME="EMPLOYE" PARENT="PERSONNE">
+        <OBJECT_TYPE NAME="EMPLOYE" PARENT="PERSONNE" ICON="badge">
             <DESCRIPTION>Représente un employé dans une entreprise</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="POSTE" TYPE="STRING" REQUIRED="false" SEARCHABLE="true">
@@ -226,7 +226,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type ENTREPRISE -->
-        <OBJECT_TYPE NAME="ENTREPRISE">
+        <OBJECT_TYPE NAME="ENTREPRISE" ICON="apartment">
             <DESCRIPTION>Représente une entreprise</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -346,7 +346,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type COMPETENCE -->
-        <OBJECT_TYPE NAME="COMPETENCE">
+        <OBJECT_TYPE NAME="COMPETENCE" ICON="build">
             <DESCRIPTION>Représente une compétence professionnelle</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">

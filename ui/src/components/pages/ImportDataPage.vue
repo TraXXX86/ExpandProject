@@ -107,6 +107,9 @@
                 variant="tonal"
                 class="ma-1"
               >
+                <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+                  {{ state.getTypeIconName(type) }}
+                </span>
                 {{ type }}
               </v-chip>
             </v-chip-group>

@@ -614,6 +614,7 @@ public class ImportApiServer {
                 row.put("key", objectType.getNAME() + "-" + index++);
                 row.put("name", objectType.getNAME());
                 row.put("parent", objectType.getPARENT() == null ? "" : objectType.getPARENT());
+                row.put("icon", objectType.getICON() == null ? "" : objectType.getICON());
                 row.put("description", objectType.getDESCRIPTION() == null ? "" : objectType.getDESCRIPTION());
 
                 List<Map<String, Object>> attributes = new ArrayList<>();

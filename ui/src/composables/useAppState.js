@@ -4,6 +4,9 @@ export function useAppState() {
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
   const currentPage = ref('navigate');
+  const activePortal = ref('');
+  const userPortalPages = ['navigate', 'table', 'search', 'create', 'import-data'];
+  const modelAdminPortalPages = ['import-model', 'model', 'admin'];
   const displayLanguage = ref('');
   const validateOnly = ref(false);
   const modelSummary = ref(null);
@@ -98,6 +101,20 @@ export function useAppState() {
   const adminModel = computed(
     () => models.value.find((model) => model.key === adminModelKey.value) || null
   );
+
+  const isPortalSelected = computed(() => Boolean(activePortal.value));
+  const isUserPortal = computed(() => activePortal.value === 'user');
+  const isModelAdminPortal = computed(() => activePortal.value === 'model-admin');
+
+  const portalLabel = computed(() => {
+    if (isUserPortal.value) {
+      return 'Portail métier';
+    }
+    if (isModelAdminPortal.value) {
+      return 'Portail administration du modèle';
+    }
+    return 'Connexion';
+  });
 
   const canUploadModel = computed(() => Boolean(getFirstFile(modelFile.value)));
   const canUploadData = computed(
@@ -930,6 +947,19 @@ export function useAppState() {
   });
 
   watch(
+    () => activePortal.value,
+    (portal) => {
+      if (!portal) {
+        return;
+      }
+      const pages = getPortalPages(portal);
+      if (!pages.includes(currentPage.value)) {
+        currentPage.value = getPortalDefaultPage(portal);
+      }
+    }
+  );
+
+  watch(
     () => selectedModelKey.value,
     async (key, previousKey) => {
       if (!key) {
@@ -1491,7 +1521,60 @@ export function useAppState() {
   }
 
   function setCurrentPage(page) {
+    if (!page) {
+      return;
+    }
     currentPage.value = page;
+  }
+
+  function setPortal(portal, preferredPage = '') {
+    const normalized = normalizePortal(portal);
+    if (!normalized) {
+      return;
+    }
+    activePortal.value = normalized;
+    const pages = getPortalPages(normalized);
+    if (preferredPage && pages.includes(preferredPage)) {
+      currentPage.value = preferredPage;
+      return;
+    }
+    if (!pages.includes(currentPage.value)) {
+      currentPage.value = getPortalDefaultPage(normalized);
+    }
+  }
+
+  function clearPortal() {
+    activePortal.value = '';
+  }
+
+  function normalizePortal(portal) {
+    if (portal === 'user' || portal === 'data') {
+      return 'user';
+    }
+    if (portal === 'model-admin' || portal === 'admin') {
+      return 'model-admin';
+    }
+    return '';
+  }
+
+  function getPortalPages(portal) {
+    if (portal === 'user') {
+      return userPortalPages;
+    }
+    if (portal === 'model-admin') {
+      return modelAdminPortalPages;
+    }
+    return [];
+  }
+
+  function getPortalDefaultPage(portal) {
+    if (portal === 'user') {
+      return 'navigate';
+    }
+    if (portal === 'model-admin') {
+      return 'model';
+    }
+    return 'navigate';
   }
 
   function selectObjectByKey(key) {
@@ -1662,7 +1745,8 @@ export function useAppState() {
       linkCount: payload?.linkTypeCount ?? linkTypes.length,
       types: objectTypes.slice(0, 6).map((type) => ({
         name: type.name,
-        parent: type.parent
+        parent: type.parent,
+        icon: type.icon || ''
       })),
       hasMore: objectTypes.length > 6 || linkTypes.length > 6
     };
@@ -1761,6 +1845,26 @@ export function useAppState() {
   function formatAttributeLabel(name, definition) {
     const label = resolveAttributeLabel(definition);
     return label || name || '';
+  }
+
+  function sanitizeMaterialIconName(iconName) {
+    if (!iconName) {
+      return '';
+    }
+    const normalized = String(iconName).trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (!normalized || !/^[a-z0-9_]+$/.test(normalized)) {
+      return '';
+    }
+    return normalized;
+  }
+
+  function getTypeIconName(typeName) {
+    if (!typeName) {
+      return 'category';
+    }
+    const typeDef = modelDetails.value.objectTypes.find((type) => type.name === typeName);
+    const iconName = sanitizeMaterialIconName(typeDef?.icon);
+    return iconName || 'category';
   }
 
   function getAttributeDefinition(typeName, attributeName) {
@@ -1885,6 +1989,11 @@ export function useAppState() {
   return {
     apiBase,
     currentPage,
+    activePortal,
+    isPortalSelected,
+    isUserPortal,
+    isModelAdminPortal,
+    portalLabel,
     displayLanguage,
     validateOnly,
     modelSummary,
@@ -1981,6 +2090,7 @@ export function useAppState() {
     linkedGroups,
     tableSelectedLinks,
     formatAttributeLabel,
+    getTypeIconName,
     getAttributeLabel,
     getRepresentativeAttributeKeys,
     getObjectPrimaryAttributes,
@@ -2004,6 +2114,8 @@ export function useAppState() {
     viewObjectFromTable,
     openInExplorerFromTable,
     setCurrentPage,
+    setPortal,
+    clearPortal,
     selectModelObjectByName,
     selectModelLinkByName,
     copyAdminCommand

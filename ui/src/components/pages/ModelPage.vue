@@ -41,7 +41,9 @@
               @click="state.selectedModelObject = type"
             >
               <template #prepend>
-                <v-icon icon="mdi-shape-outline" />
+                <span class="material-symbols-outlined type-icon" aria-hidden="true">
+                  {{ state.getTypeIconName(type.name) }}
+                </span>
               </template>
             </v-list-item>
           </v-list>
@@ -59,6 +61,9 @@
           <div v-if="state.selectedModelObject">
             <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
               <v-chip color="primary" variant="tonal">
+                <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+                  {{ state.getTypeIconName(state.selectedModelObject.name) }}
+                </span>
                 {{ state.selectedModelObject.name }}
               </v-chip>
               <v-chip v-if="state.selectedModelObject.parent" color="secondary" variant="tonal">

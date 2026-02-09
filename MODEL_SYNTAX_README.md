@@ -34,6 +34,7 @@ OBJECT_TYPES contient une ou plusieurs balises OBJECT_TYPE.
 Attributs de OBJECT_TYPE :
 - NAME (obligatoire)
 - PARENT (optionnel, heritage)
+- ICON (optionnel, nom d'une icone Google Material Symbols/Material Icons)
 
 Elements possibles dans OBJECT_TYPE :
 - DESCRIPTION (optionnel)
@@ -142,7 +143,7 @@ Les types supportes pour TYPE :
     <LANGUAGE CODE="EN_uk" LABEL="English (UK)"/>
   </LANGUAGES>
   <OBJECT_TYPES>
-    <OBJECT_TYPE NAME="PERSONNE">
+    <OBJECT_TYPE NAME="PERSONNE" ICON="person">
       <ATTRIBUTE_DEFINITIONS>
         <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true">
           <LABELS>
@@ -174,7 +175,7 @@ Les types supportes pour TYPE :
 ## Exemple avec groupes d'attributs
 
 ```xml
-<OBJECT_TYPE NAME="PERSONNE">
+<OBJECT_TYPE NAME="PERSONNE" ICON="person">
   <ATTRIBUTE_DEFINITIONS>
     <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" />
     <ATTRIBUTE_DEFINITION NAME="PRENOM" TYPE="STRING" REQUIRED="true" />

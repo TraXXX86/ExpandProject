@@ -112,6 +112,9 @@
           >
             <template #item.type="{ item }">
               <v-chip color="primary" variant="tonal" size="small">
+                <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+                  {{ state.getTypeIconName(item.type) }}
+                </span>
                 {{ item.type }}
               </v-chip>
             </template>
@@ -178,6 +181,9 @@
             <div v-if="state.tableSelectedObject">
               <div class="d-flex align-center" style="gap: 12px; flex-wrap: wrap;">
                 <v-chip color="primary" variant="tonal">
+                  <span class="material-symbols-outlined type-icon type-icon-chip" aria-hidden="true">
+                    {{ state.getTypeIconName(state.tableSelectedObject.type) }}
+                  </span>
                   {{ state.tableSelectedObject.type }}
                 </v-chip>
               <v-chip color="secondary" variant="tonal">

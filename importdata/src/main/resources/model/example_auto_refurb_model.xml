@@ -6,7 +6,7 @@
     </LANGUAGES>
     <OBJECT_TYPES>
         <!-- Définition du type CENTRE_RECONDITIONNEMENT -->
-        <OBJECT_TYPE NAME="CENTRE_RECONDITIONNEMENT">
+        <OBJECT_TYPE NAME="CENTRE_RECONDITIONNEMENT" ICON="warehouse">
             <DESCRIPTION>Centre de reconditionnement automobile</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -107,7 +107,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type VEHICULE -->
-        <OBJECT_TYPE NAME="VEHICULE">
+        <OBJECT_TYPE NAME="VEHICULE" ICON="directions_car">
             <DESCRIPTION>Véhicule pris en charge par le centre</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="VIN" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -206,7 +206,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type MANDAT_REPARATION -->
-        <OBJECT_TYPE NAME="MANDAT_REPARATION">
+        <OBJECT_TYPE NAME="MANDAT_REPARATION" ICON="description">
             <DESCRIPTION>Mandat de réparation associé à un véhicule</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NUMERO" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -306,7 +306,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type CLIENT -->
-        <OBJECT_TYPE NAME="CLIENT">
+        <OBJECT_TYPE NAME="CLIENT" ICON="person">
             <DESCRIPTION>Client propriétaire du véhicule</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
@@ -389,7 +389,7 @@
         </OBJECT_TYPE>
 
         <!-- Définition du type TECHNICIEN -->
-        <OBJECT_TYPE NAME="TECHNICIEN">
+        <OBJECT_TYPE NAME="TECHNICIEN" ICON="engineering">
             <DESCRIPTION>Technicien intervenant sur les mandats</DESCRIPTION>
             <ATTRIBUTE_DEFINITIONS>
                 <ATTRIBUTE_DEFINITION NAME="NOM" TYPE="STRING" REQUIRED="true" SEARCHABLE="true">
