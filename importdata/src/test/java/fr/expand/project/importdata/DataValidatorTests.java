@@ -13,6 +13,7 @@ import fr.expand.project.importdata.dto.generated.OBJECTS;
 import fr.expand.project.importdata.dto.util.DataPackDtoUtils;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.validation.DataValidator;
+import fr.expand.project.importdata.validation.ValidationError;
 import fr.expand.project.importdata.validation.ValidationResult;
 
 public class DataValidatorTests {
@@ -37,9 +38,8 @@ public class DataValidatorTests {
 
         ValidationResult result = new DataValidator().validate(data);
 
-        Assert.assertTrue(result.hasErrors());
-        Assert.assertTrue(result.getErrorMessages().stream()
-                .anyMatch(message -> message.contains("Missing required attribute: PRENOM")));
+        Assert.assertFalse(result.isValid());
+        Assert.assertTrue(containsErrorMessage(result, "Missing required attribute: PRENOM"));
     }
 
     @Test
@@ -57,9 +57,8 @@ public class DataValidatorTests {
 
         ValidationResult result = new DataValidator().validate(data);
 
-        Assert.assertTrue(result.hasErrors());
-        Assert.assertTrue(result.getErrorMessages().stream()
-                .anyMatch(message -> message.contains("Invalid type for attribute 'AGE': expected INTEGER")));
+        Assert.assertFalse(result.isValid());
+        Assert.assertTrue(containsErrorMessage(result, "Invalid type for attribute 'AGE': expected INTEGER"));
     }
 
     @Test
@@ -84,8 +83,17 @@ public class DataValidatorTests {
 
         ValidationResult result = new DataValidator().validate(data);
 
-        Assert.assertTrue(result.hasErrors());
-        Assert.assertTrue(result.getErrorMessages().stream().anyMatch(message -> message.contains("Source object not found")));
-        Assert.assertTrue(result.getErrorMessages().stream().anyMatch(message -> message.contains("Target object not found")));
+        Assert.assertFalse(result.isValid());
+        Assert.assertTrue(containsErrorMessage(result, "Source object not found"));
+        Assert.assertTrue(containsErrorMessage(result, "Target object not found"));
+    }
+
+    private boolean containsErrorMessage(ValidationResult result, String expectedFragment) {
+        for (ValidationError error : result.getErrors()) {
+            if (error.getMessage() != null && error.getMessage().contains(expectedFragment)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
