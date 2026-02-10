@@ -1,6 +1,7 @@
 package fr.expand.project.importdata.validation;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +63,11 @@ public class DataValidator {
         
         // Validate links
         if (data.getLINKS() != null && data.getLINKS().getLINK() != null) {
-            validateLinks(data.getLINKS().getLINK(), data.getOBJECTS().getOBJECT());
+            List<OBJECT> objects = Collections.emptyList();
+            if (data.getOBJECTS() != null && data.getOBJECTS().getOBJECT() != null) {
+                objects = data.getOBJECTS().getOBJECT();
+            }
+            validateLinks(data.getLINKS().getLINK(), objects);
         }
         
         LOGGER.info("Validation completed. Errors: " + errors.size() + ", Warnings: " + warnings.size());
