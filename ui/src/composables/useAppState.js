@@ -2,9 +2,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 
 export function useAppState() {
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-  const storedToken = typeof window !== 'undefined'
-    ? window.localStorage.getItem('expand.authToken')
-    : '';
 
   const currentPage = ref('navigate');
   const activePortal = ref('');
@@ -75,8 +72,8 @@ export function useAppState() {
   const isLoadingModel = ref(false);
   const isLoadingData = ref(false);
 
-  const authToken = ref(storedToken || '');
-  const isAuthenticated = ref(Boolean(authToken.value));
+  const authToken = ref('');
+  const isAuthenticated = ref(false);
   const isAuthenticating = ref(false);
   const authStatus = ref(null);
   const loginUsername = ref('admin');
@@ -90,6 +87,7 @@ export function useAppState() {
     actorPlatformAdmin: false,
     expiresAt: 0
   });
+  let sessionExpiryTimerId = null;
 
   const users = ref([]);
   const accessProfile = ref({
@@ -1317,18 +1315,44 @@ export function useAppState() {
     dataFile.value = Array.isArray(files) ? files[0] : files;
   }
 
-  function apiFetch(path, options = {}) {
+  async function apiFetch(path, options = {}) {
     const headers = new Headers(options.headers || {});
-    if (authToken.value) {
-      headers.set('Authorization', `Bearer ${authToken.value}`);
-    }
-    return fetch(`${apiBase}${path}`, {
+    const response = await fetch(`${apiBase}${path}`, {
       ...options,
+      credentials: options.credentials ?? 'include',
       headers
     });
+    if (response.status === 401 && isAuthenticated.value) {
+      resetAuthState('Session expirée, reconnectez-vous.');
+    }
+    return response;
+  }
+
+  function clearSessionExpiryTimer() {
+    if (typeof window === 'undefined' || sessionExpiryTimerId === null) {
+      return;
+    }
+    window.clearTimeout(sessionExpiryTimerId);
+    sessionExpiryTimerId = null;
+  }
+
+  function scheduleSessionExpiry(expiresAt) {
+    clearSessionExpiryTimer();
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const expiry = Number(expiresAt || 0);
+    if (!expiry) {
+      return;
+    }
+    const delay = Math.max(0, (expiry * 1000) - Date.now());
+    sessionExpiryTimerId = window.setTimeout(() => {
+      resetAuthState('Session expirée, reconnectez-vous.');
+    }, delay);
   }
 
   function resetAuthState(message = '') {
+    clearSessionExpiryTimer();
     authToken.value = '';
     isAuthenticated.value = false;
     authMeta.value = {
@@ -1374,7 +1398,7 @@ export function useAppState() {
     isAuthenticating.value = true;
     authStatus.value = null;
     try {
-      const response = await fetch(`${apiBase}/api/auth/login`, {
+      const response = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -1382,12 +1406,6 @@ export function useAppState() {
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Connexion refusée');
-      }
-
-      authToken.value = payload?.token || '';
-      isAuthenticated.value = Boolean(authToken.value);
-      if (typeof window !== 'undefined' && authToken.value) {
-        window.localStorage.setItem('expand.authToken', authToken.value);
       }
 
       await applyAuthPayload(payload);
@@ -1418,10 +1436,6 @@ export function useAppState() {
   }
 
   async function refreshSession() {
-    if (!authToken.value) {
-      resetAuthState();
-      return false;
-    }
     try {
       const response = await apiFetch('/api/auth/me');
       const payload = await readJson(response);
@@ -1429,7 +1443,6 @@ export function useAppState() {
         resetAuthState();
         return false;
       }
-      isAuthenticated.value = true;
       await applyAuthPayload(payload);
       return true;
     } catch (error) {
@@ -1439,6 +1452,7 @@ export function useAppState() {
   }
 
   async function applyAuthPayload(payload) {
+    authToken.value = '';
     authMeta.value = {
       actorUsername: payload?.auth?.actorUsername || '',
       actorDisplayName: payload?.auth?.actorDisplayName || '',
@@ -1456,6 +1470,8 @@ export function useAppState() {
       platformAdmin: Boolean(payload?.user?.platformAdmin)
     };
     accessPermissions.value = Array.isArray(payload?.permissions) ? payload.permissions : [];
+    isAuthenticated.value = Boolean(payload?.user?.username || payload?.auth?.effectiveUsername);
+    scheduleSessionExpiry(authMeta.value.expiresAt);
   }
 
   async function refreshUsers() {

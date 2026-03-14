@@ -10,9 +10,12 @@ import static spark.Spark.put;
 import static spark.Spark.awaitInitialization;
 
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +25,8 @@ import javax.servlet.http.Part;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.access.AccessContext;
 import fr.expand.project.importdata.access.AccessControlStore;
@@ -50,8 +55,11 @@ import fr.expand.project.importdata.validation.ValidationResult;
 
 public class ImportApiServer {
 
+    private static final Logger LOGGER = LogManager.getLogger(ImportApiServer.class);
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
     private static final int DEFAULT_PORT = 8080;
+    private static final String DEFAULT_SESSION_COOKIE_NAME = "expand_session";
+    private static final String DEFAULT_SESSION_COOKIE_SAME_SITE = "Lax";
 
     public static void main(String[] args) {
         int portValue = DEFAULT_PORT;
@@ -74,11 +82,11 @@ public class ImportApiServer {
 
     private static void configureCors() {
         options("/*", (request, response) -> {
-            addCorsHeaders(response);
+            addCorsHeaders(request, response);
             return "OK";
         });
 
-        before((request, response) -> addCorsHeaders(response));
+        before((request, response) -> addCorsHeaders(request, response));
     }
 
     private static void registerRoutes() {
@@ -105,6 +113,7 @@ public class ImportApiServer {
 
         post("/api/auth/login", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             Map<String, Object> payload = readJsonBody(request.body());
             if (payload == null) {
                 return error(response, 400, "Corps JSON manquant");
@@ -118,6 +127,8 @@ public class ImportApiServer {
             try (AccessControlStore accessStore = new AccessControlStore()) {
                 Map<String, Object> user = accessStore.authenticate(username, password);
                 if (user == null) {
+                    clearSessionCookie(request, response);
+                    LOGGER.warn("Authentication failed for username={} ip={}", username, request.ip());
                     return error(response, 401, "Authentification invalide");
                 }
                 Map<String, Object> session = accessStore.createSession(username);
@@ -128,7 +139,14 @@ public class ImportApiServer {
                 if (context == null) {
                     return error(response, 500, "Impossible de charger le profil utilisateur");
                 }
-                return GSON.toJson(buildAuthPayload(context, accessStore));
+                setSessionCookie(request, response, context.getSessionToken(), context.getExpiresAt());
+                LOGGER.info(
+                    "Authentication succeeded for actor={} effective={} ip={}",
+                    context.getActorUsername(),
+                    context.getUsername(),
+                    request.ip()
+                );
+                return GSON.toJson(buildAuthPayload(context, accessStore, true));
             } catch (Exception e) {
                 return error(response, 500, "Erreur d'authentification: " + e.getMessage());
             }
@@ -136,13 +154,24 @@ public class ImportApiServer {
 
         post("/api/auth/logout", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             String token = resolveSessionToken(request);
+            clearSessionCookie(request, response);
             if (token == null || token.isBlank()) {
-                return GSON.toJson(Map.of("status", "logged-out"));
+                return GSON.toJson(Map.of("status", "logged-out", "sessionCleared", true));
             }
             try (AccessControlStore accessStore = new AccessControlStore()) {
+                Map<String, Object> session = accessStore.loadSession(token);
                 accessStore.deleteSession(token);
-                return GSON.toJson(Map.of("status", "logged-out"));
+                if (session != null) {
+                    LOGGER.info(
+                        "Logout completed for actor={} effective={} ip={}",
+                        sanitizeUsername(getString(session.get("actorUsername"))),
+                        sanitizeUsername(getString(session.get("effectiveUsername"))),
+                        request.ip()
+                    );
+                }
+                return GSON.toJson(Map.of("status", "logged-out", "sessionCleared", true));
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors de la déconnexion: " + e.getMessage());
             }
@@ -150,12 +179,13 @@ public class ImportApiServer {
 
         get("/api/auth/me", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             AccessContext context = resolveAccessContext(request, response);
             if (context == null) {
-                return error(response, 401, "Session invalide");
+                return error(response, 401, "Session expirée ou invalide");
             }
             try (AccessControlStore accessStore = new AccessControlStore()) {
-                return GSON.toJson(buildAuthPayload(context, accessStore));
+                return GSON.toJson(buildAuthPayload(context, accessStore, false));
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors du chargement de la session: " + e.getMessage());
             }
@@ -163,9 +193,10 @@ public class ImportApiServer {
 
         post("/api/auth/impersonate", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             AccessContext context = resolveAccessContext(request, response);
             if (context == null) {
-                return error(response, 401, "Session invalide");
+                return error(response, 401, "Session expirée ou invalide");
             }
             if (!context.isActorPlatformAdmin()) {
                 return error(response, 403, "Seul un administrateur peut impersonner");
@@ -189,7 +220,14 @@ public class ImportApiServer {
                 if (refreshedContext == null) {
                     return error(response, 500, "Impossible de charger la session impersonée");
                 }
-                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore));
+                setSessionCookie(request, response, refreshedContext.getSessionToken(), refreshedContext.getExpiresAt());
+                LOGGER.info(
+                    "Impersonation started actor={} target={} ip={}",
+                    refreshedContext.getActorUsername(),
+                    refreshedContext.getUsername(),
+                    request.ip()
+                );
+                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore, false));
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors de l'impersonation: " + e.getMessage());
             }
@@ -197,9 +235,10 @@ public class ImportApiServer {
 
         post("/api/auth/impersonate/stop", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             AccessContext context = resolveAccessContext(request, response);
             if (context == null) {
-                return error(response, 401, "Session invalide");
+                return error(response, 401, "Session expirée ou invalide");
             }
             if (!context.isActorPlatformAdmin()) {
                 return error(response, 403, "Seul un administrateur peut arrêter l'impersonation");
@@ -214,7 +253,14 @@ public class ImportApiServer {
                 if (refreshedContext == null) {
                     return error(response, 500, "Impossible de charger la session");
                 }
-                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore));
+                setSessionCookie(request, response, refreshedContext.getSessionToken(), refreshedContext.getExpiresAt());
+                LOGGER.info(
+                    "Impersonation stopped actor={} effective={} ip={}",
+                    refreshedContext.getActorUsername(),
+                    refreshedContext.getUsername(),
+                    request.ip()
+                );
+                return GSON.toJson(buildAuthPayload(refreshedContext, accessStore, false));
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors de l'arrêt de l'impersonation: " + e.getMessage());
             }
@@ -222,9 +268,10 @@ public class ImportApiServer {
 
         get("/api/access/me", (request, response) -> {
             response.type("application/json");
+            disableResponseCaching(response);
             AccessContext context = resolveAccessContext(request, response);
             if (context == null) {
-                return error(response, 401, "Session invalide");
+                return error(response, 401, "Session expirée ou invalide");
             }
             try (AccessControlStore accessStore = new AccessControlStore()) {
                 Map<String, Object> payload = accessStore.loadUserAccess(context.getUsername());
@@ -982,13 +1029,25 @@ public class ImportApiServer {
         });
     }
 
-    private static void addCorsHeaders(spark.Response response) {
-        response.raw().setHeader("Access-Control-Allow-Origin", "*");
+    static void addCorsHeaders(spark.Request request, spark.Response response) {
+        String origin = getString(request.headers("Origin"));
+        if (origin == null || origin.isBlank()) {
+            response.raw().setHeader("Access-Control-Allow-Origin", "*");
+        } else if (isCorsOriginAllowed(request, origin)) {
+            response.raw().setHeader("Access-Control-Allow-Origin", origin);
+            response.raw().setHeader("Access-Control-Allow-Credentials", "true");
+            response.raw().setHeader("Vary", "Origin");
+        }
         response.raw().setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
         response.raw().setHeader(
             "Access-Control-Allow-Headers",
             "Content-Type,Authorization,Accept,Origin,X-Session-Token"
         );
+    }
+
+    private static void disableResponseCaching(spark.Response response) {
+        response.raw().setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.raw().setHeader("Pragma", "no-cache");
     }
 
     private static String readMultipartText(javax.servlet.http.HttpServletRequest request, String partName)
@@ -1205,7 +1264,11 @@ public class ImportApiServer {
         }
         try (AccessControlStore accessStore = new AccessControlStore()) {
             Map<String, Object> session = accessStore.loadSession(token);
-            return buildAccessContext(accessStore, session);
+            AccessContext context = buildAccessContext(accessStore, session);
+            if (context == null && hasSessionCookie(request)) {
+                clearSessionCookie(request, response);
+            }
+            return context;
         } catch (Exception e) {
             response.status(500);
             return null;
@@ -1242,6 +1305,10 @@ public class ImportApiServer {
         if (token != null && !token.isBlank()) {
             return token;
         }
+        String cookieToken = request.cookie(getSessionCookieName());
+        if (cookieToken != null && !cookieToken.isBlank()) {
+            return cookieToken.trim();
+        }
         String fallback = request.headers("X-Session-Token");
         if (fallback == null || fallback.isBlank()) {
             return null;
@@ -1249,13 +1316,177 @@ public class ImportApiServer {
         return fallback.trim();
     }
 
-    private static Map<String, Object> buildAuthPayload(AccessContext context, AccessControlStore accessStore) {
+    private static Map<String, Object> buildAuthPayload(AccessContext context, AccessControlStore accessStore,
+        boolean includeLegacyToken) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("token", context.getSessionToken());
+        if (includeLegacyToken) {
+            payload.put("token", context.getSessionToken());
+        }
         payload.put("auth", buildAuthMeta(context));
         payload.put("user", accessStore.loadUser(context.getUsername()));
         payload.put("permissions", accessStore.listModelPermissions(context.getUsername()));
         return payload;
+    }
+
+    static String buildSessionCookieHeader(String cookieName, String token, boolean secureCookie, long maxAgeSeconds,
+        String sameSite, boolean clearing) {
+        StringBuilder cookie = new StringBuilder();
+        cookie.append(cookieName).append("=").append(token == null ? "" : token);
+        cookie.append("; Path=/");
+        cookie.append("; HttpOnly");
+        cookie.append("; SameSite=").append(normalizeSameSite(sameSite, secureCookie));
+        cookie.append("; Max-Age=").append(Math.max(0L, maxAgeSeconds));
+        if (secureCookie) {
+            cookie.append("; Secure");
+        }
+        if (clearing) {
+            cookie.append("; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+        }
+        return cookie.toString();
+    }
+
+    static String normalizeSameSite(String value, boolean secureCookie) {
+        if (value != null) {
+            if ("Strict".equalsIgnoreCase(value.trim())) {
+                return "Strict";
+            }
+            if ("None".equalsIgnoreCase(value.trim())) {
+                return secureCookie ? "None" : DEFAULT_SESSION_COOKIE_SAME_SITE;
+            }
+        }
+        return DEFAULT_SESSION_COOKIE_SAME_SITE;
+    }
+
+    private static void setSessionCookie(spark.Request request, spark.Response response, String token, long expiresAt) {
+        if (token == null || token.isBlank()) {
+            clearSessionCookie(request, response);
+            return;
+        }
+        boolean secureCookie = shouldUseSecureCookie(request);
+        long remainingSeconds = Math.max(0L, expiresAt - Instant.now().getEpochSecond());
+        response.raw().addHeader(
+            "Set-Cookie",
+            buildSessionCookieHeader(
+                getSessionCookieName(),
+                token.trim(),
+                secureCookie,
+                remainingSeconds,
+                resolveConfiguredSameSite(),
+                false
+            )
+        );
+    }
+
+    private static void clearSessionCookie(spark.Request request, spark.Response response) {
+        boolean secureCookie = shouldUseSecureCookie(request);
+        response.raw().addHeader(
+            "Set-Cookie",
+            buildSessionCookieHeader(
+                getSessionCookieName(),
+                "",
+                secureCookie,
+                0L,
+                resolveConfiguredSameSite(),
+                true
+            )
+        );
+    }
+
+    private static boolean hasSessionCookie(spark.Request request) {
+        String cookieToken = request.cookie(getSessionCookieName());
+        return cookieToken != null && !cookieToken.isBlank();
+    }
+
+    private static boolean shouldUseSecureCookie(spark.Request request) {
+        if (readBooleanSetting("ACCESS_SESSION_COOKIE_SECURE", "SESSION_COOKIE_SECURE", false)) {
+            return true;
+        }
+        String forwardedProto = request.headers("X-Forwarded-Proto");
+        return request.secure() || "https".equalsIgnoreCase(forwardedProto);
+    }
+
+    private static String getSessionCookieName() {
+        String configuredName = readSetting(
+            "ACCESS_SESSION_COOKIE_NAME",
+            "SESSION_COOKIE_NAME",
+            DEFAULT_SESSION_COOKIE_NAME
+        );
+        if (configuredName == null || configuredName.isBlank() || !configuredName.matches("[A-Za-z0-9._-]+")) {
+            return DEFAULT_SESSION_COOKIE_NAME;
+        }
+        return configuredName.trim();
+    }
+
+    private static String resolveConfiguredSameSite() {
+        return readSetting(
+            "ACCESS_SESSION_COOKIE_SAMESITE",
+            "SESSION_COOKIE_SAMESITE",
+            DEFAULT_SESSION_COOKIE_SAME_SITE
+        );
+    }
+
+    private static boolean isCorsOriginAllowed(spark.Request request, String origin) {
+        Set<String> configuredOrigins = configuredCorsOrigins();
+        if (!configuredOrigins.isEmpty()) {
+            return configuredOrigins.contains("*") || configuredOrigins.contains(origin);
+        }
+
+        String originHost = extractHost(origin);
+        if (originHost == null || originHost.isBlank()) {
+            return false;
+        }
+
+        if ("localhost".equalsIgnoreCase(originHost)
+            || "127.0.0.1".equals(originHost)
+            || "::1".equals(originHost)) {
+            return true;
+        }
+
+        String serverName = request.raw().getServerName();
+        return serverName != null && !serverName.isBlank() && serverName.equalsIgnoreCase(originHost);
+    }
+
+    private static Set<String> configuredCorsOrigins() {
+        Set<String> origins = new LinkedHashSet<>();
+        String rawOrigins = readSetting("ACCESS_CORS_ALLOWED_ORIGINS", "API_CORS_ALLOWED_ORIGINS", null);
+        if (rawOrigins == null || rawOrigins.isBlank()) {
+            return origins;
+        }
+        for (String entry : rawOrigins.split(",")) {
+            String candidate = entry == null ? null : entry.trim();
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            origins.add(candidate);
+        }
+        return origins;
+    }
+
+    private static String extractHost(String origin) {
+        try {
+            URI uri = URI.create(origin);
+            return uri.getHost();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
+        String value = System.getProperty(envKey);
+        if (value == null || value.isBlank()) {
+            value = System.getenv(envKey);
+        }
+        if ((value == null || value.isBlank()) && fallbackEnvKey != null) {
+            value = System.getProperty(fallbackEnvKey);
+            if (value == null || value.isBlank()) {
+                value = System.getenv(fallbackEnvKey);
+            }
+        }
+        return (value == null || value.isBlank()) ? defaultValue : value;
+    }
+
+    private static boolean readBooleanSetting(String envKey, String fallbackEnvKey, boolean defaultValue) {
+        return Boolean.parseBoolean(readSetting(envKey, fallbackEnvKey, Boolean.toString(defaultValue)));
     }
 
     private static Map<String, Object> buildAuthMeta(AccessContext context) {

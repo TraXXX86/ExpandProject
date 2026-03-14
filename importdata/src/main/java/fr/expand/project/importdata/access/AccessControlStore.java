@@ -615,6 +615,10 @@ public class AccessControlStore implements AutoCloseable {
             statement.setLong(8, now);
             statement.executeUpdate();
         }
+
+        if (plainPassword != null && !plainPassword.isBlank()) {
+            deleteSessionsForUserInternal(connection, username);
+        }
     }
 
     private Map<String, Object> loadSessionInternal(Connection connection, String token) throws SQLException {
@@ -642,6 +646,19 @@ public class AccessControlStore implements AutoCloseable {
                 row.put("impersonating", !rs.getString("actor_username").equals(rs.getString("effective_username")));
                 return row;
             }
+        }
+    }
+
+    private void deleteSessionsForUserInternal(Connection connection, String username) throws SQLException {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+            "DELETE FROM sessions WHERE actor_username = ? OR effective_username = ?"
+        )) {
+            statement.setString(1, username);
+            statement.setString(2, username);
+            statement.executeUpdate();
         }
     }
 
