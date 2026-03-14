@@ -67,7 +67,7 @@ describe('useAppState critical data flows', () => {
 
     expect(state.fullTextResults.value).toHaveLength(2);
     expect(state.fullTextResults.value[0].matches).toEqual([
-      { key: 'PRENOM', label: 'Prenom', value: 'Alice' }
+      { key: 'PRENOM', label: 'PRENOM', value: 'Alice' }
     ]);
 
     state.fullTextTypeFilter.value = ['SOCIETE'];
@@ -129,16 +129,13 @@ describe('useAppState critical data flows', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const state = mountUseAppState();
-    state.accessPermissions.value = [
-      {
-        modelKey: 'social',
-        visible: true,
-        canRead: true,
-        canCreate: true,
-        canUpdate: false,
-        canDelete: false
-      }
-    ];
+    state.accessProfile.value = {
+      username: 'admin',
+      displayName: 'Administrateur',
+      portalUser: true,
+      portalModelAdmin: true,
+      platformAdmin: true
+    };
     state.selectedModelKey.value = 'social';
 
     await flushPromises();
