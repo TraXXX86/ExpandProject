@@ -78,6 +78,8 @@
                   v-model="state.createObjectAttributes[attribute.name]"
                   :label="attribute.required ? `${attribute.label} *` : attribute.label"
                   :hint="`Type: ${attribute.type || 'STRING'}`"
+                  :error="state.createObjectMissingAttributeNames.includes(attribute.name)"
+                  :error-messages="state.createObjectMissingAttributeNames.includes(attribute.name) ? ['Champ obligatoire'] : []"
                   persistent-hint
                   variant="outlined"
                   density="comfortable"
@@ -97,9 +99,20 @@
               :disabled="!state.createObjectType || !state.selectedModelKey || !state.canCreateCurrentModelData"
               @click="state.createObject"
             >
-              Creer l'objet
+              {{ state.isCreatingObject ? "Creation de l'objet..." : "Creer l'objet" }}
             </v-btn>
           </div>
+
+          <v-alert
+            v-if="state.isCreatingObject"
+            class="mt-4"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+          >
+            Creation de l'objet en cours. La liste des objets sera mise a jour automatiquement.
+          </v-alert>
 
           <v-alert
             v-if="state.createObjectStatus"
@@ -109,7 +122,12 @@
             density="comfortable"
             border="start"
           >
-            {{ state.createObjectStatus.message }}
+            <div>{{ state.createObjectStatus.message }}</div>
+            <ul v-if="state.createObjectStatus.details?.length" class="status-detail-list">
+              <li v-for="detail in state.createObjectStatus.details" :key="detail">
+                {{ detail }}
+              </li>
+            </ul>
           </v-alert>
         </v-card-text>
       </v-card>
@@ -210,9 +228,20 @@
               :disabled="!state.createLinkType || !state.createLinkSourceId || !state.createLinkTargetId || !state.canCreateCurrentModelData"
               @click="state.createLink"
             >
-              Creer le lien
+              {{ state.isCreatingLink ? 'Creation du lien...' : 'Creer le lien' }}
             </v-btn>
           </div>
+
+          <v-alert
+            v-if="state.isCreatingLink"
+            class="mt-4"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+          >
+            Creation du lien en cours. Les objets relies seront recharges ensuite.
+          </v-alert>
 
           <v-alert
             v-if="state.createLinkStatus"
@@ -222,7 +251,12 @@
             density="comfortable"
             border="start"
           >
-            {{ state.createLinkStatus.message }}
+            <div>{{ state.createLinkStatus.message }}</div>
+            <ul v-if="state.createLinkStatus.details?.length" class="status-detail-list">
+              <li v-for="detail in state.createLinkStatus.details" :key="detail">
+                {{ detail }}
+              </li>
+            </ul>
           </v-alert>
         </v-card-text>
       </v-card>

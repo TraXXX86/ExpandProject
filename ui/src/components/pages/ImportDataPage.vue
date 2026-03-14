@@ -62,7 +62,11 @@
               :disabled="!state.canUploadData"
               @click="state.uploadData"
             >
-              {{ state.validateOnly ? 'Valider les données' : 'Importer les données' }}
+              {{
+                state.isLoadingData
+                  ? (state.validateOnly ? 'Validation en cours...' : 'Import en cours...')
+                  : (state.validateOnly ? 'Valider les données' : 'Importer les données')
+              }}
             </v-btn>
             <v-btn
               variant="tonal"
@@ -76,6 +80,21 @@
           </div>
 
           <v-alert
+            v-if="state.isLoadingData"
+            class="mt-5"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+          >
+            {{
+              state.validateOnly
+                ? 'Le fichier XML est en cours de validation. Les contrôles peuvent prendre quelques secondes.'
+                : "L'import est en cours. Les résumés et l'explorateur seront rafraîchis automatiquement à la fin."
+            }}
+          </v-alert>
+
+          <v-alert
             v-if="state.status"
             class="mt-5"
             :type="state.status.type"
@@ -83,7 +102,12 @@
             density="comfortable"
             border="start"
           >
-            {{ state.status.message }}
+            <div>{{ state.status.message }}</div>
+            <ul v-if="state.status.details?.length" class="status-detail-list">
+              <li v-for="detail in state.status.details" :key="detail">
+                {{ detail }}
+              </li>
+            </ul>
           </v-alert>
         </v-card-text>
       </v-card>

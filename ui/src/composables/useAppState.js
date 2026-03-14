@@ -1,4 +1,11 @@
 import { computed, onMounted, ref, watch } from 'vue';
+import {
+  getPortalDefaultPage,
+  getPortalPages,
+  modelAdminPortalPages,
+  normalizePortal,
+  userPortalPages
+} from '../router/appRouteState';
 
 export function useAppState() {
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
@@ -8,8 +15,6 @@ export function useAppState() {
 
   const currentPage = ref('navigate');
   const activePortal = ref('');
-  const userPortalPages = ['navigate', 'table', 'search', 'create', 'import-data'];
-  const modelAdminPortalPages = ['import-model', 'model', 'admin'];
   const displayLanguage = ref('');
   const validateOnly = ref(false);
   const modelSummary = ref(null);
@@ -57,6 +62,7 @@ export function useAppState() {
   const createObjectAttributes = ref({});
   const createObjectStatus = ref(null);
   const isCreatingObject = ref(false);
+  const showCreateObjectValidation = ref(false);
   const createLinkType = ref('');
   const createLinkSourceId = ref(null);
   const createLinkTargetId = ref(null);
@@ -777,6 +783,22 @@ export function useAppState() {
       .sort((a, b) => String(a.label).localeCompare(String(b.label)));
   });
 
+  const missingCreateObjectAttributes = computed(() =>
+    createObjectAttributeDefs.value.filter((def) => {
+      if (!def.required) {
+        return false;
+      }
+      const value = createObjectAttributes.value[def.name];
+      return value === undefined || value === null || String(value).trim() === '';
+    })
+  );
+
+  const createObjectMissingAttributeNames = computed(() => (
+    showCreateObjectValidation.value
+      ? missingCreateObjectAttributes.value.map((def) => def.name)
+      : []
+  ));
+
   const createLinkDefinition = computed(
     () => modelDetails.value.linkTypes.find((link) => link.name === createLinkType.value) || null
   );
@@ -1296,8 +1318,22 @@ export function useAppState() {
   watch(
     () => createObjectType.value,
     () => {
+      showCreateObjectValidation.value = false;
       createObjectStatus.value = null;
     }
+  );
+
+  watch(
+    () => createObjectAttributes.value,
+    () => {
+      if (!showCreateObjectValidation.value) {
+        return;
+      }
+      if (!missingCreateObjectAttributes.value.length && createObjectStatus.value?.code === 'missing-required') {
+        createObjectStatus.value = null;
+      }
+    },
+    { deep: true }
   );
 
   watch(
@@ -2051,7 +2087,8 @@ export function useAppState() {
       } else {
         status.value = {
           type: 'warning',
-          message: `Validation échouée. ${payload?.errors?.length || 0} erreurs détectées.`
+          message: `Validation échouée. ${payload?.errors?.length || 0} erreurs détectées.`,
+          details: extractErrorMessages(payload)
         };
       }
 
@@ -2079,22 +2116,20 @@ export function useAppState() {
       return;
     }
 
-    const missingRequired = createObjectAttributeDefs.value.filter((def) => {
-      if (!def.required) {
-        return false;
-      }
-      const value = createObjectAttributes.value[def.name];
-      return value === undefined || value === null || String(value).trim() === '';
-    });
+    const missingRequired = missingCreateObjectAttributes.value;
 
     if (missingRequired.length) {
+      showCreateObjectValidation.value = true;
       createObjectStatus.value = {
+        code: 'missing-required',
         type: 'warning',
-        message: 'Renseignez tous les attributs obligatoires.'
+        message: 'Renseignez tous les attributs obligatoires.',
+        details: missingRequired.map((def) => def.label || def.name)
       };
       return;
     }
 
+    showCreateObjectValidation.value = false;
     createObjectStatus.value = null;
     isCreatingObject.value = true;
     try {
@@ -2352,6 +2387,7 @@ export function useAppState() {
     createObjectAttributes.value = {};
     createObjectStatus.value = null;
     isCreatingObject.value = false;
+    showCreateObjectValidation.value = false;
     createLinkType.value = '';
     createLinkSourceId.value = null;
     createLinkTargetId.value = null;
@@ -2564,36 +2600,6 @@ export function useAppState() {
 
   function clearPortal() {
     activePortal.value = '';
-  }
-
-  function normalizePortal(portal) {
-    if (portal === 'user' || portal === 'data') {
-      return 'user';
-    }
-    if (portal === 'model-admin' || portal === 'admin') {
-      return 'model-admin';
-    }
-    return '';
-  }
-
-  function getPortalPages(portal) {
-    if (portal === 'user') {
-      return userPortalPages;
-    }
-    if (portal === 'model-admin') {
-      return modelAdminPortalPages;
-    }
-    return [];
-  }
-
-  function getPortalDefaultPage(portal) {
-    if (portal === 'user') {
-      return 'navigate';
-    }
-    if (portal === 'model-admin') {
-      return 'model';
-    }
-    return 'navigate';
   }
 
   function getModelPermission(modelKey) {
@@ -3207,6 +3213,27 @@ export function useAppState() {
     return fallback;
   }
 
+  function extractErrorMessages(payload, limit = 5) {
+    const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+    if (!errors.length) {
+      return [];
+    }
+
+    const messages = errors
+      .map((error) => error?.message || error?.toString?.() || '')
+      .map((message) => String(message).trim())
+      .filter(Boolean);
+
+    if (messages.length <= limit) {
+      return messages;
+    }
+
+    return [
+      ...messages.slice(0, limit),
+      `+ ${messages.length - limit} autre(s) erreur(s)`
+    ];
+  }
+
   return {
     apiBase,
     authToken,
@@ -3284,6 +3311,7 @@ export function useAppState() {
     createObjectType,
     createObjectAttributes,
     createObjectStatus,
+    createObjectMissingAttributeNames,
     isCreatingObject,
     createLinkType,
     createLinkSourceId,

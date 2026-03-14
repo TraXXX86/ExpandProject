@@ -108,6 +108,23 @@
     <v-main>
       <div :class="['hero-bg', heroBgClass]" />
       <v-container class="py-6 hero-content">
+        <v-slide-y-transition>
+          <v-alert
+            v-if="busyState.active"
+            class="mb-6"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+            icon="mdi-progress-clock"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 12px;">
+              <span>{{ busyState.message }}</span>
+              <v-progress-circular indeterminate size="18" width="2" color="info" />
+            </div>
+          </v-alert>
+        </v-slide-y-transition>
+
         <template v-if="!state.isAuthenticated">
           <v-row class="justify-center">
             <v-col cols="12" md="7" lg="5">
@@ -297,6 +314,45 @@
             </v-col>
           </v-row>
 
+          <v-row class="mb-6">
+            <v-col cols="12">
+              <v-card class="view-overview-card" elevation="3" rounded="xl">
+                <v-card-text class="d-flex align-center justify-space-between flex-wrap" style="gap: 16px;">
+                  <div>
+                    <div class="kicker">Vue actuelle</div>
+                    <div class="text-subtitle-1 font-weight-bold">{{ activePageTitle }}</div>
+                    <div class="text-body-2 text-medium-emphasis">
+                      {{ activePageDescription }}
+                    </div>
+                    <div class="d-flex align-center flex-wrap mt-3" style="gap: 8px;">
+                      <v-chip
+                        v-for="item in overviewChips"
+                        :key="item.key"
+                        :color="item.color"
+                        variant="tonal"
+                        size="small"
+                      >
+                        <v-icon :icon="item.icon" start />
+                        {{ item.text }}
+                      </v-chip>
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-3">
+                      URL partageable: {{ shareablePath }}
+                    </div>
+                  </div>
+                  <v-btn
+                    color="primary"
+                    variant="tonal"
+                    prepend-icon="mdi-link-variant"
+                    @click="copyShareableLink"
+                  >
+                    Copier le lien
+                  </v-btn>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+
           <v-window v-if="activeTabs.length" v-model="state.currentPage">
             <v-window-item value="navigate">
               <NavigatePage :state="state" />
@@ -333,11 +389,16 @@
         </template>
       </v-container>
     </v-main>
+
+    <v-snackbar v-model="shareLinkSnackbar" color="primary" timeout="2400">
+      {{ shareLinkMessage }}
+    </v-snackbar>
   </v-app>
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAppState } from './composables/useAppState';
 import AdminPage from './components/pages/AdminPage.vue';
 import ImportDataPage from './components/pages/ImportDataPage.vue';
@@ -347,8 +408,15 @@ import NavigatePage from './components/pages/NavigatePage.vue';
 import SearchPage from './components/pages/SearchPage.vue';
 import TablePage from './components/pages/TablePage.vue';
 import CreatePage from './components/pages/CreatePage.vue';
+import { buildRouteLocation, parseRouteState } from './router/appRouteState';
 
 const state = reactive(useAppState());
+const route = useRoute();
+const router = useRouter();
+const isHydratingRoute = ref(false);
+const pendingRootObjectKey = ref('');
+const shareLinkSnackbar = ref(false);
+const shareLinkMessage = ref('');
 
 const userPortalTabs = [
   {
@@ -446,6 +514,162 @@ const activeTabs = computed(() => {
   return modelAdminTabs;
 });
 
+const routeState = computed(() => parseRouteState(route));
+const activePageMeta = computed(() => (
+  [...userPortalTabs, ...modelAdminTabs].find((tab) => tab.value === state.currentPage) || null
+));
+
+const activePageTitle = computed(() => activePageMeta.value?.title || 'Vue');
+const activePageDescription = computed(() => (
+  activePageMeta.value?.tooltip || 'Retrouvez ce contexte directement depuis l’URL.'
+));
+
+const overviewChips = computed(() => {
+  const chips = [];
+
+  if (state.selectedModel) {
+    chips.push({
+      key: 'model',
+      color: 'primary',
+      icon: 'mdi-database-outline',
+      text: state.selectedModel.version
+        ? `${state.selectedModel.name} v${state.selectedModel.version}`
+        : state.selectedModel.name
+    });
+  }
+
+  if (state.displayLanguage) {
+    const selectedLanguage = state.modelLanguages.find((language) => language.value === state.displayLanguage);
+    chips.push({
+      key: 'language',
+      color: 'secondary',
+      icon: 'mdi-translate',
+      text: selectedLanguage?.title || state.displayLanguage
+    });
+  }
+
+  if (state.dataSummary) {
+    chips.push({
+      key: 'objects',
+      color: 'accent',
+      icon: 'mdi-cube-outline',
+      text: `${state.dataSummary.objectCount} objets`
+    });
+    chips.push({
+      key: 'links',
+      color: 'secondary',
+      icon: 'mdi-connection',
+      text: `${state.dataSummary.linkCount} liens`
+    });
+  }
+
+  if (state.currentPage === 'navigate' && state.selectedRootObject) {
+    chips.push({
+      key: 'root',
+      color: 'primary',
+      icon: 'mdi-source-branch',
+      text: `${state.selectedRootObject.type} #${state.selectedRootObject.id ?? 'N/A'}`
+    });
+  }
+
+  if (state.currentPage === 'search' && state.fullTextQuery) {
+    chips.push({
+      key: 'search',
+      color: 'secondary',
+      icon: 'mdi-magnify',
+      text: `Recherche: ${state.fullTextQuery}`
+    });
+  }
+
+  if (state.currentPage === 'table' && (
+    state.tableSearch
+    || state.tableTypeFilter.length
+    || state.tableAttributeKey
+    || state.tableAttributeValue
+  )) {
+    chips.push({
+      key: 'filters',
+      color: 'secondary',
+      icon: 'mdi-filter-variant',
+      text: 'Filtres actifs'
+    });
+  }
+
+  return chips;
+});
+
+const shareableLocation = computed(() => buildRouteLocation({
+  isAuthenticated: state.isAuthenticated,
+  activePortal: state.activePortal,
+  currentPage: state.currentPage,
+  selectedModelKey: state.selectedModelKey,
+  displayLanguage: state.displayLanguage,
+  selectedRootObjectKey: state.selectedRootObjectKey,
+  tableSearch: state.tableSearch,
+  tableTypeFilter: state.tableTypeFilter,
+  tableAttributeKey: state.tableAttributeKey,
+  tableAttributeKeyOperator: state.tableAttributeKeyOperator,
+  tableAttributeValue: state.tableAttributeValue,
+  tableAttributeValueOperator: state.tableAttributeValueOperator,
+  fullTextQuery: state.fullTextQuery,
+  fullTextTypeFilter: state.fullTextTypeFilter
+}));
+
+const shareablePath = computed(() => router.resolve(shareableLocation.value).fullPath);
+
+const shareableUrl = computed(() => {
+  const href = router.resolve(shareableLocation.value).href;
+  if (typeof window === 'undefined') {
+    return href;
+  }
+  return new URL(href, window.location.origin).toString();
+});
+
+const busyState = computed(() => {
+  if (state.isAuthenticating) {
+    return { active: true, message: 'Connexion en cours...' };
+  }
+  if (state.isLoadingModels) {
+    return { active: true, message: 'Chargement des modèles disponibles...' };
+  }
+  if (state.isLoadingModel && state.currentPage === 'import-model') {
+    return { active: true, message: 'Import ou mise à jour du modèle en cours...' };
+  }
+  if (state.isLoadingModel) {
+    return { active: true, message: 'Chargement du modèle en cours...' };
+  }
+  if (state.isLoadingData && state.currentPage === 'import-data') {
+    return {
+      active: true,
+      message: state.validateOnly
+        ? 'Validation du fichier XML en cours...'
+        : 'Import des données en cours...'
+    };
+  }
+  if (state.isLoadingData) {
+    return { active: true, message: 'Actualisation des données en cours...' };
+  }
+  if (state.isCreatingObject) {
+    return { active: true, message: "Création de l'objet en cours..." };
+  }
+  if (state.isCreatingLink) {
+    return { active: true, message: 'Création du lien en cours...' };
+  }
+  if (state.isLoadingUsers) {
+    return { active: true, message: 'Chargement des utilisateurs en cours...' };
+  }
+  if (state.isLoadingModelXml) {
+    return { active: true, message: 'Chargement du XML du modèle...' };
+  }
+  if (state.isSavingModelXml) {
+    return { active: true, message: 'Sauvegarde du modèle en cours...' };
+  }
+  if (state.isSavingAccessUser || state.isSavingAccessPermissions || state.isDeletingAccessUser) {
+    return { active: true, message: 'Mise à jour des accès en cours...' };
+  }
+  return { active: false, message: '' };
+});
+
 watch(
   () => activeTabs.value,
   (tabs) => {
@@ -455,6 +679,55 @@ watch(
     if (!tabs.find((tab) => tab.value === state.currentPage)) {
       state.setCurrentPage(tabs[0].value);
     }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [route.fullPath, state.isAuthenticated, state.modelOptions.length, state.dataObjects.length, state.modelLanguages.length],
+  () => {
+    applyRouteState();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [
+    state.isAuthenticated,
+    state.activePortal,
+    state.currentPage,
+    state.selectedModelKey,
+    state.displayLanguage,
+    state.selectedRootObjectKey,
+    state.tableSearch,
+    JSON.stringify(state.tableTypeFilter),
+    state.tableAttributeKey,
+    state.tableAttributeKeyOperator,
+    state.tableAttributeValue,
+    state.tableAttributeValueOperator,
+    state.fullTextQuery,
+    JSON.stringify(state.fullTextTypeFilter)
+  ],
+  async () => {
+    if (isHydratingRoute.value) {
+      return;
+    }
+
+    const nextLocation = shareableLocation.value;
+    const resolved = router.resolve(nextLocation);
+    if (resolved.fullPath === route.fullPath) {
+      return;
+    }
+
+    const sameRouteIdentity = route.name === resolved.name
+      && JSON.stringify(route.params || {}) === JSON.stringify(resolved.params || {});
+
+    if (sameRouteIdentity) {
+      await router.replace(nextLocation);
+      return;
+    }
+
+    await router.push(nextLocation);
   },
   { immediate: true }
 );
@@ -506,5 +779,64 @@ const heroBgClass = computed(() => {
 
 function openFromAdminMenu(entry) {
   state.setPortal(entry.portal, entry.page);
+}
+
+function applyRouteState() {
+  const nextRouteState = routeState.value;
+  pendingRootObjectKey.value = nextRouteState.page === 'navigate' ? nextRouteState.rootObjectKey : '';
+
+  if (!state.isAuthenticated) {
+    return;
+  }
+
+  isHydratingRoute.value = true;
+  try {
+    if (nextRouteState.screen === 'portal-page' && nextRouteState.portal) {
+      state.setPortal(nextRouteState.portal, nextRouteState.page);
+    } else if (nextRouteState.screen === 'portal-selector' || nextRouteState.screen === 'root') {
+      state.clearPortal();
+    }
+
+    if (nextRouteState.modelKey && state.modelOptions.some((option) => option.value === nextRouteState.modelKey)) {
+      state.selectedModelKey = nextRouteState.modelKey;
+    }
+
+    if (nextRouteState.language && state.modelLanguages.some((option) => option.value === nextRouteState.language)) {
+      state.displayLanguage = nextRouteState.language;
+    }
+
+    if (nextRouteState.page === 'table') {
+      state.tableSearch = nextRouteState.tableSearch;
+      state.tableTypeFilter = nextRouteState.tableTypes;
+      state.tableAttributeKey = nextRouteState.tableAttributeKey;
+      state.tableAttributeKeyOperator = nextRouteState.tableAttributeKeyOperator || 'contains';
+      state.tableAttributeValue = nextRouteState.tableAttributeValue;
+      state.tableAttributeValueOperator = nextRouteState.tableAttributeValueOperator || 'contains';
+    }
+
+    if (nextRouteState.page === 'search') {
+      state.fullTextQuery = nextRouteState.fullTextQuery;
+      state.fullTextTypeFilter = nextRouteState.fullTextTypes;
+    }
+  } finally {
+    isHydratingRoute.value = false;
+  }
+
+  if (pendingRootObjectKey.value && state.dataObjects.length) {
+    state.setRootObjectByKey(pendingRootObjectKey.value);
+    if (state.selectedRootObjectKey === pendingRootObjectKey.value) {
+      pendingRootObjectKey.value = '';
+    }
+  }
+}
+
+async function copyShareableLink() {
+  try {
+    await navigator.clipboard.writeText(shareableUrl.value);
+    shareLinkMessage.value = 'Lien de partage copié.';
+  } catch (error) {
+    shareLinkMessage.value = 'Impossible de copier le lien.';
+  }
+  shareLinkSnackbar.value = true;
 }
 </script>
