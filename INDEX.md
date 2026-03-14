@@ -91,9 +91,9 @@ java -jar importdata/target/expandproject-importdata.jar --example
 - API d'import
 - Connecteurs DB
 
-### Module Model
+### Dossier `model/`
 → `model/README.md`
-- Module modèle (vide actuellement)
+- Note d'archive pour l'ancien module modèle, retiré du build Maven
 
 ---
 

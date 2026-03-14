@@ -62,6 +62,18 @@ Les DTOs sont générés automatiquement via JAXB 3.x (Jakarta) à partir des XS
 - **Package model**: `fr.expand.project.importdata.model.generated`
   - Classes générées: DATAMODEL, OBJECTTYPE, LINKTYPE, ATTRIBUTEDEFINITION, etc.
 
+### 2.1 Frontière entre code généré et code maintenu
+
+- **A modifier à la main**:
+  - `fr.expand.project.importdata.model`
+  - `fr.expand.project.importdata.validation`
+  - `fr.expand.project.importdata.api`
+- **A régénérer, pas à éditer directement**:
+  - `fr.expand.project.importdata.dto.generated`
+  - `fr.expand.project.importdata.model.generated`
+- **Zone archivée**:
+  - le dossier racine `model/` est conservé uniquement comme trace historique et n'est plus compilé par Maven
+
 ### 3. Héritage entre types d'objets
 
 Un `OBJECT_TYPE` peut déclarer un parent via l'attribut `PARENT`. Le type enfant hérite de tous les attributs du parent et peut en ajouter de nouveaux.
@@ -173,31 +185,10 @@ Créer un fichier XML basé sur `data.xsd`:
 
 ### 3. Validation et Import
 
-L'API d'import pourra:
+L'API d'import permet aujourd'hui de:
 1. Charger le modèle de données
 2. Valider les données contre le modèle
 3. Importer dans Neo4j si valide
-
-## Prochaines Étapes
-
-1. **API de gestion du modèle**
-   - Lecture et chargement des modèles
-   - Cache des modèles
-
-2. **Validation des données**
-   - Vérifier que les types d'objets existent
-   - Vérifier que les types de liens sont valides
-   - Valider les attributs (types, obligatoires, etc.)
-
-3. **Stockage Neo4j**
-   - Stocker le modèle dans Neo4j
-   - Créer des contraintes basées sur le modèle
-   - Enrichir l'import avec les métadonnées du modèle
-
-4. **Tests**
-   - Tests unitaires pour la validation
-   - Tests d'intégration avec Neo4j
-   - Tests de conformité modèle/données
 
 ## État Actuel
 
@@ -206,14 +197,15 @@ L'API d'import pourra:
 - Génération automatique des DTOs via JAXB 3.x
 - Exemples de modèle et données
 - Migration vers Jakarta JAXB (Java 17+)
-- Compilation du code principal réussie
+- Chargement des modèles XML via `ModelManager`
+- Validation des données via `DataValidator`
+- Import piloté par modèle via `ModelBasedImportAPI`
+- Stockage optionnel du modèle dans Neo4j via `Neo4jModelStore`
 
-⚠️ **En cours/À faire**:
-- Finaliser les classes wrapper pour compatibilité totale
-- Mettre à jour les tests unitaires
-- Créer l'API de gestion du modèle
-- Implémenter la validation
-- Documenter l'API
+⚠️ **Limites connues / points d'attention**:
+- Les packages `*.generated` doivent être considérés comme des artefacts de build
+- L'ancien dossier racine `model/` n'est pas une implémentation active du système de modèle
+- Les évolutions fonctionnelles doivent cibler `importdata/` et la régénération JAXB si le schéma change
 
 ## Notes Techniques
 

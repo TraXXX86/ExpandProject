@@ -35,7 +35,7 @@ mvn clean install
 ```
 
 Cette commande va :
-- Compiler tous les modules (commons, importdata, model)
+- Compiler les modules maintenus (commons, importdata)
 - Générer les DTOs à partir des schémas XSD
 - Créer les JARs dans les dossiers `target/`
 
@@ -331,9 +331,18 @@ ExpandProject/
 │           ├── data.xsd           # Schéma XSD des données
 │           └── example_social_network_data.xml
 │
-├── model/                # Module modèle (vide pour l'instant)
 └── pom.xml              # Configuration Maven parent
 ```
+
+### Statut des modules et des sources
+
+| Zone | Statut | Notes |
+|------|--------|-------|
+| `commons/` | Maintenu | Constantes, enums et utilitaires partagés |
+| `importdata/` | Maintenu | Module principal: chargement du modèle, validation, API et import Neo4j |
+| `importdata/src/main/java/fr/expand/project/importdata/dto/generated/` | Généré | Sources JAXB régénérées depuis `data.xsd`; ne pas modifier à la main |
+| `importdata/src/main/java/fr/expand/project/importdata/model/generated/` | Généré | Sources JAXB régénérées depuis `model.xsd`; ne pas modifier à la main |
+| `model/` | Archivé | Ancien module expérimental conservé uniquement comme note historique, hors build Maven |
 
 ## 🧪 Tests
 
@@ -410,7 +419,7 @@ mvn clean install -U
 
 ### Les classes générées (DATAS, OBJECT, etc.) n'existent pas
 
-**Solution** : Lancez la génération JAXB :
+**Solution** : Lancez la génération JAXB. Les packages `*.generated` sont reconstruits depuis les XSD et ne doivent pas être édités à la main :
 ```bash
 cd importdata
 mvn generate-sources
