@@ -129,16 +129,16 @@ public class DataValidator {
         
         // Validate attribute types
         for (ATTRIBUTE attr : obj.getATTRIBUTE()) {
-            validateAttributeType(obj, attr, attrDefinitions);
+            validateAttributeType("OBJECT[" + obj.getID() + "]", attr, attrDefinitions);
         }
     }
     
     /**
      * Validate attribute value type
      */
-    private void validateAttributeType(OBJECT obj, ATTRIBUTE attr, Map<String, ATTRIBUTEDEFINITION> attrDefinitions) {
+    private void validateAttributeType(String ownerLabel, ATTRIBUTE attr, Map<String, ATTRIBUTEDEFINITION> attrDefinitions) {
         if (attrDefinitions == null || attrDefinitions.isEmpty()) {
-            warnings.add(new ValidationWarning("OBJECT[" + obj.getID() + "]", 
+            warnings.add(new ValidationWarning(ownerLabel, 
                 "Attribute '" + attr.getKEY() + "' not defined in model (no attribute definitions)"));
             return;
         }
@@ -146,7 +146,7 @@ public class DataValidator {
         ATTRIBUTEDEFINITION attrDef = attrDefinitions.get(attr.getKEY());
         
         if (attrDef == null) {
-            warnings.add(new ValidationWarning("OBJECT[" + obj.getID() + "]", 
+            warnings.add(new ValidationWarning(ownerLabel, 
                 "Attribute '" + attr.getKEY() + "' not defined in model"));
             return;
         }
@@ -155,7 +155,7 @@ public class DataValidator {
         if (attr.getVALUE() != null && !attr.getVALUE().isEmpty()) {
             ATTRIBUTETYPE type = attrDef.getTYPE();
             if (type != null && !validateValueType(attr.getVALUE(), type)) {
-                errors.add(new ValidationError("OBJECT[" + obj.getID() + "]", 
+                errors.add(new ValidationError(ownerLabel, 
                     "Invalid type for attribute '" + attr.getKEY() + "': expected " + type + ", got '" + attr.getVALUE() + "'"));
             }
         }
@@ -266,6 +266,28 @@ public class DataValidator {
         if (!targetAllowed) {
             errors.add(new ValidationError("LINK[" + link.getTYPE() + "]", 
                 "Target type '" + targetType + "' not allowed for this link type"));
+        }
+
+        validateLinkAttributes(link, linkType);
+    }
+
+    private void validateLinkAttributes(LINK link, LINKTYPE linkType) {
+        Map<String, ATTRIBUTEDEFINITION> attrDefinitions = modelManager.getAttributeDefinitionMap(linkType);
+        Set<String> providedAttributes = new HashSet<>();
+        for (ATTRIBUTE attr : link.getATTRIBUTE()) {
+            providedAttributes.add(attr.getKEY());
+        }
+
+        for (ATTRIBUTEDEFINITION attrDef : attrDefinitions.values()) {
+            String attrName = attrDef.getNAME();
+            if (attrDef.isREQUIRED() && !providedAttributes.contains(attrName)) {
+                errors.add(new ValidationError("LINK[" + link.getTYPE() + "]",
+                    "Missing required attribute: " + attrName));
+            }
+        }
+
+        for (ATTRIBUTE attr : link.getATTRIBUTE()) {
+            validateAttributeType("LINK[" + link.getTYPE() + "]", attr, attrDefinitions);
         }
     }
 }

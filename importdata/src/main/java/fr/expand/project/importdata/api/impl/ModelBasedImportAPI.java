@@ -34,7 +34,7 @@ public class ModelBasedImportAPI {
     public ModelBasedImportAPI() {
         this.modelManager = ModelManager.getInstance();
         this.validator = new DataValidator();
-        this.connector = new CypherConnector();
+        this.connector = null;
     }
     
     /**
@@ -86,6 +86,9 @@ public class ModelBasedImportAPI {
         LOGGER.info("Validation successful. Starting import...");
         if (modelKey == null || modelKey.isBlank()) {
             modelKey = storeModelToNeo4j();
+        }
+        if (connector == null) {
+            connector = new CypherConnector();
         }
         connector.setModelKey(modelKey);
         importToNeo4j(data);
@@ -166,7 +169,7 @@ public class ModelBasedImportAPI {
                         }
                     }
                     
-                    connector.writeLink(objA, objB, isDirected, link.getTYPE());
+                    connector.writeLink(objA, objB, isDirected, link.getTYPE(), link.getATTRIBUTE());
                     linkCount++;
                 }
                 LOGGER.info("Imported " + linkCount + " links");

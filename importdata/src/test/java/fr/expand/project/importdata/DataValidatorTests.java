@@ -88,6 +88,39 @@ public class DataValidatorTests {
         Assert.assertTrue(containsErrorMessage(result, "Target object not found"));
     }
 
+    @Test
+    public void validate_shouldDetectInvalidLinkAttributeType() {
+        DATAS data = new DATAS();
+        data.setOBJECTS(new OBJECTS());
+        data.setLINKS(new LINKS());
+
+        DataPackObject source = new DataPackObject();
+        source.setID(10);
+        source.setTYPE("PERSONNE");
+        source.getATTRIBUTE().add(new DataPackAttribute("NOM", "Durand"));
+        source.getATTRIBUTE().add(new DataPackAttribute("PRENOM", "Alice"));
+        data.getOBJECTS().getOBJECT().add(source);
+
+        DataPackObject target = new DataPackObject();
+        target.setID(11);
+        target.setTYPE("PERSONNE");
+        target.getATTRIBUTE().add(new DataPackAttribute("NOM", "Martin"));
+        target.getATTRIBUTE().add(new DataPackAttribute("PRENOM", "Bob"));
+        data.getOBJECTS().getOBJECT().add(target);
+
+        LINK link = new LINK();
+        link.setTYPE("CONNAIT");
+        link.setOBJLINKA(DataPackDtoUtils.createObjLink(source));
+        link.setOBJLINKB(DataPackDtoUtils.createObjLink(target));
+        link.getATTRIBUTE().add(new DataPackAttribute("DEPUIS", "hier"));
+        data.getLINKS().getLINK().add(link);
+
+        ValidationResult result = new DataValidator().validate(data);
+
+        Assert.assertFalse(result.isValid());
+        Assert.assertTrue(containsErrorMessage(result, "Invalid type for attribute 'DEPUIS': expected DATE"));
+    }
+
     private boolean containsErrorMessage(ValidationResult result, String expectedFragment) {
         for (ValidationError error : result.getErrors()) {
             if (error.getMessage() != null && error.getMessage().contains(expectedFragment)) {

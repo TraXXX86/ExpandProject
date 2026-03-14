@@ -316,6 +316,25 @@ public class ModelManager {
     }
 
     /**
+     * Resolve attribute definitions for a link type.
+     */
+    public Map<String, ATTRIBUTEDEFINITION> getAttributeDefinitionMap(LINKTYPE linkType) {
+        Map<String, ATTRIBUTEDEFINITION> merged = new LinkedHashMap<>();
+        if (linkType == null
+            || linkType.getATTRIBUTEDEFINITIONS() == null
+            || linkType.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION() == null) {
+            return merged;
+        }
+        for (ATTRIBUTEDEFINITION def : linkType.getATTRIBUTEDEFINITIONS().getATTRIBUTEDEFINITION()) {
+            if (def == null || def.getNAME() == null) {
+                continue;
+            }
+            merged.put(def.getNAME(), def);
+        }
+        return merged;
+    }
+
+    /**
      * Check if a candidate type is the same as, or inherits from, an allowed type.
      */
     public boolean isTypeOrSubtype(String candidateType, String allowedType) {

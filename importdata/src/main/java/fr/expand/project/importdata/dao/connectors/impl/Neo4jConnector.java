@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -115,10 +116,22 @@ public class Neo4jConnector extends IConnectorDb {
 
 	@Override
 	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
+		return writeLink(objectA, objectB, isOriented, linkType, List.of());
+	}
+
+	@Override
+	public int writeLink(
+		DataPackObject objectA,
+		DataPackObject objectB,
+		boolean isOriented,
+		String linkType,
+		List<DataPackAttribute> attributes
+	) {
 		connectToDb();
 
 		// Create query
 		String relationType = normalizeRelationshipType(linkType);
+		String relationId = UUID.randomUUID().toString();
 		StringBuilder request = new StringBuilder();
 		request.append("MATCH (a:").append(objectA.getTYPE()).append(")");
 		buildMatchConditions(request, "a", objectA);
@@ -130,12 +143,12 @@ public class Neo4jConnector extends IConnectorDb {
 		if (modelKey != null && !modelKey.isBlank()) {
 			request.append(" AND b.modelKey=?");
 		}
-		request.append(" CREATE (a)-[:").append(relationType);
-		String relationProperties = buildRelationProperties(linkType);
+		request.append(" CREATE (a)-[r:").append(relationType);
+		String relationProperties = buildRelationProperties(linkType, relationId, attributes);
 		if (!relationProperties.isEmpty()) {
 			request.append(" {").append(relationProperties).append("}");
 		}
-		request.append("]->(b)");
+		request.append("]->(b) RETURN ID(r) AS ID");
 		String requestString = request.toString();
 		LOGGER.info(requestString);
 
@@ -150,11 +163,26 @@ public class Neo4jConnector extends IConnectorDb {
 		if (modelKey != null && !modelKey.isBlank()) {
 			params.put(Integer.toString(index++), modelKey);
 		}
-		if (modelKey != null && !modelKey.isBlank()) {
-			params.put(Integer.toString(index++), modelKey);
-		}
-		if (linkType != null && !linkType.isBlank()) {
-			params.put(Integer.toString(index), linkType);
+		if (!relationProperties.isEmpty()) {
+			if (modelKey != null && !modelKey.isBlank()) {
+				params.put(Integer.toString(index++), modelKey);
+			}
+			if (linkType != null && !linkType.isBlank()) {
+				params.put(Integer.toString(index++), linkType);
+			}
+			params.put(Integer.toString(index++), relationId);
+			if (attributes != null) {
+				for (DataPackAttribute attribute : attributes) {
+					if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+						continue;
+					}
+					String key = attribute.getKEY();
+					if ("modelKey".equals(key) || "linkType".equals(key) || "relationId".equals(key)) {
+						continue;
+					}
+					params.put(Integer.toString(index++), attribute.getVALUE() == null ? "" : attribute.getVALUE());
+				}
+			}
 		}
 
 		// Launch request
@@ -314,7 +342,7 @@ public class Neo4jConnector extends IConnectorDb {
 		}
 	}
 
-	private String buildRelationProperties(String linkType) {
+	private String buildRelationProperties(String linkType, String relationId, List<DataPackAttribute> attributes) {
 		StringBuilder builder = new StringBuilder();
 		boolean first = true;
 		if (modelKey != null && !modelKey.isBlank()) {
@@ -326,6 +354,30 @@ public class Neo4jConnector extends IConnectorDb {
 				builder.append(",");
 			}
 			builder.append("linkType:?");
+			first = false;
+		}
+		if (relationId != null && !relationId.isBlank()) {
+			if (!first) {
+				builder.append(",");
+			}
+			builder.append("relationId:?");
+			first = false;
+		}
+		if (attributes != null) {
+			for (DataPackAttribute attribute : attributes) {
+				if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+					continue;
+				}
+				String key = attribute.getKEY();
+				if ("modelKey".equals(key) || "linkType".equals(key) || "relationId".equals(key)) {
+					continue;
+				}
+				if (!first) {
+					builder.append(",");
+				}
+				builder.append("`").append(key.replace("`", "``")).append("`:?");
+				first = false;
+			}
 		}
 		return builder.toString();
 	}

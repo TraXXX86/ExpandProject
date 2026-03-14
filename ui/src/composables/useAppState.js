@@ -60,8 +60,19 @@ export function useAppState() {
   const createLinkType = ref('');
   const createLinkSourceId = ref(null);
   const createLinkTargetId = ref(null);
+  const createLinkAttributes = ref({});
   const createLinkStatus = ref(null);
   const isCreatingLink = ref(false);
+  const relationManagementStatus = ref(null);
+  const relationEditorOpen = ref(false);
+  const relationEditorId = ref('');
+  const relationEditorType = ref('');
+  const relationEditorAttributeDefs = ref([]);
+  const relationEditorAttributes = ref({});
+  const relationEditorSourceLabel = ref('');
+  const relationEditorTargetLabel = ref('');
+  const isUpdatingRelation = ref(false);
+  const relationBusyId = ref('');
   const modelXml = ref('');
   const modelXmlStatus = ref(null);
   const isLoadingModelXml = ref(false);
@@ -781,6 +792,19 @@ export function useAppState() {
     () => modelDetails.value.linkTypes.find((link) => link.name === createLinkType.value) || null
   );
 
+  const createLinkAttributeDefs = computed(() => {
+    const attributes = Array.isArray(createLinkDefinition.value?.attributes)
+      ? createLinkDefinition.value.attributes
+      : [];
+    return attributes
+      .filter((attr) => attr && attr.name)
+      .map((attr) => ({
+        ...attr,
+        label: getLinkAttributeLabel(createLinkType.value, attr.name) || attr.name
+      }))
+      .sort((a, b) => String(a.label || a.name).localeCompare(String(b.label || b.name)));
+  });
+
   const createLinkSourceOptions = computed(() => {
     if (!createLinkDefinition.value || !dataObjects.value.length) {
       return [];
@@ -799,6 +823,41 @@ export function useAppState() {
       }))
       .sort((a, b) => String(a.title).localeCompare(String(b.title)));
   });
+
+  const relationManagementRows = computed(() =>
+    dataLinks.value
+      .filter((link) => !createLinkType.value || link.type === createLinkType.value)
+      .map((link, index) => {
+        const source = objectIndex.value.get(link.fromKey) || null;
+        const target = objectIndex.value.get(link.toKey) || null;
+        const attributes = Array.isArray(link.attributes) ? link.attributes : [];
+        const attributePreview = attributes.slice(0, 3).map((attribute) => ({
+          key: attribute.key,
+          label: getLinkAttributeLabel(link.type, attribute.key),
+          value: attribute.value
+        }));
+        return {
+          ...link,
+          key: link.id || `managed-link-${index}`,
+          source,
+          target,
+          sourceLabel: source ? formatObjectOptionLabel(source) : `ID ${link.fromId ?? 'N/A'}`,
+          targetLabel: target ? formatObjectOptionLabel(target) : `ID ${link.toId ?? 'N/A'}`,
+          attributeCount: attributes.length,
+          attributePreview
+        };
+      })
+      .sort((a, b) => {
+        if (a.type !== b.type) {
+          return String(a.type || '').localeCompare(String(b.type || ''));
+        }
+        const sourceCompare = String(a.sourceLabel || '').localeCompare(String(b.sourceLabel || ''));
+        if (sourceCompare !== 0) {
+          return sourceCompare;
+        }
+        return String(a.targetLabel || '').localeCompare(String(b.targetLabel || ''));
+      })
+  );
 
   const createLinkTargetOptions = computed(() => {
     if (!createLinkDefinition.value || !dataObjects.value.length) {
@@ -976,9 +1035,11 @@ export function useAppState() {
       const list = map.get(sourceKey) || [];
       list.push({
         key,
+        id: link.id,
         type: link.type,
         targetKey,
         target,
+        attributes: Array.isArray(link.attributes) ? link.attributes : [],
         direction,
         directionLabel: directionToLabel(direction),
         directionIcon: directionToIcon(direction),
@@ -1301,11 +1362,20 @@ export function useAppState() {
   );
 
   watch(
+    () => createLinkAttributeDefs.value,
+    (defs) => {
+      createLinkAttributes.value = buildAttributeState(defs, createLinkAttributes.value);
+    },
+    { immediate: true }
+  );
+
+  watch(
     () => createLinkType.value,
     () => {
       createLinkSourceId.value = null;
       createLinkTargetId.value = null;
       createLinkStatus.value = null;
+      relationManagementStatus.value = null;
     }
   );
 
@@ -2153,6 +2223,7 @@ export function useAppState() {
     createLinkStatus.value = null;
     isCreatingLink.value = true;
     try {
+      const attributes = buildAttributePayload(createLinkAttributeDefs.value, createLinkAttributes.value);
       const response = await apiFetch('/api/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2160,7 +2231,8 @@ export function useAppState() {
           modelKey: selectedModelKey.value,
           type: createLinkType.value,
           fromId: createLinkSourceId.value,
-          toId: createLinkTargetId.value
+          toId: createLinkTargetId.value,
+          attributes
         })
       });
       const payload = await readJson(response);
@@ -2170,13 +2242,126 @@ export function useAppState() {
 
       createLinkStatus.value = {
         type: 'success',
-        message: 'Lien créé.'
+        message: payload?.id ? `Lien créé (${payload.id}).` : 'Lien créé.'
       };
       await refreshData(selectedModelKey.value);
     } catch (error) {
       createLinkStatus.value = { type: 'error', message: error.message };
     } finally {
       isCreatingLink.value = false;
+    }
+  }
+
+  function openRelationEditor(relation) {
+    if (!relation?.id) {
+      return;
+    }
+    const definitions = buildAttributeDefinitions(
+      relation.type,
+      getLinkTypeDefinition(relation.type)?.attributes || [],
+      relation.attributes
+    );
+    relationEditorId.value = relation.id;
+    relationEditorType.value = relation.type || '';
+    relationEditorAttributeDefs.value = definitions;
+    relationEditorAttributes.value = buildAttributeState(
+      definitions,
+      attributesArrayToMap(relation.attributes)
+    );
+    relationEditorSourceLabel.value = relation.sourceLabel || '';
+    relationEditorTargetLabel.value = relation.targetLabel || '';
+    relationManagementStatus.value = null;
+    relationEditorOpen.value = true;
+  }
+
+  function closeRelationEditor() {
+    relationEditorOpen.value = false;
+    relationEditorId.value = '';
+    relationEditorType.value = '';
+    relationEditorAttributeDefs.value = [];
+    relationEditorAttributes.value = {};
+    relationEditorSourceLabel.value = '';
+    relationEditorTargetLabel.value = '';
+    isUpdatingRelation.value = false;
+  }
+
+  async function saveRelationEdits() {
+    if (!relationEditorId.value) {
+      return;
+    }
+    if (!selectedModelKey.value) {
+      relationManagementStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
+      return;
+    }
+    if (!canUpdateCurrentModelData.value) {
+      relationManagementStatus.value = { type: 'warning', message: 'Droit UPDATE manquant pour ce modèle.' };
+      return;
+    }
+
+    isUpdatingRelation.value = true;
+    relationBusyId.value = relationEditorId.value;
+    relationManagementStatus.value = null;
+    try {
+      const response = await apiFetch(`/api/links/${encodeURIComponent(relationEditorId.value)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelKey: selectedModelKey.value,
+          type: relationEditorType.value,
+          attributes: buildAttributePayload(relationEditorAttributeDefs.value, relationEditorAttributes.value)
+        })
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(extractErrorMessage(payload, 'Erreur lors de la mise à jour du lien.'));
+      }
+      relationManagementStatus.value = { type: 'success', message: 'Lien mis à jour.' };
+      closeRelationEditor();
+      await refreshData(selectedModelKey.value);
+    } catch (error) {
+      relationManagementStatus.value = { type: 'error', message: error.message };
+    } finally {
+      relationBusyId.value = '';
+      isUpdatingRelation.value = false;
+    }
+  }
+
+  async function deleteRelation(relation) {
+    if (!relation?.id) {
+      return;
+    }
+    if (!selectedModelKey.value) {
+      relationManagementStatus.value = { type: 'warning', message: 'Sélectionnez un modèle cible.' };
+      return;
+    }
+    if (!canDeleteCurrentModelData.value) {
+      relationManagementStatus.value = { type: 'warning', message: 'Droit DELETE manquant pour ce modèle.' };
+      return;
+    }
+    if (typeof window !== 'undefined' && !window.confirm('Supprimer ce lien ?')) {
+      return;
+    }
+
+    relationBusyId.value = relation.id;
+    relationManagementStatus.value = null;
+    try {
+      const response = await apiFetch(
+        `/api/links/${encodeURIComponent(relation.id)}?modelKey=${encodeURIComponent(selectedModelKey.value)}`,
+        { method: 'DELETE' }
+      );
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(extractErrorMessage(payload, 'Erreur lors de la suppression du lien.'));
+      }
+      relationManagementStatus.value = { type: 'success', message: 'Lien supprimé.' };
+      if (relationEditorId.value === relation.id) {
+        closeRelationEditor();
+      }
+      await refreshData(selectedModelKey.value);
+    } catch (error) {
+      relationManagementStatus.value = { type: 'error', message: error.message };
+    } finally {
+      relationBusyId.value = '';
     }
   }
 
@@ -2355,8 +2540,12 @@ export function useAppState() {
     createLinkType.value = '';
     createLinkSourceId.value = null;
     createLinkTargetId.value = null;
+    createLinkAttributes.value = {};
     createLinkStatus.value = null;
     isCreatingLink.value = false;
+    relationManagementStatus.value = null;
+    closeRelationEditor();
+    relationBusyId.value = '';
   }
 
   function resetModelEditorState() {
@@ -2954,15 +3143,89 @@ export function useAppState() {
 
   function normalizeLinks(links) {
     return links.map((link, index) => {
+      const id = link.id || '';
+      const fromId = link.fromId ?? null;
+      const toId = link.toId ?? null;
       const fromKey = link.fromId !== undefined ? String(link.fromId) : '';
       const toKey = link.toId !== undefined ? String(link.toId) : '';
       return {
-        key: `link-${index}-${fromKey}-${toKey}`,
+        id,
+        fromId,
+        toId,
+        key: id || `link-${index}-${fromKey}-${toKey}`,
         type: link.type || link.linkType || link.relationshipType || 'Lien',
         fromKey,
-        toKey
+        toKey,
+        attributes: Array.isArray(link.attributes) ? link.attributes : []
       };
     });
+  }
+
+  function attributesArrayToMap(attributes) {
+    const map = {};
+    (Array.isArray(attributes) ? attributes : []).forEach((attribute) => {
+      const key = attribute?.key;
+      if (!key) {
+        return;
+      }
+      map[key] = attribute?.value ?? '';
+    });
+    return map;
+  }
+
+  function buildAttributeState(definitions, currentValues = {}) {
+    const next = {};
+    (Array.isArray(definitions) ? definitions : []).forEach((definition) => {
+      if (!definition?.name) {
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(currentValues, definition.name)) {
+        next[definition.name] = currentValues[definition.name];
+      } else if (definition.defaultValue) {
+        next[definition.name] = definition.defaultValue;
+      } else {
+        next[definition.name] = '';
+      }
+    });
+    return next;
+  }
+
+  function buildAttributeDefinitions(typeName, attributes, existingAttributes = []) {
+    const definitions = Array.isArray(attributes) ? attributes : [];
+    const merged = new Map();
+    definitions.forEach((attribute) => {
+      if (!attribute?.name) {
+        return;
+      }
+      merged.set(attribute.name, {
+        ...attribute,
+        label: typeName ? getLinkAttributeLabel(typeName, attribute.name) : attribute.name
+      });
+    });
+    (Array.isArray(existingAttributes) ? existingAttributes : []).forEach((attribute) => {
+      if (!attribute?.key || merged.has(attribute.key)) {
+        return;
+      }
+      merged.set(attribute.key, {
+        name: attribute.key,
+        type: '',
+        required: false,
+        defaultValue: '',
+        label: attribute.key
+      });
+    });
+    return Array.from(merged.values()).sort((a, b) =>
+      String(a.label || a.name).localeCompare(String(b.label || b.name))
+    );
+  }
+
+  function buildAttributePayload(definitions, values) {
+    return (Array.isArray(definitions) ? definitions : [])
+      .map((definition) => ({
+        key: definition.name,
+        value: values?.[definition.name]
+      }))
+      .filter((attribute) => attribute.key && String(attribute.value ?? '').trim() !== '');
   }
 
   function getFirstFile(value) {
@@ -3038,6 +3301,23 @@ export function useAppState() {
       return null;
     }
     return modelDetails.value.linkTypes.find((link) => link.name === linkTypeName) || null;
+  }
+
+  function getLinkAttributeDefinition(linkTypeName, attributeName) {
+    if (!linkTypeName || !attributeName) {
+      return null;
+    }
+    const linkType = getLinkTypeDefinition(linkTypeName);
+    if (!linkType || !Array.isArray(linkType.attributes)) {
+      return null;
+    }
+    return linkType.attributes.find((attribute) => attribute.name === attributeName) || null;
+  }
+
+  function getLinkAttributeLabel(linkTypeName, attributeName) {
+    const definition = getLinkAttributeDefinition(linkTypeName, attributeName);
+    const label = resolveAttributeLabel(definition);
+    return label || attributeName || '';
   }
 
   function getLinkTypeLabel(linkTypeName, direction = 'both') {
@@ -3288,8 +3568,19 @@ export function useAppState() {
     createLinkType,
     createLinkSourceId,
     createLinkTargetId,
+    createLinkAttributes,
     createLinkStatus,
     isCreatingLink,
+    relationManagementStatus,
+    relationEditorOpen,
+    relationEditorId,
+    relationEditorType,
+    relationEditorAttributeDefs,
+    relationEditorAttributes,
+    relationEditorSourceLabel,
+    relationEditorTargetLabel,
+    isUpdatingRelation,
+    relationBusyId,
     modelXml,
     modelXmlStatus,
     isLoadingModelXml,
@@ -3330,8 +3621,10 @@ export function useAppState() {
     objectTypeGroups,
     createObjectAttributeDefs,
     createLinkDefinition,
+    createLinkAttributeDefs,
     createLinkSourceOptions,
     createLinkTargetOptions,
+    relationManagementRows,
     adminCommand,
     graphNodes,
     graphEdges,
@@ -3354,6 +3647,7 @@ export function useAppState() {
     formatAttributeLabel,
     getTypeIconName,
     getAttributeLabel,
+    getLinkAttributeLabel,
     getLinkTypeLabel,
     getUserPortalTitle,
     getRepresentativeAttributeKeys,
@@ -3372,6 +3666,10 @@ export function useAppState() {
     uploadData,
     createObject,
     createLink,
+    openRelationEditor,
+    closeRelationEditor,
+    saveRelationEdits,
+    deleteRelation,
     deleteObject,
     createAccessUser,
     saveAccessUser,

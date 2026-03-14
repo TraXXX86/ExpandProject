@@ -51,6 +51,14 @@ npm run dev
 
 L'interface consomme l'API d'import pour charger les modèles et données dans Neo4j, puis afficher uniquement ce qui est stocké en base.
 
+La page `Creation` permet désormais :
+- de créer des objets,
+- de créer des liens avec leurs attributs,
+- de modifier les attributs d'un lien existant,
+- de supprimer un lien existant.
+
+Les relations exposées par l'API portent maintenant un identifiant stable `id`, réutilisé par les opérations `PUT /api/links/:id` et `DELETE /api/links/:id`.
+
 Pour démarrer l'API :
 
 ```bash

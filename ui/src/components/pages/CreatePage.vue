@@ -202,6 +202,27 @@
             </v-col>
           </v-row>
 
+          <div v-if="state.createLinkAttributeDefs.length" class="mt-4">
+            <div class="text-subtitle-2 font-weight-bold">Attributs du lien</div>
+            <v-row class="mt-2">
+              <v-col
+                v-for="attribute in state.createLinkAttributeDefs"
+                :key="attribute.name"
+                cols="12"
+                md="6"
+              >
+                <v-text-field
+                  v-model="state.createLinkAttributes[attribute.name]"
+                  :label="attribute.required ? `${attribute.label} *` : attribute.label"
+                  :hint="`Type: ${attribute.type || 'STRING'}`"
+                  persistent-hint
+                  variant="outlined"
+                  density="comfortable"
+                />
+              </v-col>
+            </v-row>
+          </div>
+
           <div class="d-flex align-center" style="gap: 12px; margin-top: 16px;">
             <v-btn
               color="primary"
@@ -237,14 +258,166 @@
             Les listes affichent uniquement les objets compatibles avec le type de lien.
           </div>
           <v-divider class="my-4" />
-          <div class="text-subtitle-2 font-weight-bold">Mise a jour</div>
+          <div class="text-subtitle-2 font-weight-bold">CRUD des liens</div>
           <div class="text-medium-emphasis">
-            Pensez a rafraichir les donnees si vous venez d'importer un nouveau fichier.
+            Vous pouvez creer, modifier les attributs et supprimer les liens existants depuis cette page.
           </div>
         </v-card-text>
       </v-card>
     </v-col>
   </v-row>
+
+  <v-row class="mt-8">
+    <v-col cols="12">
+      <v-card class="card-animate delay-2" elevation="4" rounded="xl">
+        <v-card-title class="section-title d-flex align-center justify-space-between">
+          Liens existants
+          <v-chip v-if="state.dataSummary" color="secondary" variant="tonal">
+            {{ state.relationManagementRows.length }} / {{ state.dataSummary.linkCount }} liens
+          </v-chip>
+        </v-card-title>
+        <v-card-text>
+          <div class="text-medium-emphasis mb-4">
+            <span v-if="state.createLinkType">
+              Affichage filtré sur le type {{ state.getLinkTypeLabel(state.createLinkType) || state.createLinkType }}.
+            </span>
+            <span v-else>
+              Selectionnez un type de lien ci-dessus pour filtrer la liste si besoin.
+            </span>
+          </div>
+
+          <v-alert
+            v-if="state.relationManagementStatus"
+            class="mb-4"
+            :type="state.relationManagementStatus.type"
+            variant="tonal"
+            density="comfortable"
+            border="start"
+          >
+            {{ state.relationManagementStatus.message }}
+          </v-alert>
+
+          <v-table v-if="state.relationManagementRows.length" density="comfortable">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Source</th>
+                <th>Cible</th>
+                <th>Attributs</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="relation in state.relationManagementRows" :key="relation.key">
+                <td>
+                  <div class="font-weight-medium">
+                    {{ state.getLinkTypeLabel(relation.type) || relation.type }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ relation.type }}
+                  </div>
+                </td>
+                <td>{{ relation.sourceLabel }}</td>
+                <td>{{ relation.targetLabel }}</td>
+                <td>
+                  <div v-if="relation.attributePreview.length" class="table-attributes">
+                    <span v-for="(attribute, index) in relation.attributePreview" :key="attribute.key">
+                      {{ attribute.label || attribute.key }}: {{ attribute.value }}<span v-if="index < relation.attributePreview.length - 1"> • </span>
+                    </span>
+                    <span v-if="relation.attributeCount > relation.attributePreview.length">
+                      • +{{ relation.attributeCount - relation.attributePreview.length }}
+                    </span>
+                  </div>
+                  <span v-else class="text-medium-emphasis">Aucun attribut</span>
+                </td>
+                <td class="text-right">
+                  <div class="d-flex justify-end" style="gap: 8px;">
+                    <v-btn
+                      v-if="state.canUpdateCurrentModelData"
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      prepend-icon="mdi-pencil-outline"
+                      :disabled="state.relationBusyId === relation.id"
+                      @click="state.openRelationEditor(relation)"
+                    >
+                      Editer
+                    </v-btn>
+                    <v-btn
+                      v-if="state.canDeleteCurrentModelData"
+                      size="small"
+                      color="error"
+                      variant="tonal"
+                      prepend-icon="mdi-delete-outline"
+                      :loading="state.relationBusyId === relation.id"
+                      :disabled="state.isUpdatingRelation"
+                      @click="state.deleteRelation(relation)"
+                    >
+                      Supprimer
+                    </v-btn>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+          <div v-else class="text-medium-emphasis">
+            Aucun lien disponible pour ce filtre.
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
+
+  <v-dialog v-model="state.relationEditorOpen" max-width="820">
+    <v-card rounded="xl">
+      <v-card-title class="section-title">Modifier un lien</v-card-title>
+      <v-card-text>
+        <div class="text-medium-emphasis">
+          {{ state.relationEditorSourceLabel }} → {{ state.relationEditorTargetLabel }}
+        </div>
+        <div class="text-caption text-medium-emphasis mt-1">
+          {{ state.getLinkTypeLabel(state.relationEditorType) || state.relationEditorType }}
+        </div>
+
+        <div v-if="state.relationEditorAttributeDefs.length" class="mt-4">
+          <v-row>
+            <v-col
+              v-for="attribute in state.relationEditorAttributeDefs"
+              :key="attribute.name"
+              cols="12"
+              md="6"
+            >
+              <v-text-field
+                v-model="state.relationEditorAttributes[attribute.name]"
+                :label="attribute.required ? `${attribute.label} *` : attribute.label"
+                :hint="`Type: ${attribute.type || 'STRING'}`"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+        </div>
+        <div v-else class="text-medium-emphasis mt-4">
+          Ce type de lien ne declare pas d'attributs. Vous pouvez fermer cette fenetre ou supprimer le lien.
+        </div>
+      </v-card-text>
+      <v-card-actions class="px-6 pb-6">
+        <v-spacer />
+        <v-btn variant="text" @click="state.closeRelationEditor">
+          Annuler
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="state.isUpdatingRelation"
+          @click="state.saveRelationEdits"
+        >
+          Enregistrer
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>

@@ -1,9 +1,12 @@
 package fr.expand.project.importdata.dao;
 
+import java.util.List;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.commons.ObjectTypeEnum;
+import fr.expand.project.importdata.dto.DataPackAttribute;
 import fr.expand.project.importdata.dto.DataPackObject;
 
 public abstract class IConnectorDb implements AutoCloseable {
@@ -56,6 +59,19 @@ public abstract class IConnectorDb implements AutoCloseable {
 	 * @return
 	 */
     public abstract int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType);
+
+	/**
+	 * Create a simple link between 2 objects with optional attributes.
+	 */
+	public int writeLink(
+		DataPackObject objectA,
+		DataPackObject objectB,
+		boolean isOriented,
+		String linkType,
+		List<DataPackAttribute> attributes
+	) {
+		return writeLink(objectA, objectB, isOriented, linkType);
+	}
 
 	/**
 	 * Get object from DB

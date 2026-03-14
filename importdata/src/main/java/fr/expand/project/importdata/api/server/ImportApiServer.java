@@ -36,6 +36,7 @@ import fr.expand.project.importdata.dto.generated.OBJECTS;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
+import fr.expand.project.importdata.model.generated.ATTRIBUTETYPE;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEGROUP;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEREF;
 import fr.expand.project.importdata.model.generated.LABEL;
@@ -46,7 +47,9 @@ import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
 import fr.expand.project.importdata.model.generated.TYPEREF;
 import fr.expand.project.importdata.validation.DataValidator;
+import fr.expand.project.importdata.validation.ValidationError;
 import fr.expand.project.importdata.validation.ValidationResult;
+import fr.expand.project.importdata.validation.ValidationWarning;
 
 public class ImportApiServer {
 
@@ -896,6 +899,7 @@ public class ImportApiServer {
             String linkTypeName = getString(payload.get("type"));
             Integer fromId = getInt(payload.get("fromId"));
             Integer toId = getInt(payload.get("toId"));
+            List<DataPackAttribute> attributes = readAttributes(payload.get("attributes"));
 
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
@@ -927,6 +931,16 @@ public class ImportApiServer {
                 return error(response, 400, "Type de lien inconnu: " + linkTypeName);
             }
 
+            ValidationResult validationResult = validateLinkPayload(linkTypeName, linkType, attributes);
+            if (!validationResult.isValid()) {
+                response.status(400);
+                Map<String, Object> errorPayload = new HashMap<>();
+                errorPayload.put("valid", false);
+                errorPayload.put("errors", validationResult.getErrors());
+                errorPayload.put("warnings", validationResult.getWarnings());
+                return GSON.toJson(errorPayload);
+            }
+
             Map<String, Object> source;
             Map<String, Object> target;
             try (Neo4jDataStore store = new Neo4jDataStore()) {
@@ -950,34 +964,155 @@ public class ImportApiServer {
                 return error(response, 400, "Type cible non autorisé pour ce lien");
             }
 
-            try (CypherConnector connector = new CypherConnector()) {
-                connector.setModelKey(modelKey);
-                DataPackObject objA = new DataPackObject();
-                objA.setID(fromId);
-                objA.setInternalId(fromId);
-                objA.setTYPE(sourceType);
-
-                DataPackObject objB = new DataPackObject();
-                objB.setID(toId);
-                objB.setInternalId(toId);
-                objB.setTYPE(targetType);
-
-                boolean directed = true;
-                try {
-                    directed = linkType.isDIRECTED();
-                } catch (Exception ignored) {
-                    directed = true;
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Map<String, Object> createdLink = store.createLink(
+                    modelKey,
+                    fromId.longValue(),
+                    toId.longValue(),
+                    linkTypeName,
+                    attributesToMap(attributes)
+                );
+                if (createdLink == null) {
+                    return error(response, 500, "Erreur lors de la création du lien");
                 }
-                connector.writeLink(objA, objB, directed, linkTypeName);
-
-                Map<String, Object> resultPayload = new HashMap<>();
+                Map<String, Object> resultPayload = new HashMap<>(createdLink);
                 resultPayload.put("status", "created");
-                resultPayload.put("type", linkTypeName);
-                resultPayload.put("fromId", fromId);
-                resultPayload.put("toId", toId);
+                resultPayload.put("warnings", validationResult.getWarnings());
                 return GSON.toJson(resultPayload);
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors de la création du lien: " + e.getMessage());
+            }
+        });
+
+        put("/api/links/:id", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+
+            String relationId = getString(request.params("id"));
+            if (relationId == null || relationId.isBlank()) {
+                return error(response, 400, "id lien invalide");
+            }
+
+            Map<String, Object> payload = readJsonBody(request.body());
+            if (payload == null) {
+                return error(response, 400, "Corps JSON manquant");
+            }
+
+            String modelKey = getString(payload.get("modelKey"));
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canUpdateData(modelKey)) {
+                return error(response, 403, "Droit UPDATE refusé pour ce modèle");
+            }
+
+            try (Neo4jModelStore modelStore = new Neo4jModelStore();
+                Neo4jDataStore dataStore = new Neo4jDataStore()) {
+                Map<String, Object> existingLink = dataStore.loadLinkByRelationId(modelKey, relationId);
+                if (existingLink == null) {
+                    return error(response, 404, "Lien introuvable");
+                }
+
+                String existingType = getString(existingLink.get("type"));
+                String requestedType = getString(payload.get("type"));
+                if (requestedType != null && !requestedType.isBlank() && !requestedType.equals(existingType)) {
+                    return error(response, 400, "Le type du lien ne peut pas être modifié");
+                }
+
+                Long requestedFromId = getLong(payload.get("fromId"));
+                Long requestedToId = getLong(payload.get("toId"));
+                Long existingFromId = getLong(existingLink.get("fromId"));
+                Long existingToId = getLong(existingLink.get("toId"));
+                if (requestedFromId != null && !requestedFromId.equals(existingFromId)) {
+                    return error(response, 400, "La source du lien ne peut pas être modifiée");
+                }
+                if (requestedToId != null && !requestedToId.equals(existingToId)) {
+                    return error(response, 400, "La cible du lien ne peut pas être modifiée");
+                }
+
+                String modelXml = modelStore.loadModelXmlByKey(modelKey);
+                if (modelXml == null || modelXml.isBlank()) {
+                    return error(response, 404, "Modèle introuvable pour la clé fournie");
+                }
+                ModelManager modelManager = ModelManager.getInstance();
+                modelManager.loadModelFromXml(modelXml);
+                LINKTYPE linkType = modelManager.getLinkType(existingType);
+                if (linkType == null) {
+                    return error(response, 400, "Type de lien inconnu: " + existingType);
+                }
+
+                Map<String, Object> nextAttributes = attributesToMap(readAttributes(existingLink.get("attributes")));
+                if (payload.containsKey("attributes")) {
+                    nextAttributes = attributesToMap(readAttributes(payload.get("attributes")));
+                }
+
+                ValidationResult validationResult =
+                    validateLinkPayload(existingType, linkType, readAttributesFromMap(nextAttributes));
+                if (!validationResult.isValid()) {
+                    response.status(400);
+                    Map<String, Object> errorPayload = new HashMap<>();
+                    errorPayload.put("valid", false);
+                    errorPayload.put("errors", validationResult.getErrors());
+                    errorPayload.put("warnings", validationResult.getWarnings());
+                    return GSON.toJson(errorPayload);
+                }
+
+                boolean updated = dataStore.updateLink(modelKey, relationId, nextAttributes);
+                if (!updated) {
+                    return error(response, 404, "Lien introuvable");
+                }
+
+                Map<String, Object> updatedLink = dataStore.loadLinkByRelationId(modelKey, relationId);
+                Map<String, Object> resultPayload = updatedLink == null ? new HashMap<>() : new HashMap<>(updatedLink);
+                resultPayload.put("status", "updated");
+                resultPayload.put("warnings", validationResult.getWarnings());
+                return GSON.toJson(resultPayload);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la mise à jour du lien: " + e.getMessage());
+            }
+        });
+
+        delete("/api/links/:id", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+
+            String relationId = getString(request.params("id"));
+            if (relationId == null || relationId.isBlank()) {
+                return error(response, 400, "id lien invalide");
+            }
+
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                Map<String, Object> payload = readJsonBody(request.body());
+                modelKey = payload == null ? null : getString(payload.get("modelKey"));
+            }
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canDeleteData(modelKey)) {
+                return error(response, 403, "Droit DELETE refusé pour ce modèle");
+            }
+
+            try (Neo4jDataStore dataStore = new Neo4jDataStore()) {
+                boolean deleted = dataStore.deleteLink(modelKey, relationId);
+                if (!deleted) {
+                    return error(response, 404, "Lien introuvable");
+                }
+                return GSON.toJson(Map.of("status", "deleted", "id", relationId, "modelKey", modelKey));
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la suppression du lien: " + e.getMessage());
             }
         });
     }
@@ -1157,6 +1292,85 @@ public class ImportApiServer {
             map.put(attribute.getKEY(), attribute.getVALUE() == null ? "" : attribute.getVALUE());
         }
         return map;
+    }
+
+    private static ValidationResult validateLinkPayload(
+        String linkTypeName,
+        LINKTYPE linkType,
+        List<DataPackAttribute> attributes
+    ) {
+        List<ValidationError> errors = new ArrayList<>();
+        List<ValidationWarning> warnings = new ArrayList<>();
+        Map<String, ATTRIBUTEDEFINITION> definitions = ModelManager.getInstance().getAttributeDefinitionMap(linkType);
+        java.util.Set<String> providedAttributes = new java.util.HashSet<>();
+
+        if (attributes != null) {
+            for (DataPackAttribute attribute : attributes) {
+                if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+                    continue;
+                }
+                providedAttributes.add(attribute.getKEY());
+            }
+        }
+
+        for (ATTRIBUTEDEFINITION definition : definitions.values()) {
+            if (definition.isREQUIRED() && !providedAttributes.contains(definition.getNAME())) {
+                errors.add(new ValidationError(
+                    "LINK[" + linkTypeName + "]",
+                    "Missing required attribute: " + definition.getNAME()
+                ));
+            }
+        }
+
+        if (attributes != null) {
+            for (DataPackAttribute attribute : attributes) {
+                if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+                    continue;
+                }
+                ATTRIBUTEDEFINITION definition = definitions.get(attribute.getKEY());
+                if (definition == null) {
+                    warnings.add(new ValidationWarning(
+                        "LINK[" + linkTypeName + "]",
+                        "Attribute '" + attribute.getKEY() + "' not defined in model"
+                    ));
+                    continue;
+                }
+
+                String value = attribute.getVALUE();
+                ATTRIBUTETYPE type = definition.getTYPE();
+                if (value != null && !value.isBlank() && type != null && !validateAttributeValue(value, type)) {
+                    errors.add(new ValidationError(
+                        "LINK[" + linkTypeName + "]",
+                        "Invalid type for attribute '" + attribute.getKEY() + "': expected "
+                            + type + ", got '" + value + "'"
+                    ));
+                }
+            }
+        }
+
+        return new ValidationResult(errors, warnings);
+    }
+
+    private static boolean validateAttributeValue(String value, ATTRIBUTETYPE type) {
+        try {
+            switch (type) {
+                case INTEGER:
+                    Integer.parseInt(value);
+                    return true;
+                case DOUBLE:
+                    Double.parseDouble(value);
+                    return true;
+                case BOOLEAN:
+                    return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
+                case DATE:
+                    return value.matches("\\d{4}-\\d{2}-\\d{2}.*");
+                case STRING:
+                default:
+                    return true;
+            }
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static List<Map<String, Object>> readPermissionList(Object value) {

@@ -1,6 +1,10 @@
 package fr.expand.project.importdata.dao.connectors.impl;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Map;
+import java.util.UUID;
 
 import org.neo4j.driver.AuthToken;
 import org.neo4j.driver.AuthTokens;
@@ -72,16 +76,31 @@ public class CypherConnector extends IConnectorDb {
 	}
 
 	@Override
-    public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
-        String relationType = normalizeRelationshipType(linkType);
-        String relationProperties = buildRelationProperties(linkType);
-        String matchA = buildNodeMatch(objectA, "a");
-        String matchB = buildNodeMatch(objectB, "b");
-        String request = matchA + " " + matchB + " CREATE (a)-[:"
-                + relationType + relationProperties + "]->(b)";
-        LOGGER.info(request);
-        return launchCreationRequest(request, false);
-    }
+	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
+		return writeLink(objectA, objectB, isOriented, linkType, List.of());
+	}
+
+	@Override
+	public int writeLink(
+		DataPackObject objectA,
+		DataPackObject objectB,
+		boolean isOriented,
+		String linkType,
+		List<DataPackAttribute> attributes
+	) {
+		String relationType = normalizeRelationshipType(linkType);
+		Map<String, Object> relationProperties = buildRelationProperties(linkType, attributes);
+		String matchA = buildNodeMatch(objectA, "a");
+		String matchB = buildNodeMatch(objectB, "b");
+		String request = matchA + " " + matchB + " CREATE (a)-[r:"
+				+ relationType + " $properties]->(b) RETURN id(r) AS id";
+		LOGGER.info(request);
+		Result result = session.run(request, Map.of("properties", relationProperties));
+		if (!result.hasNext()) {
+			return -1;
+		}
+		return result.next().get("id").asInt();
+	}
 
 	@Override
 	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
@@ -159,28 +178,30 @@ public class CypherConnector extends IConnectorDb {
 		return result;
 	}
 
-    private String buildRelationProperties(String linkType) {
-        boolean hasModel = modelKey != null && !modelKey.isBlank();
-        boolean hasLinkType = linkType != null && !linkType.isBlank();
-        if (!hasModel && !hasLinkType) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        builder.append(" {");
-        boolean first = true;
-        if (hasModel) {
-            builder.append("modelKey:'").append(modelKey).append("'");
-            first = false;
-        }
-        if (hasLinkType) {
-            if (!first) {
-                builder.append(",");
-            }
-            builder.append("linkType:'").append(linkType).append("'");
-        }
-        builder.append("}");
-        return builder.toString();
-    }
+	private Map<String, Object> buildRelationProperties(String linkType, List<DataPackAttribute> attributes) {
+		Map<String, Object> properties = new HashMap<>();
+		if (modelKey != null && !modelKey.isBlank()) {
+			properties.put("modelKey", modelKey);
+		}
+		if (linkType != null && !linkType.isBlank()) {
+			properties.put("linkType", linkType);
+		}
+		properties.put("relationId", UUID.randomUUID().toString());
+		if (attributes == null) {
+			return properties;
+		}
+		for (DataPackAttribute attribute : attributes) {
+			if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+				continue;
+			}
+			String key = attribute.getKEY();
+			if ("modelKey".equals(key) || "linkType".equals(key) || "relationId".equals(key)) {
+				continue;
+			}
+			properties.put(key, attribute.getVALUE() == null ? "" : attribute.getVALUE());
+		}
+		return properties;
+	}
 
     private String normalizeRelationshipType(String linkType) {
         if (linkType == null || linkType.isBlank()) {
