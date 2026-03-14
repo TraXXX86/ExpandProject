@@ -26,13 +26,14 @@ import java.util.UUID;
 public class AccessControlStore implements AutoCloseable {
 
     private static final String ADMIN_USERNAME = "admin";
-    private static final String ADMIN_DEFAULT_PASSWORD = "admin";
     private static final long SESSION_TTL_SECONDS = 12 * 60 * 60;
 
+    private final AccessBootstrapConfig bootstrapConfig;
     private final String sqlitePath;
     private final String jdbcUrl;
 
     public AccessControlStore() {
+        this.bootstrapConfig = AccessBootstrapConfig.load();
         this.sqlitePath = resolveSqlitePath();
         this.jdbcUrl = "jdbc:sqlite:" + sqlitePath;
         initialize();
@@ -44,23 +45,29 @@ public class AccessControlStore implements AutoCloseable {
             try {
                 Map<String, Object> admin = loadUserInternal(connection, ADMIN_USERNAME);
                 if (admin == null) {
-                    upsertUserInternal(
-                        connection,
-                        ADMIN_USERNAME,
-                        "Administrateur",
-                        true,
-                        true,
-                        true,
-                        ADMIN_DEFAULT_PASSWORD
-                    );
+                    if (bootstrapConfig.hasConfiguredPassword()) {
+                        upsertUserInternal(
+                            connection,
+                            ADMIN_USERNAME,
+                            bootstrapConfig.getAdminDisplayName(),
+                            true,
+                            true,
+                            true,
+                            bootstrapConfig.getAdminPassword()
+                        );
+                    }
                 } else {
-                    boolean hasPassword = getString(admin.get("passwordHash")) != null
-                        && !getString(admin.get("passwordHash")).isBlank();
-                    String password = hasPassword ? null : ADMIN_DEFAULT_PASSWORD;
+                    String displayName = getString(admin.get("displayName"));
+                    if (displayName == null || displayName.isBlank()) {
+                        displayName = bootstrapConfig.getAdminDisplayName();
+                    }
+                    String password = hasStoredPassword(admin) || !bootstrapConfig.hasConfiguredPassword()
+                        ? null
+                        : bootstrapConfig.getAdminPassword();
                     upsertUserInternal(
                         connection,
                         ADMIN_USERNAME,
-                        getString(admin.get("displayName")),
+                        displayName,
                         true,
                         true,
                         true,
@@ -76,6 +83,14 @@ public class AccessControlStore implements AutoCloseable {
             }
         } catch (Exception e) {
             throw new RuntimeException("Unable to bootstrap admin user", e);
+        }
+    }
+
+    public Map<String, Object> getBootstrapStatus() {
+        try (Connection connection = openConnection()) {
+            return getBootstrapStatusInternal(connection);
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to read bootstrap status", e);
         }
     }
 
@@ -570,6 +585,38 @@ public class AccessControlStore implements AutoCloseable {
         return copy;
     }
 
+    private Map<String, Object> getBootstrapStatusInternal(Connection connection) throws Exception {
+        Map<String, Object> admin = loadUserInternal(connection, ADMIN_USERNAME);
+        int userCount = countUsersInternal(connection);
+        boolean adminExists = admin != null;
+        boolean passwordSet = hasStoredPassword(admin);
+        boolean passwordConfigured = bootstrapConfig.hasConfiguredPassword();
+        boolean bootstrapPasswordActive = adminExists && passwordConfigured && matchesPassword(admin,
+            bootstrapConfig.getAdminPassword());
+
+        Map<String, Object> status = new HashMap<>();
+        status.put("mode", bootstrapConfig.getMode());
+        status.put("adminUsername", ADMIN_USERNAME);
+        status.put("adminDisplayName", bootstrapConfig.getAdminDisplayName());
+        status.put("firstStart", userCount <= 1);
+        status.put("loginReady", adminExists && passwordSet);
+        status.put("passwordConfigured", passwordConfigured);
+        status.put("requiresSetup", !passwordSet && bootstrapConfig.isProductionMode() && !passwordConfigured);
+        status.put("passwordChangeRecommended", bootstrapPasswordActive);
+        status.put("passwordChangeRequired", bootstrapPasswordActive && bootstrapConfig.isProductionMode());
+        return status;
+    }
+
+    private int countUsersInternal(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT COUNT(*) AS count FROM users");
+            ResultSet rs = statement.executeQuery()) {
+            if (!rs.next()) {
+                return 0;
+            }
+            return rs.getInt("count");
+        }
+    }
+
     private void upsertUserInternal(Connection connection, String username, String displayName, boolean portalUser,
         boolean portalModelAdmin, boolean platformAdmin, String plainPassword) throws Exception {
         Map<String, Object> current = loadUserInternal(connection, username);
@@ -586,9 +633,8 @@ public class AccessControlStore implements AutoCloseable {
             finalSalt = getString(current.get("passwordSalt"));
             finalHash = getString(current.get("passwordHash"));
         } else {
-            String defaultPassword = username;
-            finalSalt = generateSalt();
-            finalHash = hashPassword(defaultPassword, finalSalt);
+            finalSalt = "";
+            finalHash = "";
         }
 
         long now = Instant.now().getEpochSecond();
@@ -665,6 +711,21 @@ public class AccessControlStore implements AutoCloseable {
         digest.update(salt);
         byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
         return Base64.getEncoder().encodeToString(hash);
+    }
+
+    private static boolean hasStoredPassword(Map<String, Object> user) {
+        return getString(user == null ? null : user.get("passwordHash")) != null
+            && !getString(user == null ? null : user.get("passwordHash")).isBlank()
+            && getString(user.get("passwordSalt")) != null
+            && !getString(user.get("passwordSalt")).isBlank();
+    }
+
+    private static boolean matchesPassword(Map<String, Object> user, String plainPassword) throws Exception {
+        if (!hasStoredPassword(user) || plainPassword == null || plainPassword.isBlank()) {
+            return false;
+        }
+        String computedHash = hashPassword(plainPassword, getString(user.get("passwordSalt")));
+        return computedHash.equals(getString(user.get("passwordHash")));
     }
 
     private static String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {

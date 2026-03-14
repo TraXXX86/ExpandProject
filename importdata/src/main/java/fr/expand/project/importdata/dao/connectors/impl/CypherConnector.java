@@ -30,7 +30,6 @@ public class CypherConnector extends IConnectorDb {
 	private Session session;
 	private static final String DEFAULT_BOLT_URI = "bolt://localhost:7687";
 	private static final String DEFAULT_USER = "neo4j";
-	private static final String DEFAULT_PASSWORD = "expand";
 
 	// ############################# Start/Close Connection to DB methods
 
@@ -233,7 +232,10 @@ public class CypherConnector extends IConnectorDb {
 		}
 
 		String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
-		String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
+		String password = readSetting("NEO4J_PASSWORD", null, null);
+		if (password == null || password.isBlank()) {
+			throw new IllegalStateException("Neo4j password not configured. Set NEO4J_AUTH or NEO4J_PASSWORD.");
+		}
 		return AuthTokens.basic(user, password);
 	}
 

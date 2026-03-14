@@ -23,6 +23,8 @@
 .project
 .vscode/
 logs/
+.env
+.env.local
 
 # UI (Vue/Vite)
 ui/node_modules/

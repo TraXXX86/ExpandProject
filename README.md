@@ -65,6 +65,8 @@ Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VIT
 Pour lancer Neo4j + API + IHM sans installer Java localement :
 
 ```bash
+cp .env.example .env
+# adaptez les mots de passe si besoin
 docker compose up --build
 ```
 
@@ -73,7 +75,8 @@ Accès :
 - API : http://localhost:8080
 - Neo4j : http://localhost:7474 (bolt 7687)
 
-Le mot de passe par défaut est `neo4j/expand123456`. Vous pouvez modifier cette valeur dans `docker-compose.yml`.
+Les identifiants Neo4j et le mot de passe de bootstrap administrateur sont lus depuis `.env`
+(voir `.env.example` pour les valeurs locales de départ).
 
 ### Vérifier rapidement l'import du modèle
 
@@ -109,7 +112,7 @@ brew install neo4j
 docker run -d \
   --name neo4j \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/<mot-de-passe-local> \
   neo4j:5.17.0
 ```
 
@@ -128,19 +131,18 @@ neo4j status
 
 #### Configuration
 
-Par défaut, l'application utilise :
+Par défaut, l'application cible :
 - **URL**: `bolt://localhost:7687`
 - **Utilisateur**: `neo4j`
-- **Mot de passe**: `expand`
+- **Mot de passe**: fourni via l'environnement
 
-Pour modifier ces paramètres, éditez :
-- `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` (ligne 35)
-
-Vous pouvez aussi surcharger via variables d'environnement ou propriétés JVM :
+Paramètres disponibles via variables d'environnement ou propriétés JVM :
 - `NEO4J_BOLT_URI` (ex: `bolt://localhost:7687`)
 - `NEO4J_HTTP_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
 - `NEO4J_USER` / `NEO4J_PASSWORD`
 - `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`)
+- `ACCESS_BOOTSTRAP_MODE` (`development` ou `production`)
+- `ACCESS_BOOTSTRAP_ADMIN_PASSWORD` (mot de passe initial du compte `admin`)
 
 ## 📖 Utilisation
 
@@ -360,7 +362,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 Après l'import, visualisez vos données :
 
 1. Ouvrez Neo4j Browser : http://localhost:7474
-2. Connectez-vous (neo4j/expand)
+2. Connectez-vous avec les identifiants configurés via `NEO4J_AUTH`
 3. Exécutez des requêtes Cypher :
 
 ```cypher
@@ -396,9 +398,9 @@ neo4j start                 # macOS
 
 ### Erreur : Problème d'authentification Neo4j
 
-**Solution** : Modifiez le mot de passe dans le code ou réinitialisez Neo4j :
+**Solution** : Vérifiez la valeur de `NEO4J_AUTH` / `NEO4J_PASSWORD` ou réinitialisez Neo4j :
 ```bash
-neo4j-admin set-initial-password expand
+neo4j-admin set-initial-password <nouveau-mot-de-passe>
 ```
 
 ### Erreur de compilation : "package jakarta.xml.bind does not exist"

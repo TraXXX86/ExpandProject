@@ -20,17 +20,19 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 ## 🐳 Démarrage Neo4j (Docker - Recommandé)
 
 ```bash
+cp .env.example .env
+
 docker run -d \
   --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/<mot-de-passe-local> \
   neo4j:5.17.0
 
 # Vérifier que Neo4j est démarré
 docker logs neo4j-expand
 
 # Accéder à l'interface web
-# http://localhost:7474 (login: neo4j/expand)
+# http://localhost:7474 (identifiants définis par NEO4J_AUTH)
 ```
 
 ## 📋 Que fait cette application ?
@@ -92,7 +94,7 @@ java -jar importdata/target/expandproject-importdata.jar \
 Une fois les données importées :
 
 1. Ouvrez **http://localhost:7474**
-2. Connectez-vous avec **neo4j/expand**
+2. Connectez-vous avec les identifiants définis par **NEO4J_AUTH**
 3. Exécutez :
 
 ```cypher

@@ -27,7 +27,6 @@ public class Neo4jConnector extends IConnectorDb {
 	private Connection conn = null;
 	private static final String DEFAULT_HTTP_URI = "jdbc:neo4j:http://localhost:7474";
 	private static final String DEFAULT_USER = "neo4j";
-	private static final String DEFAULT_PASSWORD = "expand";
 
 	// ############################# Start/Close Connection to DB methods
 
@@ -51,7 +50,12 @@ public class Neo4jConnector extends IConnectorDb {
 				}
 				if (conn == null) {
 					String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
-					String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
+					String password = readSetting("NEO4J_PASSWORD", null, null);
+					if (password == null || password.isBlank()) {
+						throw new IllegalStateException(
+							"Neo4j password not configured. Set NEO4J_AUTH or NEO4J_PASSWORD."
+						);
+					}
 					conn = DriverManager.getConnection(uri, user, password);
 				}
 			} catch (SQLException e) {

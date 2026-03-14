@@ -79,8 +79,8 @@ export function useAppState() {
   const isAuthenticated = ref(Boolean(authToken.value));
   const isAuthenticating = ref(false);
   const authStatus = ref(null);
-  const loginUsername = ref('admin');
-  const loginPassword = ref('admin');
+  const loginUsername = ref('');
+  const loginPassword = ref('');
   const authMeta = ref({
     actorUsername: '',
     actorDisplayName: '',
@@ -90,6 +90,7 @@ export function useAppState() {
     actorPlatformAdmin: false,
     expiresAt: 0
   });
+  const bootstrapStatus = ref(defaultBootstrapStatus());
 
   const users = ref([]);
   const accessProfile = ref({
@@ -1127,6 +1128,7 @@ export function useAppState() {
   });
 
   onMounted(async () => {
+    await refreshBootstrapStatus();
     const authenticated = await refreshSession();
     if (!authenticated) {
       return;
@@ -1363,6 +1365,57 @@ export function useAppState() {
     }
   }
 
+  function defaultBootstrapStatus() {
+    return {
+      loaded: false,
+      unavailable: false,
+      mode: '',
+      adminUsername: 'admin',
+      adminDisplayName: 'Administrateur',
+      firstStart: false,
+      loginReady: true,
+      passwordConfigured: false,
+      requiresSetup: false,
+      passwordChangeRecommended: false,
+      passwordChangeRequired: false
+    };
+  }
+
+  function applyBootstrapStatus(payload) {
+    bootstrapStatus.value = {
+      ...defaultBootstrapStatus(),
+      loaded: true,
+      mode: payload?.mode || '',
+      adminUsername: payload?.adminUsername || 'admin',
+      adminDisplayName: payload?.adminDisplayName || 'Administrateur',
+      firstStart: Boolean(payload?.firstStart),
+      loginReady: Boolean(payload?.loginReady),
+      passwordConfigured: Boolean(payload?.passwordConfigured),
+      requiresSetup: Boolean(payload?.requiresSetup),
+      passwordChangeRecommended: Boolean(payload?.passwordChangeRecommended),
+      passwordChangeRequired: Boolean(payload?.passwordChangeRequired)
+    };
+  }
+
+  async function refreshBootstrapStatus() {
+    try {
+      const response = await fetch(`${apiBase}/api/auth/bootstrap`);
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Impossible de charger le bootstrap de connexion.');
+      }
+      applyBootstrapStatus(payload);
+      return true;
+    } catch (error) {
+      bootstrapStatus.value = {
+        ...defaultBootstrapStatus(),
+        loaded: true,
+        unavailable: true
+      };
+      return false;
+    }
+  }
+
   async function login() {
     const username = String(loginUsername.value || '').trim();
     const password = String(loginPassword.value || '');
@@ -1414,6 +1467,7 @@ export function useAppState() {
       // ignore
     }
     resetAuthState();
+    await refreshBootstrapStatus();
     authStatus.value = { type: 'info', message: 'Déconnecté.' };
   }
 
@@ -1448,6 +1502,7 @@ export function useAppState() {
       actorPlatformAdmin: Boolean(payload?.auth?.actorPlatformAdmin),
       expiresAt: Number(payload?.auth?.expiresAt || 0)
     };
+    applyBootstrapStatus(payload?.bootstrap);
     accessProfile.value = {
       username: payload?.user?.username || '',
       displayName: payload?.user?.displayName || '',
@@ -1519,6 +1574,7 @@ export function useAppState() {
         actorPlatformAdmin: Boolean(payload?.auth?.actorPlatformAdmin ?? authMeta.value.actorPlatformAdmin),
         expiresAt: Number(payload?.auth?.expiresAt || authMeta.value.expiresAt || 0)
       };
+      applyBootstrapStatus(payload?.bootstrap);
       accessProfile.value = {
         username: payload?.user?.username || '',
         displayName: payload?.user?.displayName || '',
@@ -3216,6 +3272,7 @@ export function useAppState() {
     loginUsername,
     loginPassword,
     authMeta,
+    bootstrapStatus,
     currentPage,
     activePortal,
     users,
@@ -3382,6 +3439,7 @@ export function useAppState() {
     login,
     logout,
     refreshSession,
+    refreshBootstrapStatus,
     loadModelXml,
     saveModelXml,
     deleteModel,

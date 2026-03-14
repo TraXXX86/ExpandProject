@@ -8,6 +8,12 @@ echo "  ExpandProject - Import to Neo4j"
 echo "========================================="
 echo ""
 
+if [ -f ".env" ]; then
+    set -a
+    . ".env"
+    set +a
+fi
+
 # Vérifier les arguments
 if [ "$#" -lt 2 ]; then
     echo "Usage: ./run-import.sh <model.xml> <data.xml> [--validate-only]"
@@ -97,7 +103,7 @@ if [ $EXIT_CODE -eq 0 ]; then
         echo ""
         echo "📊 Pour visualiser les données:"
         echo "   1. Ouvrez http://localhost:7474"
-        echo "   2. Connectez-vous (neo4j/expand)"
+        echo "   2. Connectez-vous avec les identifiants Neo4j configurés (NEO4J_AUTH)"
         echo "   3. Exécutez: MATCH (n) RETURN n"
     fi
 else

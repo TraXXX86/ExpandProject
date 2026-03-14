@@ -134,6 +134,15 @@ public class ImportApiServer {
             }
         });
 
+        get("/api/auth/bootstrap", (request, response) -> {
+            response.type("application/json");
+            try (AccessControlStore accessStore = new AccessControlStore()) {
+                return GSON.toJson(accessStore.getBootstrapStatus());
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors du chargement du bootstrap: " + e.getMessage());
+            }
+        });
+
         post("/api/auth/logout", (request, response) -> {
             response.type("application/json");
             String token = resolveSessionToken(request);
@@ -1255,6 +1264,7 @@ public class ImportApiServer {
         payload.put("auth", buildAuthMeta(context));
         payload.put("user", accessStore.loadUser(context.getUsername()));
         payload.put("permissions", accessStore.listModelPermissions(context.getUsername()));
+        payload.put("bootstrap", accessStore.getBootstrapStatus());
         return payload;
     }
 

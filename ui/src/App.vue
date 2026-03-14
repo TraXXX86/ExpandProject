@@ -108,6 +108,20 @@
     <v-main>
       <div :class="['hero-bg', heroBgClass]" />
       <v-container class="py-6 hero-content">
+        <v-alert
+          v-if="state.isAuthenticated && state.canManageAccess && state.bootstrapStatus.passwordChangeRecommended"
+          class="mb-6"
+          :type="state.bootstrapStatus.passwordChangeRequired ? 'warning' : 'info'"
+          variant="tonal"
+          density="comfortable"
+          border="start"
+        >
+          Le compte <strong>{{ state.bootstrapStatus.adminUsername }}</strong> utilise encore son mot de passe de
+          bootstrap.
+          Ouvrez <strong>Admin plateforme</strong>, sélectionnez cet utilisateur puis définissez un mot de passe
+          dédié.
+        </v-alert>
+
         <template v-if="!state.isAuthenticated">
           <v-row class="justify-center">
             <v-col cols="12" md="7" lg="5">
@@ -116,8 +130,37 @@
                 <v-card-text>
                   <div class="text-medium-emphasis mb-4">
                     Connectez-vous avec votre compte plateforme.
-                    Le compte initial administrateur est <strong>admin / admin</strong>.
                   </div>
+                  <v-alert
+                    v-if="state.bootstrapStatus.loaded && !state.bootstrapStatus.unavailable && state.bootstrapStatus.requiresSetup"
+                    class="mb-4"
+                    type="warning"
+                    variant="tonal"
+                    density="comfortable"
+                    border="start"
+                  >
+                    Premier démarrage en mode production :
+                    définissez <code>ACCESS_BOOTSTRAP_ADMIN_PASSWORD</code> côté API puis redémarrez le service
+                    pour activer le compte <strong>{{ state.bootstrapStatus.adminUsername }}</strong>.
+                  </v-alert>
+                  <v-alert
+                    v-else-if="state.bootstrapStatus.loaded && !state.bootstrapStatus.unavailable && state.bootstrapStatus.firstStart"
+                    class="mb-4"
+                    type="info"
+                    variant="tonal"
+                    density="comfortable"
+                    border="start"
+                  >
+                    Compte administrateur initial :
+                    <strong>{{ state.bootstrapStatus.adminUsername }}</strong>.
+                    <template v-if="state.bootstrapStatus.loginReady">
+                      Le mot de passe de bootstrap est fourni côté serveur via la configuration d'environnement.
+                    </template>
+                    <template v-else>
+                      Définissez <code>ACCESS_BOOTSTRAP_ADMIN_PASSWORD</code> côté API pour autoriser la première
+                      connexion.
+                    </template>
+                  </v-alert>
                   <v-text-field
                     v-model="state.loginUsername"
                     label="Login"

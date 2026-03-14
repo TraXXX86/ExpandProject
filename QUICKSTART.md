@@ -7,28 +7,34 @@ Ce guide vous permettra de démarrer avec ExpandProject en 5 minutes.
 Si vous avez Docker installé, utilisez cette méthode :
 
 ```bash
-# 1. Démarrer Neo4j avec Docker
+# 1. Préparer les variables locales
+cp .env.example .env
+
+# 2. Démarrer Neo4j avec Docker
 docker run -d \
   --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand123456 \
+  -e NEO4J_AUTH=neo4j/<mot-de-passe-local> \
   neo4j:5.17.0
 
-# 2. Compiler le projet
+# 3. Compiler le projet
 mvn clean install -DskipTests
 
-# 3. Tester avec les données d'exemple
+# 4. Tester avec les données d'exemple
 cd importdata
 mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" -Dexec.args="--example"
 
-# 4. Importer les données d'exemple dans Neo4j
+# 5. Importer les données d'exemple dans Neo4j
 mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="src/main/resources/model/example_social_network_model.xml src/main/resources/datapack/example_social_network_data.xml"
 
-# 5. Visualiser dans Neo4j Browser
-# Ouvrez http://localhost:7474 (login: neo4j/expand)
+# 6. Visualiser dans Neo4j Browser
+# Ouvrez http://localhost:7474 avec les identifiants configurés dans NEO4J_AUTH
 # Exécutez: MATCH (n) RETURN n
 ```
+
+Pour la première connexion à l'IHM, définissez aussi `ACCESS_BOOTSTRAP_ADMIN_PASSWORD`
+(voir `.env.example`) : le compte `admin` n'utilise plus de mot de passe codé en dur.
 
 ## 📋 Étapes Détaillées
 
@@ -65,7 +71,7 @@ Option A - Docker (Recommandé):
 ```bash
 docker run -d --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/<mot-de-passe-local> \
   neo4j:5.17.0
 ```
 
@@ -126,7 +132,7 @@ Ouvrez Neo4j Browser : **http://localhost:7474**
 
 Connectez-vous :
 - **Utilisateur**: neo4j
-- **Mot de passe**: expand
+- **Mot de passe**: celui configuré dans `NEO4J_AUTH`
 
 Exécutez cette requête Cypher :
 ```cypher
@@ -233,7 +239,7 @@ MATCH (n) DETACH DELETE n
 
 **Q: Comment modifier les identifiants de connexion Neo4j ?**
 
-R: Éditez `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` ligne 35.
+R: Définissez `NEO4J_AUTH` (ou `NEO4J_USER` / `NEO4J_PASSWORD`) avant de lancer l'import.
 
 **Q: Comment voir les logs détaillés ?**
 
