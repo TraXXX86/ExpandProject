@@ -338,7 +338,7 @@
 
 <script setup>
 import { computed, reactive, watch } from 'vue';
-import { useAppState } from './composables/useAppState';
+import { useAppState } from './composables/useAppState.js';
 import AdminPage from './components/pages/AdminPage.vue';
 import ImportDataPage from './components/pages/ImportDataPage.vue';
 import ImportModelPage from './components/pages/ImportModelPage.vue';
