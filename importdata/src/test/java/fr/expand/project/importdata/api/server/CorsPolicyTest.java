@@ -6,7 +6,7 @@ import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class CorsPolicyTests {
+public class CorsPolicyTest {
 
     @Test
     public void fromSettings_shouldUseDevDefaults() {
