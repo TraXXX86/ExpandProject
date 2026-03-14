@@ -1402,7 +1402,7 @@ public class ImportApiServer {
             return true;
         }
         String forwardedProto = request.headers("X-Forwarded-Proto");
-        return request.secure() || "https".equalsIgnoreCase(forwardedProto);
+        return request.raw().isSecure() || "https".equalsIgnoreCase(forwardedProto);
     }
 
     private static String getSessionCookieName() {
