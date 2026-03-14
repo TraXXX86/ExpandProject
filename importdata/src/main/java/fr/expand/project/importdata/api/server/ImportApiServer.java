@@ -52,6 +52,7 @@ public class ImportApiServer {
 
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
     private static final int DEFAULT_PORT = 8080;
+    private static final CorsPolicy CORS_POLICY = CorsPolicy.load();
 
     public static void main(String[] args) {
         int portValue = DEFAULT_PORT;
@@ -74,11 +75,16 @@ public class ImportApiServer {
 
     private static void configureCors() {
         options("/*", (request, response) -> {
-            addCorsHeaders(response);
-            return "OK";
+            if (request.headers("Origin") != null && !CORS_POLICY.isOriginAllowed(request.headers("Origin"))) {
+                response.status(403);
+                return "";
+            }
+            addCorsHeaders(request, response);
+            response.status(204);
+            return "";
         });
 
-        before((request, response) -> addCorsHeaders(response));
+        before(ImportApiServer::addCorsHeaders);
     }
 
     private static void registerRoutes() {
@@ -982,13 +988,14 @@ public class ImportApiServer {
         });
     }
 
-    private static void addCorsHeaders(spark.Response response) {
-        response.raw().setHeader("Access-Control-Allow-Origin", "*");
-        response.raw().setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-        response.raw().setHeader(
-            "Access-Control-Allow-Headers",
-            "Content-Type,Authorization,Accept,Origin,X-Session-Token"
+    private static void addCorsHeaders(spark.Request request, spark.Response response) {
+        CorsPolicy.ResolvedCors resolvedCors = CORS_POLICY.resolve(
+            request.headers("Origin"),
+            request.headers("Access-Control-Request-Headers")
         );
+        for (Map.Entry<String, String> header : resolvedCors.getHeaders().entrySet()) {
+            response.raw().setHeader(header.getKey(), header.getValue());
+        }
     }
 
     private static String readMultipartText(javax.servlet.http.HttpServletRequest request, String partName)

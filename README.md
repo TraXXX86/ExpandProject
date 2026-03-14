@@ -60,6 +60,39 @@ java -jar importdata/target/expandproject-importdata.jar --api 8080
 
 Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
 
+### Configuration CORS de l'API
+
+L'API n'utilise plus `Access-Control-Allow-Origin: *`. Elle ne renvoie désormais les en-têtes CORS que pour les origines explicitement autorisées.
+
+Variables disponibles :
+
+- `APP_ENV` : environnement courant (`dev` par défaut, ou `recette` / `prod`)
+- `CORS_ALLOWED_ORIGINS` : liste globale d'origines autorisées, séparées par des virgules
+- `CORS_ALLOWED_ORIGINS_DEV`, `CORS_ALLOWED_ORIGINS_RECETTE`, `CORS_ALLOWED_ORIGINS_PROD` : listes spécifiques par environnement
+- `CORS_ALLOW_CREDENTIALS` : `true` par défaut pour permettre les requêtes CORS avec credentials/cookies sur les origines autorisées
+
+Valeurs par défaut :
+
+- `dev` : `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`, `http://127.0.0.1:3000`
+- `recette` / `prod` : aucune origine distante autorisée tant qu'une variable `CORS_ALLOWED_ORIGINS...` n'est pas définie
+
+Exemples :
+
+```bash
+# Développement local
+export APP_ENV=dev
+
+# Recette
+export APP_ENV=recette
+export CORS_ALLOWED_ORIGINS_RECETTE=https://recette-ui.example.com
+
+# Production avec plusieurs frontends
+export APP_ENV=prod
+export CORS_ALLOWED_ORIGINS_PROD=https://app.example.com,https://admin.example.com
+```
+
+Les requêtes `OPTIONS` de preflight ne renvoient `Access-Control-Allow-Origin` que si l'origine appelante est autorisée, et ajoutent aussi `Access-Control-Allow-Credentials: true` lorsque les credentials sont activés.
+
 ## 🐳 Docker Compose
 
 Pour lancer Neo4j + API + IHM sans installer Java localement :
