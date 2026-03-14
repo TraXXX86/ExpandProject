@@ -621,6 +621,171 @@ public class ImportApiServer {
             }
         });
 
+        get("/api/data/summary", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Neo4jDataStore.DataSummary summary = store.loadDataSummary(modelKey);
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("modelKey", modelKey);
+                payload.put("objectCount", summary.objectCount());
+                payload.put("linkCount", summary.linkCount());
+                payload.put("objectTypes", summary.objectTypes());
+                return GSON.toJson(payload);
+            }
+        });
+
+        get("/api/data/objects", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            Neo4jDataStore.ObjectQueryOptions options = new Neo4jDataStore.ObjectQueryOptions(
+                DataQuerySupport.parseNonNegativeInt(request.queryParams("offset"), 0),
+                DataQuerySupport.parseLimit(request.queryParams("limit"), DataQuerySupport.DEFAULT_PAGE_SIZE),
+                DataQuerySupport.readMultiValueParam(request, "type"),
+                request.queryParams("q"),
+                request.queryParams("attributeKey"),
+                DataQuerySupport.normalizeOperator(request.queryParams("attributeKeyOperator")),
+                request.queryParams("attributeValue"),
+                DataQuerySupport.normalizeOperator(request.queryParams("attributeValueOperator"))
+            );
+
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Neo4jDataStore.PageResult page = store.loadObjectsPage(modelKey, options);
+                Map<String, Object> payload = buildPagePayload(modelKey, page);
+                payload.put("items", page.items());
+                return GSON.toJson(payload);
+            }
+        });
+
+        get("/api/data/search", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            Neo4jDataStore.SearchQueryOptions options = new Neo4jDataStore.SearchQueryOptions(
+                DataQuerySupport.parseNonNegativeInt(request.queryParams("offset"), 0),
+                DataQuerySupport.parseLimit(request.queryParams("limit"), DataQuerySupport.DEFAULT_PAGE_SIZE),
+                DataQuerySupport.readMultiValueParam(request, "type"),
+                request.queryParams("q"),
+                DataQuerySupport.readMultiValueParam(request, "searchableAttribute")
+            );
+
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Neo4jDataStore.PageResult page = store.searchObjects(modelKey, options);
+                Map<String, Object> payload = buildPagePayload(modelKey, page);
+                payload.put("items", page.items());
+                return GSON.toJson(payload);
+            }
+        });
+
+        get("/api/data/objects/:id", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            Long objectId = getLong(request.params("id"));
+            if (objectId == null || objectId <= 0) {
+                return error(response, 400, "id objet invalide");
+            }
+
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Map<String, Object> object = store.loadObjectById(modelKey, objectId);
+                if (object == null) {
+                    return error(response, 404, "Objet introuvable");
+                }
+                return GSON.toJson(object);
+            }
+        });
+
+        get("/api/data/objects/:id/neighbors", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+            String modelKey = request.queryParams("modelKey");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            Long objectId = getLong(request.params("id"));
+            if (objectId == null || objectId <= 0) {
+                return error(response, 400, "id objet invalide");
+            }
+
+            try (Neo4jDataStore store = new Neo4jDataStore()) {
+                Neo4jDataStore.NeighborResult neighbors = store.loadNeighbors(modelKey, objectId);
+                if (neighbors.object() == null) {
+                    return error(response, 404, "Objet introuvable");
+                }
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("modelKey", modelKey);
+                payload.put("object", neighbors.object());
+                payload.put("neighbors", neighbors.neighbors());
+                payload.put("links", neighbors.links());
+                payload.put("neighborCount", neighbors.neighbors().size());
+                return GSON.toJson(payload);
+            }
+        });
+
         get("/api/data", (request, response) -> {
             response.type("application/json");
             AccessContext context = resolveAccessContext(request, response);
@@ -1042,6 +1207,19 @@ public class ImportApiServer {
             return 0;
         }
         return data.getLINKS().getLINK().size();
+    }
+
+    private static Map<String, Object> buildPagePayload(String modelKey, Neo4jDataStore.PageResult page) {
+        Map<String, Object> payload = new HashMap<>();
+        int safeOffset = page == null ? 0 : Math.max(page.offset(), 0);
+        int safeLimit = page == null ? 0 : Math.max(page.limit(), 0);
+        int totalCount = page == null ? 0 : Math.max(page.totalCount(), 0);
+        payload.put("modelKey", modelKey);
+        payload.put("offset", safeOffset);
+        payload.put("limit", safeLimit);
+        payload.put("totalCount", totalCount);
+        payload.put("hasMore", safeOffset + safeLimit < totalCount);
+        return payload;
     }
 
     private static String error(spark.Response response, int status, String message) {

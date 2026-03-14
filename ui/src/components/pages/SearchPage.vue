@@ -14,7 +14,7 @@
         <v-card-title class="section-title d-flex align-center justify-space-between">
           Résultats
           <v-chip v-if="state.fullTextQuery" color="primary" variant="tonal">
-            {{ state.fullTextResults.length }} objet(s)
+            {{ state.fullTextTotalCount }} objet(s)
           </v-chip>
         </v-card-title>
         <v-card-text>
@@ -50,7 +50,8 @@
             item-key="key"
             density="comfortable"
             class="mt-4"
-            :items-per-page="10"
+            :loading="state.isLoadingFullText"
+            hide-default-footer
           >
             <template #item.type="{ item }">
               <v-chip color="primary" variant="tonal" size="small">
@@ -86,10 +87,33 @@
             </template>
             <template #no-data>
               <div class="text-medium-emphasis py-6">
-                Saisissez une recherche pour afficher les résultats.
+                {{ state.fullTextQuery ? 'Aucun objet ne correspond à la recherche.' : 'Saisissez une recherche pour afficher les résultats.' }}
               </div>
             </template>
           </v-data-table>
+
+          <div class="d-flex align-center justify-space-between flex-wrap mt-4" style="gap: 12px;">
+            <div class="text-caption text-medium-emphasis">
+              {{ state.fullTextTotalCount }} resultat(s) • page {{ state.fullTextPage }} / {{ state.fullTextPageCount }}
+            </div>
+            <div class="d-flex align-center flex-wrap justify-end" style="gap: 12px;">
+              <v-select
+                v-model="state.fullTextItemsPerPage"
+                :items="[10, 25, 50, 100].map((value) => ({ title: `${value} / page`, value }))"
+                label="Pagination"
+                density="compact"
+                variant="outlined"
+                hide-details
+                style="max-width: 140px;"
+              />
+              <v-pagination
+                v-model="state.fullTextPage"
+                :length="state.fullTextPageCount"
+                :total-visible="7"
+                density="comfortable"
+              />
+            </div>
+          </div>
         </v-card-text>
       </v-card>
     </v-col>

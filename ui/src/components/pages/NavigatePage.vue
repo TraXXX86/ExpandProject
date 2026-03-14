@@ -51,7 +51,8 @@
             density="comfortable"
             clearable
             no-filter
-            :disabled="!state.dataObjects.length"
+            :loading="state.isLoadingRootObjects"
+            :disabled="!state.selectedModelKey || !state.canReadCurrentModelData"
             @update:model-value="state.setRootObjectByKey"
           >
             <template #item="{ props, item }">

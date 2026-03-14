@@ -20,7 +20,8 @@
             size="x-small"
             variant="text"
             class="explorer-expand-btn"
-            :disabled="!hasChildren"
+            :loading="isLoadingRelations"
+            :disabled="state.isNeighborsLoaded?.(node.object.idKey) && !hasChildren"
             @click.stop="toggleExpand"
           >
             <v-icon :icon="isExpanded ? 'mdi-chevron-down' : 'mdi-chevron-right'" />
@@ -100,7 +101,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 defineOptions({ name: 'ExplorerRecursiveNode' });
 
@@ -123,6 +124,7 @@ const menuRef = ref(null);
 const contextMenuVisible = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
+const isLoadingRelations = ref(false);
 
 const primaryAttributes = computed(() => state.getObjectPrimaryAttributes(node.object));
 const relationTypeItems = computed(() =>
@@ -200,7 +202,9 @@ const groupedChildren = computed(() => {
   return Array.from(groups.values());
 });
 const hasChildren = computed(() => visibleChildren.value.length > 0);
-const hasExpandableRelations = computed(() => node.relations.length > 0);
+const hasExpandableRelations = computed(() =>
+  node.relations.length > 0 || !state.isNeighborsLoaded?.(node.object.idKey)
+);
 const isExpanded = computed(() => state.isNodeExpanded(node.nodePath));
 
 const contextMenuStyle = computed(() => ({
@@ -212,7 +216,24 @@ function selectNode() {
   state.selectObjectByKey(node.object.idKey);
 }
 
-function toggleExpand() {
+async function ensureNodeRelationsLoaded() {
+  if (!state.ensureNeighborsLoaded || !node.object?.idKey) {
+    return;
+  }
+  if (state.isNeighborsLoaded?.(node.object.idKey)) {
+    return;
+  }
+  isLoadingRelations.value = true;
+  try {
+    await state.ensureNeighborsLoaded(node.object.idKey);
+    await nextTick();
+  } finally {
+    isLoadingRelations.value = false;
+  }
+}
+
+async function toggleExpand() {
+  await ensureNodeRelationsLoaded();
   if (!hasExpandableRelations.value) {
     return;
   }
@@ -223,8 +244,9 @@ function toggleExpand() {
   state.toggleNodeExpanded(node.nodePath);
 }
 
-function openContextMenu(event) {
+async function openContextMenu(event) {
   event?.preventDefault?.();
+  await ensureNodeRelationsLoaded();
   if (!relationTypeItems.value.length) {
     return;
   }

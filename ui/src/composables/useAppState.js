@@ -32,9 +32,11 @@ export function useAppState() {
   const selectedObject = ref(null);
   const objectFilter = ref('');
   const rootObjectQuery = ref('');
+  const rootObjectOptions = ref([]);
   const selectedRootObjectKey = ref('');
   const treeLinkSelections = ref({});
   const treeExpandedNodes = ref({});
+  const loadedNeighborObjectKeys = ref([]);
   const showCycleDetection = ref(true);
   const explorerMaxDepth = 12;
   const status = ref(null);
@@ -50,9 +52,14 @@ export function useAppState() {
   const tableAttributeKeyOperator = ref('contains');
   const tableAttributeValue = ref('');
   const tableAttributeValueOperator = ref('contains');
+  const tableRows = ref([]);
+  const tablePage = ref(1);
+  const tableItemsPerPage = ref(25);
+  const tableTotalCount = ref(0);
   const tableSelectedObject = ref(null);
   const showTableDetailPanel = ref(true);
   const tableSelectedAttributeTab = ref(null);
+  const isLoadingTable = ref(false);
   const createObjectType = ref('');
   const createObjectAttributes = ref({});
   const createObjectStatus = ref(null);
@@ -60,8 +67,14 @@ export function useAppState() {
   const createLinkType = ref('');
   const createLinkSourceId = ref(null);
   const createLinkTargetId = ref(null);
+  const createLinkSourceQuery = ref('');
+  const createLinkTargetQuery = ref('');
+  const createLinkSourceOptions = ref([]);
+  const createLinkTargetOptions = ref([]);
   const createLinkStatus = ref(null);
   const isCreatingLink = ref(false);
+  const isLoadingCreateLinkSources = ref(false);
+  const isLoadingCreateLinkTargets = ref(false);
   const modelXml = ref('');
   const modelXmlStatus = ref(null);
   const isLoadingModelXml = ref(false);
@@ -74,6 +87,7 @@ export function useAppState() {
   const isLoadingModels = ref(false);
   const isLoadingModel = ref(false);
   const isLoadingData = ref(false);
+  const isLoadingRootObjects = ref(false);
 
   const authToken = ref(storedToken || '');
   const isAuthenticated = ref(Boolean(authToken.value));
@@ -102,6 +116,11 @@ export function useAppState() {
   const accessPermissions = ref([]);
   const accessStatus = ref(null);
   const isLoadingUsers = ref(false);
+  const fullTextResults = ref([]);
+  const fullTextTotalCount = ref(0);
+  const fullTextPage = ref(1);
+  const fullTextItemsPerPage = ref(25);
+  const isLoadingFullText = ref(false);
 
   const adminAccessUserKey = ref('');
   const adminAccessStatus = ref(null);
@@ -123,6 +142,17 @@ export function useAppState() {
   const adminModelKey = ref('');
   const adminCommandVisible = ref(false);
   const adminStatus = ref(null);
+  let tableFetchTimer = null;
+  let fullTextFetchTimer = null;
+  let rootLookupTimer = null;
+  let createLinkSourceTimer = null;
+  let createLinkTargetTimer = null;
+  let tableRequestId = 0;
+  let fullTextRequestId = 0;
+  let rootLookupRequestId = 0;
+  let createLinkSourceRequestId = 0;
+  let createLinkTargetRequestId = 0;
+  const neighborLoadPromises = new Map();
 
   const modelLanguages = computed(() => {
     const languages = Array.isArray(modelDetails.value.languages)
@@ -341,29 +371,6 @@ export function useAppState() {
     });
   });
 
-  const rootObjectOptions = computed(() => {
-    const query = rootObjectQuery.value.trim().toLowerCase();
-    return dataObjects.value
-      .filter((object) => {
-        if (!query) {
-          return true;
-        }
-        const id = object.id !== null && object.id !== undefined ? String(object.id) : '';
-        const label = getObjectPrimaryLabel(object);
-        const primaryValues = getObjectPrimaryAttributes(object)
-          .map((attribute) => String(attribute.value || '').toLowerCase())
-          .join(' ');
-        const haystack = `${object.type} ${id} ${label} ${primaryValues}`.toLowerCase();
-        return haystack.includes(query);
-      })
-      .slice(0, 120)
-      .map((object) => ({
-        title: formatObjectOptionLabel(object),
-        value: object.idKey,
-        subtitle: `${object.type} • ID ${object.id ?? 'N/A'}`
-      }));
-  });
-
   const selectedRootObject = computed(() => {
     if (!selectedRootObjectKey.value) {
       return null;
@@ -372,56 +379,14 @@ export function useAppState() {
   });
 
   const tableTypeOptions = computed(() => {
-    const types = new Set();
-    dataObjects.value.forEach((object) => {
-      if (object.type) {
-        types.add(object.type);
-      }
-    });
-    return Array.from(types)
+    const types = Array.isArray(dataSummary.value?.objectTypes) ? dataSummary.value.objectTypes : [];
+    return Array.from(new Set(types.filter(Boolean)))
       .sort()
       .map((type) => ({ title: type, value: type }));
   });
 
   const filteredTableRows = computed(() => {
-    const typeFilter = Array.isArray(tableTypeFilter.value)
-      ? tableTypeFilter.value.map((type) => String(type).toLowerCase())
-      : [];
-    const search = tableSearch.value.trim().toLowerCase();
-    const attributeKey = tableAttributeKey.value.trim().toLowerCase();
-    const attributeKeyOperator = tableAttributeKeyOperator.value;
-    const attributeValue = tableAttributeValue.value.trim().toLowerCase();
-    const attributeValueOperator = tableAttributeValueOperator.value;
-
-    return dataObjects.value
-      .filter((object) => {
-        if (typeFilter.length && !typeFilter.includes(object.type.toLowerCase())) {
-          return false;
-        }
-
-        if (search) {
-          const id = object.id !== null && object.id !== undefined ? String(object.id).toLowerCase() : '';
-          if (!object.type.toLowerCase().includes(search) && !id.includes(search)) {
-            return false;
-          }
-        }
-
-        if (!attributeKey && !attributeValue) {
-          return true;
-        }
-
-        const attributes = Array.isArray(object.attributes) ? object.attributes : [];
-        return attributes.some((attr) => {
-          const keyValue = String(attr.key || '').toLowerCase();
-          const valueValue = String(attr.value || '').toLowerCase();
-          const keyMatch = !attributeKey
-            || (attributeKeyOperator === 'equals' ? keyValue === attributeKey : keyValue.includes(attributeKey));
-          const valueMatch = !attributeValue
-            || (attributeValueOperator === 'equals' ? valueValue === attributeValue : valueValue.includes(attributeValue));
-          return keyMatch && valueMatch;
-        });
-      })
-      .map((object) => {
+    return tableRows.value.map((object) => {
         const attributes = Array.isArray(object.attributes) ? object.attributes : [];
         const attributePreview = attributes.slice(0, 3).map((attr) => ({
           key: attr.key,
@@ -781,44 +746,6 @@ export function useAppState() {
     () => modelDetails.value.linkTypes.find((link) => link.name === createLinkType.value) || null
   );
 
-  const createLinkSourceOptions = computed(() => {
-    if (!createLinkDefinition.value || !dataObjects.value.length) {
-      return [];
-    }
-    const allowed = Array.isArray(createLinkDefinition.value.sources)
-      ? createLinkDefinition.value.sources
-      : [];
-    if (!allowed.length) {
-      return [];
-    }
-    return dataObjects.value
-      .filter((object) => isTypeAllowed(object.type, allowed))
-      .map((object) => ({
-        title: formatObjectOptionLabel(object),
-        value: object.id
-      }))
-      .sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  });
-
-  const createLinkTargetOptions = computed(() => {
-    if (!createLinkDefinition.value || !dataObjects.value.length) {
-      return [];
-    }
-    const allowed = Array.isArray(createLinkDefinition.value.targets)
-      ? createLinkDefinition.value.targets
-      : [];
-    if (!allowed.length) {
-      return [];
-    }
-    return dataObjects.value
-      .filter((object) => isTypeAllowed(object.type, allowed))
-      .map((object) => ({
-        title: formatObjectOptionLabel(object),
-        value: object.id
-      }))
-      .sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  });
-
   const adminCommand = computed(() => {
     if (!adminModel.value) {
       return 'java -jar importpackage.jar --delete-model <modelName> [modelVersion]';
@@ -856,9 +783,15 @@ export function useAppState() {
   ];
 
   const tableHasDetails = computed(() => Boolean(tableSelectedObject.value && showTableDetailPanel.value));
+  const tablePageCount = computed(() =>
+    Math.max(1, Math.ceil((tableTotalCount.value || 0) / tableItemsPerPage.value))
+  );
 
   const fullTextQuery = ref('');
   const fullTextTypeFilter = ref([]);
+  const fullTextPageCount = computed(() =>
+    Math.max(1, Math.ceil((fullTextTotalCount.value || 0) / fullTextItemsPerPage.value))
+  );
 
   const representativeAttributesByType = computed(() => {
     const map = new Map();
@@ -899,57 +832,6 @@ export function useAppState() {
   });
 
   const fullTextTypeOptions = computed(() => tableTypeOptions.value);
-
-  const fullTextResults = computed(() => {
-    const query = fullTextQuery.value.trim().toLowerCase();
-    if (!query) {
-      return [];
-    }
-
-    const typeFilter = Array.isArray(fullTextTypeFilter.value)
-      ? fullTextTypeFilter.value.map((type) => String(type).toLowerCase())
-      : [];
-
-    return dataObjects.value
-      .filter((object) => {
-        if (typeFilter.length && !typeFilter.includes(object.type.toLowerCase())) {
-          return false;
-        }
-        const searchable = searchableAttributesByType.value.get(object.type);
-        if (!searchable || searchable.size === 0) {
-          return false;
-        }
-        const attributes = Array.isArray(object.attributes) ? object.attributes : [];
-        return attributes.some((attr) => {
-          if (!searchable.has(attr.key)) {
-            return false;
-          }
-          const value = String(attr.value || '').toLowerCase();
-          return value.includes(query);
-        });
-      })
-      .map((object) => {
-        const searchable = searchableAttributesByType.value.get(object.type) || new Set();
-        const attributes = Array.isArray(object.attributes) ? object.attributes : [];
-        const matches = attributes
-          .filter((attr) => searchable.has(attr.key))
-          .filter((attr) => String(attr.value || '').toLowerCase().includes(query))
-          .map((attr) => ({
-            key: attr.key,
-            label: getAttributeLabel(object.type, attr.key),
-            value: attr.value
-          }));
-
-        return {
-          key: object.key,
-          id: object.id ?? 'N/A',
-          idKey: object.idKey,
-          type: object.type,
-          primaryLabel: getObjectPrimaryLabel(object),
-          matches
-        };
-      });
-  });
 
   const objectIndex = computed(() => {
     const map = new Map();
@@ -1171,6 +1053,73 @@ export function useAppState() {
   );
 
   watch(
+    () => [
+      selectedModelKey.value,
+      tablePage.value,
+      tableItemsPerPage.value,
+      JSON.stringify(tableTypeFilter.value || []),
+      tableSearch.value,
+      tableAttributeKey.value,
+      tableAttributeKeyOperator.value,
+      tableAttributeValue.value,
+      tableAttributeValueOperator.value
+    ],
+    () => {
+      scheduleTableFetch();
+    }
+  );
+
+  watch(
+    () => [
+      selectedModelKey.value,
+      JSON.stringify(tableTypeFilter.value || []),
+      tableSearch.value,
+      tableAttributeKey.value,
+      tableAttributeKeyOperator.value,
+      tableAttributeValue.value,
+      tableAttributeValueOperator.value
+    ],
+    () => {
+      if (tablePage.value !== 1) {
+        tablePage.value = 1;
+      }
+    }
+  );
+
+  watch(
+    () => [selectedModelKey.value, rootObjectQuery.value],
+    () => {
+      scheduleRootLookup();
+    }
+  );
+
+  watch(
+    () => [
+      selectedModelKey.value,
+      fullTextPage.value,
+      fullTextItemsPerPage.value,
+      JSON.stringify(fullTextTypeFilter.value || []),
+      fullTextQuery.value
+    ],
+    () => {
+      scheduleFullTextFetch();
+    }
+  );
+
+  watch(
+    () => [
+      selectedModelKey.value,
+      JSON.stringify(fullTextTypeFilter.value || []),
+      fullTextQuery.value
+    ],
+    () => {
+      if (fullTextPage.value !== 1) {
+        fullTextPage.value = 1;
+      }
+    }
+  );
+
+  watch(
     () => models.value,
     (list) => {
       if (!list.length) {
@@ -1305,7 +1254,25 @@ export function useAppState() {
     () => {
       createLinkSourceId.value = null;
       createLinkTargetId.value = null;
+      createLinkSourceQuery.value = '';
+      createLinkTargetQuery.value = '';
+      createLinkSourceOptions.value = [];
+      createLinkTargetOptions.value = [];
       createLinkStatus.value = null;
+    }
+  );
+
+  watch(
+    () => [selectedModelKey.value, createLinkType.value, createLinkSourceQuery.value],
+    () => {
+      scheduleCreateLinkSourceLookup();
+    }
+  );
+
+  watch(
+    () => [selectedModelKey.value, createLinkType.value, createLinkTargetQuery.value],
+    () => {
+      scheduleCreateLinkTargetLookup();
     }
   );
 
@@ -1945,6 +1912,76 @@ export function useAppState() {
     }
   }
 
+  function scheduleTableFetch(immediate = false) {
+    if (tableFetchTimer) {
+      clearTimeout(tableFetchTimer);
+      tableFetchTimer = null;
+    }
+    if (immediate) {
+      return fetchTableRows();
+    }
+    tableFetchTimer = setTimeout(() => {
+      void fetchTableRows();
+    }, 250);
+    return Promise.resolve();
+  }
+
+  function scheduleRootLookup(immediate = false) {
+    if (rootLookupTimer) {
+      clearTimeout(rootLookupTimer);
+      rootLookupTimer = null;
+    }
+    if (immediate) {
+      return fetchRootObjectOptions(rootObjectQuery.value);
+    }
+    rootLookupTimer = setTimeout(() => {
+      void fetchRootObjectOptions(rootObjectQuery.value);
+    }, 250);
+    return Promise.resolve();
+  }
+
+  function scheduleFullTextFetch(immediate = false) {
+    if (fullTextFetchTimer) {
+      clearTimeout(fullTextFetchTimer);
+      fullTextFetchTimer = null;
+    }
+    if (immediate) {
+      return fetchFullTextResults();
+    }
+    fullTextFetchTimer = setTimeout(() => {
+      void fetchFullTextResults();
+    }, 250);
+    return Promise.resolve();
+  }
+
+  function scheduleCreateLinkSourceLookup(immediate = false) {
+    if (createLinkSourceTimer) {
+      clearTimeout(createLinkSourceTimer);
+      createLinkSourceTimer = null;
+    }
+    if (immediate) {
+      return fetchCreateLinkOptions('source');
+    }
+    createLinkSourceTimer = setTimeout(() => {
+      void fetchCreateLinkOptions('source');
+    }, 250);
+    return Promise.resolve();
+  }
+
+  function scheduleCreateLinkTargetLookup(immediate = false) {
+    if (createLinkTargetTimer) {
+      clearTimeout(createLinkTargetTimer);
+      createLinkTargetTimer = null;
+    }
+    if (immediate) {
+      return fetchCreateLinkOptions('target');
+    }
+    createLinkTargetTimer = setTimeout(() => {
+      void fetchCreateLinkOptions('target');
+    }, 250);
+    return Promise.resolve();
+  }
+
   async function refreshData(modelKey) {
     if (modelKey && !canReadModelData(modelKey)) {
       resetDataState();
@@ -1952,29 +1989,335 @@ export function useAppState() {
     }
     isLoadingData.value = true;
     try {
-      const response = await apiFetch(`/api/data?modelKey=${encodeURIComponent(modelKey)}`);
+      const response = await apiFetch(`/api/data/summary?modelKey=${encodeURIComponent(modelKey)}`);
       const payload = await readJson(response);
       if (!response.ok) {
         throw new Error(payload?.error || 'Erreur lors du chargement des données');
       }
 
-      const objects = normalizeObjects(payload?.objects || []);
-      const links = normalizeLinks(payload?.links || []);
-      dataObjects.value = objects;
-      dataLinks.value = links;
-      dataSummary.value = buildDataSummary(payload, objects, links);
-      selectedObject.value = objects[0] ?? null;
-      selectedRootObjectKey.value = objects[0]?.idKey || '';
+      dataSummary.value = buildDataSummary(payload, [], []);
+      dataObjects.value = [];
+      dataLinks.value = [];
+      loadedNeighborObjectKeys.value = [];
+      neighborLoadPromises.clear();
+      selectedObject.value = null;
+      tableSelectedObject.value = null;
+      selectedRootObjectKey.value = '';
       rootObjectQuery.value = '';
+      rootObjectOptions.value = [];
       treeLinkSelections.value = {};
       treeExpandedNodes.value = {};
       objectFilter.value = '';
+      tableRows.value = [];
+      tableTotalCount.value = 0;
+      fullTextResults.value = [];
+      fullTextTotalCount.value = 0;
+
+      await Promise.all([
+        scheduleTableFetch(true),
+        scheduleRootLookup(true),
+        scheduleFullTextFetch(true),
+        scheduleCreateLinkSourceLookup(true),
+        scheduleCreateLinkTargetLookup(true)
+      ]);
     } catch (error) {
       resetDataState();
       status.value = { type: 'error', message: error.message };
     } finally {
       isLoadingData.value = false;
     }
+  }
+
+  async function fetchTableRows() {
+    if (!selectedModelKey.value || !canReadCurrentModelData.value) {
+      tableRows.value = [];
+      tableTotalCount.value = 0;
+      return;
+    }
+
+    const requestId = ++tableRequestId;
+    isLoadingTable.value = true;
+    try {
+      const params = new URLSearchParams();
+      params.set('modelKey', selectedModelKey.value);
+      params.set('offset', String((tablePage.value - 1) * tableItemsPerPage.value));
+      params.set('limit', String(tableItemsPerPage.value));
+      appendMultiValueParam(params, 'type', tableTypeFilter.value);
+      appendOptionalParam(params, 'q', tableSearch.value);
+      appendOptionalParam(params, 'attributeKey', tableAttributeKey.value);
+      appendOptionalParam(params, 'attributeKeyOperator', tableAttributeKeyOperator.value);
+      appendOptionalParam(params, 'attributeValue', tableAttributeValue.value);
+      appendOptionalParam(params, 'attributeValueOperator', tableAttributeValueOperator.value);
+
+      const response = await apiFetch(`/api/data/objects?${params.toString()}`);
+      const payload = await readJson(response);
+      if (requestId !== tableRequestId) {
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors du chargement de la table');
+      }
+
+      const items = normalizeObjects(payload?.items || []);
+      mergeObjects(items);
+      tableRows.value = items;
+      tableTotalCount.value = Number(payload?.totalCount || items.length || 0);
+      const maxPage = Math.max(1, Math.ceil((tableTotalCount.value || 0) / tableItemsPerPage.value));
+      if (tablePage.value > maxPage) {
+        tablePage.value = maxPage;
+      }
+      if (tableSelectedObject.value) {
+        const updated = objectIndex.value.get(tableSelectedObject.value.idKey);
+        if (updated) {
+          tableSelectedObject.value = updated;
+        }
+      }
+    } catch (error) {
+      if (requestId !== tableRequestId) {
+        return;
+      }
+      tableRows.value = [];
+      tableTotalCount.value = 0;
+      status.value = { type: 'error', message: error.message };
+    } finally {
+      if (requestId === tableRequestId) {
+        isLoadingTable.value = false;
+      }
+    }
+  }
+
+  async function fetchRootObjectOptions(query = '') {
+    if (!selectedModelKey.value || !canReadCurrentModelData.value) {
+      rootObjectOptions.value = [];
+      return;
+    }
+
+    const requestId = ++rootLookupRequestId;
+    isLoadingRootObjects.value = true;
+    try {
+      const params = new URLSearchParams();
+      params.set('modelKey', selectedModelKey.value);
+      params.set('offset', '0');
+      params.set('limit', '30');
+      appendOptionalParam(params, 'q', query);
+
+      const response = await apiFetch(`/api/data/objects?${params.toString()}`);
+      const payload = await readJson(response);
+      if (requestId !== rootLookupRequestId) {
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors du chargement des racines');
+      }
+
+      const items = normalizeObjects(payload?.items || []);
+      mergeObjects(items);
+      rootObjectOptions.value = items.map((object) => ({
+        title: formatObjectOptionLabel(object),
+        value: object.idKey,
+        subtitle: `${object.type} • ID ${object.id ?? 'N/A'}`
+      }));
+    } catch (error) {
+      if (requestId !== rootLookupRequestId) {
+        return;
+      }
+      rootObjectOptions.value = [];
+      status.value = { type: 'error', message: error.message };
+    } finally {
+      if (requestId === rootLookupRequestId) {
+        isLoadingRootObjects.value = false;
+      }
+    }
+  }
+
+  async function fetchFullTextResults() {
+    if (!selectedModelKey.value || !canReadCurrentModelData.value) {
+      fullTextResults.value = [];
+      fullTextTotalCount.value = 0;
+      return;
+    }
+
+    const query = String(fullTextQuery.value || '').trim();
+    if (!query) {
+      fullTextResults.value = [];
+      fullTextTotalCount.value = 0;
+      return;
+    }
+
+    const requestId = ++fullTextRequestId;
+    isLoadingFullText.value = true;
+    try {
+      const params = new URLSearchParams();
+      params.set('modelKey', selectedModelKey.value);
+      params.set('offset', String((fullTextPage.value - 1) * fullTextItemsPerPage.value));
+      params.set('limit', String(fullTextItemsPerPage.value));
+      params.set('q', query);
+      appendMultiValueParam(params, 'type', fullTextTypeFilter.value);
+      appendMultiValueParam(params, 'searchableAttribute', getSearchableAttributeNames(fullTextTypeFilter.value));
+
+      const response = await apiFetch(`/api/data/search?${params.toString()}`);
+      const payload = await readJson(response);
+      if (requestId !== fullTextRequestId) {
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors de la recherche plein texte');
+      }
+
+      const rawItems = Array.isArray(payload?.items) ? payload.items : [];
+      const items = normalizeObjects(rawItems);
+      mergeObjects(items);
+      fullTextTotalCount.value = Number(payload?.totalCount || rawItems.length || 0);
+      fullTextResults.value = items.map((object, index) => ({
+        key: object.key,
+        id: object.id ?? 'N/A',
+        idKey: object.idKey,
+        type: object.type,
+        primaryLabel: getObjectPrimaryLabel(object),
+        matches: normalizeSearchMatches(rawItems[index]?.matches || [], object.type)
+      }));
+      const maxPage = Math.max(1, Math.ceil((fullTextTotalCount.value || 0) / fullTextItemsPerPage.value));
+      if (fullTextPage.value > maxPage) {
+        fullTextPage.value = maxPage;
+      }
+    } catch (error) {
+      if (requestId !== fullTextRequestId) {
+        return;
+      }
+      fullTextResults.value = [];
+      fullTextTotalCount.value = 0;
+      status.value = { type: 'error', message: error.message };
+    } finally {
+      if (requestId === fullTextRequestId) {
+        isLoadingFullText.value = false;
+      }
+    }
+  }
+
+  async function fetchCreateLinkOptions(kind) {
+    const definition = createLinkDefinition.value;
+    const isSource = kind === 'source';
+    const queryRef = isSource ? createLinkSourceQuery : createLinkTargetQuery;
+    const optionsRef = isSource ? createLinkSourceOptions : createLinkTargetOptions;
+    const loadingRef = isSource ? isLoadingCreateLinkSources : isLoadingCreateLinkTargets;
+    const requestId = isSource ? ++createLinkSourceRequestId : ++createLinkTargetRequestId;
+    const allowedTypes = Array.isArray(isSource ? definition?.sources : definition?.targets)
+      ? expandAllowedTypes(isSource ? definition.sources : definition.targets)
+      : [];
+
+    if (!selectedModelKey.value || !canReadCurrentModelData.value || !definition || !allowedTypes.length) {
+      optionsRef.value = [];
+      loadingRef.value = false;
+      return;
+    }
+
+    loadingRef.value = true;
+    try {
+      const params = new URLSearchParams();
+      params.set('modelKey', selectedModelKey.value);
+      params.set('offset', '0');
+      params.set('limit', '25');
+      appendOptionalParam(params, 'q', queryRef.value);
+      appendMultiValueParam(params, 'type', allowedTypes);
+
+      const response = await apiFetch(`/api/data/objects?${params.toString()}`);
+      const payload = await readJson(response);
+      const expectedRequestId = isSource ? createLinkSourceRequestId : createLinkTargetRequestId;
+      if (requestId !== expectedRequestId) {
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors du chargement des objets');
+      }
+
+      const items = normalizeObjects(payload?.items || []);
+      mergeObjects(items);
+      optionsRef.value = items
+        .filter((object) => isTypeAllowed(object.type, isSource ? definition.sources : definition.targets))
+        .map((object) => ({
+          title: formatObjectOptionLabel(object),
+          value: object.id
+        }));
+    } catch (error) {
+      const expectedRequestId = isSource ? createLinkSourceRequestId : createLinkTargetRequestId;
+      if (requestId !== expectedRequestId) {
+        return;
+      }
+      optionsRef.value = [];
+      status.value = { type: 'error', message: error.message };
+    } finally {
+      const expectedRequestId = isSource ? createLinkSourceRequestId : createLinkTargetRequestId;
+      if (requestId === expectedRequestId) {
+        loadingRef.value = false;
+      }
+    }
+  }
+
+  async function fetchObjectById(objectKey) {
+    const key = String(objectKey || '').trim();
+    if (!key || !selectedModelKey.value || !canReadCurrentModelData.value) {
+      return null;
+    }
+
+    const existing = objectIndex.value.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const response = await apiFetch(
+      `/api/data/objects/${encodeURIComponent(key)}?modelKey=${encodeURIComponent(selectedModelKey.value)}`
+    );
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Objet introuvable');
+    }
+
+    const [object] = normalizeObjects([payload]);
+    mergeObjects(object ? [object] : []);
+    return object || null;
+  }
+
+  async function ensureNeighborsLoaded(objectKey, { force = false } = {}) {
+    const key = String(objectKey || '').trim();
+    if (!key || !selectedModelKey.value || !canReadCurrentModelData.value) {
+      return [];
+    }
+    if (!force && loadedNeighborObjectKeys.value.includes(key)) {
+      return relationsByObjectKey.value.get(key) || [];
+    }
+    if (!force && neighborLoadPromises.has(key)) {
+      return neighborLoadPromises.get(key);
+    }
+
+    const loader = (async () => {
+      const response = await apiFetch(
+        `/api/data/objects/${encodeURIComponent(key)}/neighbors?modelKey=${encodeURIComponent(selectedModelKey.value)}`
+      );
+      const payload = await readJson(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors du chargement des voisins');
+      }
+
+      const center = normalizeObjects(payload?.object ? [payload.object] : []);
+      const neighbors = normalizeObjects(payload?.neighbors || []);
+      const links = normalizeLinks(payload?.links || []);
+      mergeObjects(center);
+      mergeObjects(neighbors);
+      mergeLinks(links);
+      loadedNeighborObjectKeys.value = Array.from(new Set([...loadedNeighborObjectKeys.value, key]));
+      return relationsByObjectKey.value.get(key) || [];
+    })();
+
+    neighborLoadPromises.set(key, loader);
+    try {
+      return await loader;
+    } finally {
+      neighborLoadPromises.delete(key);
+    }
+  }
+
+  function isNeighborsLoaded(objectKey) {
+    return loadedNeighborObjectKeys.value.includes(String(objectKey || ''));
   }
 
   async function uploadModel() {
@@ -2340,11 +2683,21 @@ export function useAppState() {
     dataSummary.value = null;
     dataObjects.value = [];
     dataLinks.value = [];
+    loadedNeighborObjectKeys.value = [];
+    neighborLoadPromises.clear();
     selectedObject.value = null;
     selectedRootObjectKey.value = '';
     rootObjectQuery.value = '';
+    rootObjectOptions.value = [];
     treeLinkSelections.value = {};
     treeExpandedNodes.value = {};
+    tableRows.value = [];
+    tablePage.value = 1;
+    tableTotalCount.value = 0;
+    tableSelectedObject.value = null;
+    fullTextResults.value = [];
+    fullTextPage.value = 1;
+    fullTextTotalCount.value = 0;
   }
 
   function resetCreateState() {
@@ -2355,8 +2708,14 @@ export function useAppState() {
     createLinkType.value = '';
     createLinkSourceId.value = null;
     createLinkTargetId.value = null;
+    createLinkSourceQuery.value = '';
+    createLinkTargetQuery.value = '';
+    createLinkSourceOptions.value = [];
+    createLinkTargetOptions.value = [];
     createLinkStatus.value = null;
     isCreatingLink.value = false;
+    isLoadingCreateLinkSources.value = false;
+    isLoadingCreateLinkTargets.value = false;
   }
 
   function resetModelEditorState() {
@@ -2368,25 +2727,33 @@ export function useAppState() {
 
   function selectObject(object) {
     selectedObject.value = object;
+    if (object?.idKey) {
+      void ensureNeighborsLoaded(object.idKey);
+    }
   }
 
-  function setRootObjectByKey(key) {
+  async function setRootObjectByKey(key) {
     if (!key) {
       selectedRootObjectKey.value = '';
       treeLinkSelections.value = {};
       treeExpandedNodes.value = {};
       return;
     }
-    const target = objectIndex.value.get(String(key));
-    if (!target) {
-      return;
-    }
-    const isSameRoot = selectedRootObjectKey.value === target.idKey;
-    selectedRootObjectKey.value = target.idKey;
-    selectedObject.value = target;
-    if (!isSameRoot) {
-      treeLinkSelections.value = {};
-      treeExpandedNodes.value = {};
+    try {
+      const target = await fetchObjectById(String(key));
+      if (!target) {
+        return;
+      }
+      await ensureNeighborsLoaded(target.idKey);
+      const isSameRoot = selectedRootObjectKey.value === target.idKey;
+      selectedRootObjectKey.value = target.idKey;
+      selectedObject.value = target;
+      if (!isSameRoot) {
+        treeLinkSelections.value = {};
+        treeExpandedNodes.value = {};
+      }
+    } catch (error) {
+      status.value = { type: 'error', message: error.message };
     }
   }
 
@@ -2649,26 +3016,36 @@ export function useAppState() {
     }
   }
 
-  function selectObjectByKey(key) {
-    const target = objectIndex.value.get(String(key));
-    if (target) {
-      selectedObject.value = target;
+  async function selectObjectByKey(key) {
+    try {
+      const target = await fetchObjectById(String(key));
+      if (target) {
+        selectedObject.value = target;
+        await ensureNeighborsLoaded(target.idKey);
+      }
+    } catch (error) {
+      status.value = { type: 'error', message: error.message };
     }
   }
 
-  function viewObjectFromTable(key) {
-    const target = objectIndex.value.get(String(key));
-    if (target) {
-      tableSelectedObject.value = target;
-      showTableDetailPanel.value = true;
+  async function viewObjectFromTable(key) {
+    try {
+      const target = await fetchObjectById(String(key));
+      if (target) {
+        tableSelectedObject.value = target;
+        showTableDetailPanel.value = true;
+        await ensureNeighborsLoaded(target.idKey);
+      }
+    } catch (error) {
+      status.value = { type: 'error', message: error.message };
     }
   }
 
-  function openInExplorerFromTable() {
+  async function openInExplorerFromTable() {
     if (!tableSelectedObject.value) {
       return;
     }
-    setRootObjectByKey(tableSelectedObject.value.idKey);
+    await setRootObjectByKey(tableSelectedObject.value.idKey);
     currentPage.value = 'navigate';
   }
 
@@ -2957,12 +3334,121 @@ export function useAppState() {
       const fromKey = link.fromId !== undefined ? String(link.fromId) : '';
       const toKey = link.toId !== undefined ? String(link.toId) : '';
       return {
-        key: `link-${index}-${fromKey}-${toKey}`,
+        key: buildLinkCacheKey(link, index),
         type: link.type || link.linkType || link.relationshipType || 'Lien',
         fromKey,
         toKey
       };
     });
+  }
+
+  function buildLinkCacheKey(link, fallbackIndex = 0) {
+    const fromKey = link?.fromId !== undefined ? String(link.fromId) : '';
+    const toKey = link?.toId !== undefined ? String(link.toId) : '';
+    const type = link?.type || link?.linkType || link?.relationshipType || 'Lien';
+    const relationshipType = link?.relationshipType || '';
+    return `link-${fromKey}-${toKey}-${type}-${relationshipType || fallbackIndex}`;
+  }
+
+  function mergeObjects(objects) {
+    if (!Array.isArray(objects) || !objects.length) {
+      return;
+    }
+    const byId = new Map(dataObjects.value.map((object) => [object.idKey, object]));
+    objects.forEach((object) => {
+      if (!object?.idKey) {
+        return;
+      }
+      const existing = byId.get(object.idKey);
+      if (!existing) {
+        byId.set(object.idKey, object);
+        return;
+      }
+      byId.set(object.idKey, {
+        ...existing,
+        ...object,
+        attributes: Array.isArray(object.attributes) ? object.attributes : existing.attributes || []
+      });
+    });
+    dataObjects.value = Array.from(byId.values());
+  }
+
+  function mergeLinks(links) {
+    if (!Array.isArray(links) || !links.length) {
+      return;
+    }
+    const byKey = new Map(dataLinks.value.map((link) => [link.key, link]));
+    links.forEach((link) => {
+      if (!link?.key) {
+        return;
+      }
+      byKey.set(link.key, link);
+    });
+    dataLinks.value = Array.from(byKey.values());
+  }
+
+  function removeObjectFromCaches(objectKey) {
+    const key = String(objectKey || '');
+    if (!key) {
+      return;
+    }
+    dataObjects.value = dataObjects.value.filter((object) => object.idKey !== key);
+    dataLinks.value = dataLinks.value.filter((link) => link.fromKey !== key && link.toKey !== key);
+    loadedNeighborObjectKeys.value = loadedNeighborObjectKeys.value.filter((loadedKey) => loadedKey !== key);
+    neighborLoadPromises.delete(key);
+    if (selectedRootObjectKey.value === key) {
+      selectedRootObjectKey.value = '';
+    }
+  }
+
+  function normalizeSearchMatches(matches, typeName) {
+    if (!Array.isArray(matches)) {
+      return [];
+    }
+    return matches.map((match) => ({
+      key: match.key,
+      label: getAttributeLabel(typeName, match.key),
+      value: match.value
+    }));
+  }
+
+  function appendOptionalParam(params, key, value) {
+    const normalized = String(value || '').trim();
+    if (normalized) {
+      params.set(key, normalized);
+    }
+  }
+
+  function appendMultiValueParam(params, key, values) {
+    if (!(params instanceof URLSearchParams) || !Array.isArray(values)) {
+      return;
+    }
+    values
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .forEach((value) => params.append(key, value));
+  }
+
+  function getSearchableAttributeNames(typeFilter = []) {
+    const selectedTypes = Array.isArray(typeFilter) && typeFilter.length
+      ? typeFilter
+      : modelDetails.value.objectTypes.map((type) => type.name);
+    const attributes = new Set();
+    selectedTypes.forEach((typeName) => {
+      const searchable = searchableAttributesByType.value.get(typeName) || new Set();
+      searchable.forEach((name) => attributes.add(name));
+    });
+    return Array.from(attributes).sort((a, b) => a.localeCompare(b));
+  }
+
+  function expandAllowedTypes(allowedTypes = []) {
+    if (!Array.isArray(allowedTypes) || !allowedTypes.length) {
+      return [];
+    }
+    return modelDetails.value.objectTypes
+      .map((type) => type.name)
+      .filter((typeName) => isTypeAllowed(typeName, allowedTypes))
+      .sort((a, b) => a.localeCompare(b));
   }
 
   function getFirstFile(value) {
@@ -3261,6 +3747,7 @@ export function useAppState() {
     selectedObject,
     objectFilter,
     rootObjectQuery,
+    rootObjectOptions,
     selectedRootObjectKey,
     treeLinkSelections,
     treeExpandedNodes,
@@ -3278,9 +3765,14 @@ export function useAppState() {
     tableAttributeKeyOperator,
     tableAttributeValue,
     tableAttributeValueOperator,
+    tableRows,
+    tablePage,
+    tableItemsPerPage,
+    tableTotalCount,
     tableSelectedObject,
     showTableDetailPanel,
     tableSelectedAttributeTab,
+    isLoadingTable,
     createObjectType,
     createObjectAttributes,
     createObjectStatus,
@@ -3288,8 +3780,12 @@ export function useAppState() {
     createLinkType,
     createLinkSourceId,
     createLinkTargetId,
+    createLinkSourceQuery,
+    createLinkTargetQuery,
     createLinkStatus,
     isCreatingLink,
+    isLoadingCreateLinkSources,
+    isLoadingCreateLinkTargets,
     modelXml,
     modelXmlStatus,
     isLoadingModelXml,
@@ -3301,6 +3797,7 @@ export function useAppState() {
     isLoadingModels,
     isLoadingModel,
     isLoadingData,
+    isLoadingRootObjects,
     adminModelKey,
     adminCommandVisible,
     adminStatus,
@@ -3319,10 +3816,10 @@ export function useAppState() {
     filteredModelLinks,
     modelGroupTabs,
     filteredObjects,
-    rootObjectOptions,
     selectedRootObject,
     tableTypeOptions,
     filteredTableRows,
+    tablePageCount,
     selectedObjectType,
     tableSelectedObjectType,
     attributeTabs,
@@ -3341,6 +3838,11 @@ export function useAppState() {
     tableHasDetails,
     fullTextQuery,
     fullTextTypeFilter,
+    fullTextTotalCount,
+    fullTextPage,
+    fullTextItemsPerPage,
+    fullTextPageCount,
+    isLoadingFullText,
     searchableAttributesByType,
     fullTextTypeOptions,
     fullTextResults,
@@ -3394,6 +3896,8 @@ export function useAppState() {
     toggleNodeRelation,
     isNodeExpanded,
     toggleNodeExpanded,
+    ensureNeighborsLoaded,
+    isNeighborsLoaded,
     getExplorerSubtree,
     selectObjectByKey,
     viewObjectFromTable,

@@ -179,24 +179,28 @@
             <v-col cols="12" md="6">
               <v-autocomplete
                 v-model="state.createLinkSourceId"
+                v-model:search="state.createLinkSourceQuery"
                 :items="state.createLinkSourceOptions"
                 label="Objet source"
                 prepend-icon="mdi-source-branch"
                 variant="outlined"
                 density="comfortable"
                 clearable
+                :loading="state.isLoadingCreateLinkSources"
                 :disabled="!state.createLinkType || !state.canCreateCurrentModelData"
               />
             </v-col>
             <v-col cols="12" md="6">
               <v-autocomplete
                 v-model="state.createLinkTargetId"
+                v-model:search="state.createLinkTargetQuery"
                 :items="state.createLinkTargetOptions"
                 label="Objet cible"
                 prepend-icon="mdi-target"
                 variant="outlined"
                 density="comfortable"
                 clearable
+                :loading="state.isLoadingCreateLinkTargets"
                 :disabled="!state.createLinkType || !state.canCreateCurrentModelData"
               />
             </v-col>
