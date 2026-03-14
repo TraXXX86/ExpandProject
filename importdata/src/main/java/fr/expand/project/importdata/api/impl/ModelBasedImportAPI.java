@@ -166,7 +166,7 @@ public class ModelBasedImportAPI {
                         }
                     }
                     
-                    connector.writeLink(objA, objB, isDirected, link.getTYPE());
+                    connector.writeLink(objA, objB, isDirected, link.getTYPE(), link.getATTRIBUTE());
                     linkCount++;
                 }
                 LOGGER.info("Imported " + linkCount + " links");

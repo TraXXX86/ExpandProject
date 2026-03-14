@@ -114,7 +114,13 @@ public class Neo4jConnector extends IConnectorDb {
 	}
 
 	@Override
-	public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
+	public int writeLink(
+		DataPackObject objectA,
+		DataPackObject objectB,
+		boolean isOriented,
+		String linkType,
+		List<ATTRIBUTE> attributes
+	) {
 		connectToDb();
 
 		// Create query
@@ -131,11 +137,11 @@ public class Neo4jConnector extends IConnectorDb {
 			request.append(" AND b.modelKey=?");
 		}
 		request.append(" CREATE (a)-[:").append(relationType);
-		String relationProperties = buildRelationProperties(linkType);
+		String relationProperties = buildRelationProperties(linkType, attributes);
 		if (!relationProperties.isEmpty()) {
 			request.append(" {").append(relationProperties).append("}");
 		}
-		request.append("]->(b)");
+		request.append("]->(b) RETURN 1 AS ID");
 		String requestString = request.toString();
 		LOGGER.info(requestString);
 
@@ -153,9 +159,7 @@ public class Neo4jConnector extends IConnectorDb {
 		if (modelKey != null && !modelKey.isBlank()) {
 			params.put(Integer.toString(index++), modelKey);
 		}
-		if (linkType != null && !linkType.isBlank()) {
-			params.put(Integer.toString(index), linkType);
-		}
+		index = appendRelationParameters(params, index, linkType, attributes);
 
 		// Launch request
 		List<DataPackObject> results = query(requestString, params);
@@ -314,7 +318,30 @@ public class Neo4jConnector extends IConnectorDb {
 		}
 	}
 
-	private String buildRelationProperties(String linkType) {
+	private int appendRelationParameters(
+		Map<String, Object> params,
+		int index,
+		String linkType,
+		List<ATTRIBUTE> attributes
+	) {
+		if (modelKey != null && !modelKey.isBlank()) {
+			params.put(Integer.toString(index++), modelKey);
+		}
+		if (linkType != null && !linkType.isBlank()) {
+			params.put(Integer.toString(index++), linkType);
+		}
+		if (attributes != null) {
+			for (ATTRIBUTE attribute : attributes) {
+				if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+					continue;
+				}
+				params.put(Integer.toString(index++), attribute.getVALUE() == null ? "" : attribute.getVALUE());
+			}
+		}
+		return index;
+	}
+
+	private String buildRelationProperties(String linkType, List<ATTRIBUTE> attributes) {
 		StringBuilder builder = new StringBuilder();
 		boolean first = true;
 		if (modelKey != null && !modelKey.isBlank()) {
@@ -326,6 +353,19 @@ public class Neo4jConnector extends IConnectorDb {
 				builder.append(",");
 			}
 			builder.append("linkType:?");
+			first = false;
+		}
+		if (attributes != null) {
+			for (ATTRIBUTE attribute : attributes) {
+				if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+					continue;
+				}
+				if (!first) {
+					builder.append(",");
+				}
+				builder.append(attribute.getKEY()).append(":?");
+				first = false;
+			}
 		}
 		return builder.toString();
 	}

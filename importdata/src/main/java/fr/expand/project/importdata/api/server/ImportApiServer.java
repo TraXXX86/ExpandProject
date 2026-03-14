@@ -30,7 +30,9 @@ import fr.expand.project.importdata.data.Neo4jDataStore;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
 import fr.expand.project.importdata.dto.DataPackAttribute;
 import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.DataPackObjectLink;
 import fr.expand.project.importdata.dto.generated.DATAS;
+import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.OBJECT;
 import fr.expand.project.importdata.dto.generated.OBJECTS;
 import fr.expand.project.importdata.model.ModelManager;
@@ -896,6 +898,7 @@ public class ImportApiServer {
             String linkTypeName = getString(payload.get("type"));
             Integer fromId = getInt(payload.get("fromId"));
             Integer toId = getInt(payload.get("toId"));
+            List<DataPackAttribute> attributes = readAttributes(payload.get("attributes"));
 
             if (modelKey == null || modelKey.isBlank()) {
                 return error(response, 400, "modelKey manquant");
@@ -910,7 +913,6 @@ public class ImportApiServer {
                 return error(response, 400, "fromId/toId invalides");
             }
 
-            LINKTYPE linkType;
             try (Neo4jModelStore store = new Neo4jModelStore()) {
                 String modelXml = store.loadModelXmlByKey(modelKey);
                 if (modelXml == null || modelXml.isBlank()) {
@@ -919,12 +921,6 @@ public class ImportApiServer {
                 ModelManager.getInstance().loadModelFromXml(modelXml);
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors du chargement du modèle: " + e.getMessage());
-            }
-
-            ModelManager modelManager = ModelManager.getInstance();
-            linkType = modelManager.getLinkType(linkTypeName);
-            if (linkType == null) {
-                return error(response, 400, "Type de lien inconnu: " + linkTypeName);
             }
 
             Map<String, Object> source;
@@ -943,12 +939,36 @@ public class ImportApiServer {
             String sourceType = source.get("type") == null ? "" : source.get("type").toString();
             String targetType = target.get("type") == null ? "" : target.get("type").toString();
 
-            if (!isLinkTypeAllowed(modelManager, linkType, sourceType, true)) {
-                return error(response, 400, "Type source non autorisé pour ce lien");
+            LINK link = new LINK();
+            link.setTYPE(linkTypeName);
+            link.setOBJLINKA(new DataPackObjectLink(fromId, sourceType));
+            link.setOBJLINKB(new DataPackObjectLink(toId, targetType));
+            link.getATTRIBUTE().addAll(attributes);
+
+            List<OBJECT> linkObjects = new ArrayList<>();
+            OBJECT sourceObject = new OBJECT();
+            sourceObject.setID(fromId);
+            sourceObject.setTYPE(sourceType);
+            linkObjects.add(sourceObject);
+            if (!sourceType.equals(targetType) || !fromId.equals(toId)) {
+                OBJECT targetObject = new OBJECT();
+                targetObject.setID(toId);
+                targetObject.setTYPE(targetType);
+                linkObjects.add(targetObject);
             }
-            if (!isLinkTypeAllowed(modelManager, linkType, targetType, false)) {
-                return error(response, 400, "Type cible non autorisé pour ce lien");
+
+            ValidationResult result = new DataValidator().validateLink(link, linkObjects);
+            if (!result.isValid()) {
+                response.status(400);
+                Map<String, Object> errorPayload = new HashMap<>();
+                errorPayload.put("valid", false);
+                errorPayload.put("errors", result.getErrors());
+                errorPayload.put("warnings", result.getWarnings());
+                return GSON.toJson(errorPayload);
             }
+
+            ModelManager modelManager = ModelManager.getInstance();
+            LINKTYPE linkType = modelManager.getLinkType(linkTypeName);
 
             try (CypherConnector connector = new CypherConnector()) {
                 connector.setModelKey(modelKey);
@@ -968,13 +988,14 @@ public class ImportApiServer {
                 } catch (Exception ignored) {
                     directed = true;
                 }
-                connector.writeLink(objA, objB, directed, linkTypeName);
+                connector.writeLink(objA, objB, directed, linkTypeName, link.getATTRIBUTE());
 
                 Map<String, Object> resultPayload = new HashMap<>();
                 resultPayload.put("status", "created");
                 resultPayload.put("type", linkTypeName);
                 resultPayload.put("fromId", fromId);
                 resultPayload.put("toId", toId);
+                resultPayload.put("warnings", result.getWarnings());
                 return GSON.toJson(resultPayload);
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors de la création du lien: " + e.getMessage());
@@ -1268,34 +1289,6 @@ public class ImportApiServer {
         meta.put("actorPlatformAdmin", context.isActorPlatformAdmin());
         meta.put("expiresAt", context.getExpiresAt());
         return meta;
-    }
-
-    private static boolean isLinkTypeAllowed(ModelManager modelManager, LINKTYPE linkType, String candidateType, boolean source) {
-        if (candidateType == null || candidateType.isBlank() || linkType == null) {
-            return false;
-        }
-        List<TYPEREF> refs = null;
-        if (source) {
-            if (linkType.getSOURCETYPES() != null) {
-                refs = linkType.getSOURCETYPES().getTYPEREF();
-            }
-        } else {
-            if (linkType.getTARGETTYPES() != null) {
-                refs = linkType.getTARGETTYPES().getTYPEREF();
-            }
-        }
-        if (refs == null || refs.isEmpty()) {
-            return false;
-        }
-        for (TYPEREF ref : refs) {
-            if (ref == null || ref.getNAME() == null) {
-                continue;
-            }
-            if (modelManager.isTypeOrSubtype(candidateType, ref.getNAME())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static Map<String, Object> buildModelDetails(String modelKey, DATAMODEL model) {

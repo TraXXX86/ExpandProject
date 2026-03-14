@@ -83,7 +83,8 @@ public class Neo4jDataStore implements AutoCloseable {
                 params.put("modelKey", modelKey);
                 Result result = tx.run(
                     "MATCH (a:DataObject {modelKey:$modelKey})-[r]->(b:DataObject {modelKey:$modelKey}) "
-                        + "RETURN id(a) AS fromId, id(b) AS toId, r.linkType AS linkType, type(r) AS relType "
+                        + "RETURN id(a) AS fromId, id(b) AS toId, r.linkType AS linkType, "
+                        + "type(r) AS relType, properties(r) AS props "
                         + "ORDER BY id(a), id(b)",
                     params
                 );
@@ -96,6 +97,17 @@ public class Neo4jDataStore implements AutoCloseable {
                     String linkType = record.get("linkType").isNull() ? "" : record.get("linkType").asString();
                     String relType = record.get("relType").isNull() ? "" : record.get("relType").asString();
                     String type = linkType != null && !linkType.isBlank() ? linkType : relType;
+                    Map<String, Object> props = new HashMap<>(record.get("props").asMap());
+                    props.remove("modelKey");
+                    props.remove("linkType");
+
+                    List<Map<String, Object>> attributes = new ArrayList<>();
+                    for (Map.Entry<String, Object> entry : props.entrySet()) {
+                        Map<String, Object> attribute = new HashMap<>();
+                        attribute.put("key", entry.getKey());
+                        attribute.put("value", entry.getValue() == null ? "" : entry.getValue().toString());
+                        attributes.add(attribute);
+                    }
 
                     Map<String, Object> row = new HashMap<>();
                     row.put("fromId", fromId);
@@ -103,6 +115,7 @@ public class Neo4jDataStore implements AutoCloseable {
                     row.put("type", type);
                     row.put("relationshipType", relType);
                     row.put("linkType", linkType);
+                    row.put("attributes", attributes);
                     links.add(row);
                 }
                 return links;

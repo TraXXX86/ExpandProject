@@ -1,5 +1,8 @@
 package fr.expand.project.importdata.dao.connectors.impl;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.neo4j.driver.AuthToken;
@@ -16,6 +19,7 @@ import fr.expand.project.commons.ObjectTypeEnum;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.DataPackAttribute;
 import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.util.CypherUtils;
 
 /**
@@ -72,15 +76,22 @@ public class CypherConnector extends IConnectorDb {
 	}
 
 	@Override
-    public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
+    public int writeLink(
+        DataPackObject objectA,
+        DataPackObject objectB,
+        boolean isOriented,
+        String linkType,
+        List<ATTRIBUTE> attributes
+    ) {
         String relationType = normalizeRelationshipType(linkType);
-        String relationProperties = buildRelationProperties(linkType);
         String matchA = buildNodeMatch(objectA, "a");
         String matchB = buildNodeMatch(objectB, "b");
-        String request = matchA + " " + matchB + " CREATE (a)-[:"
-                + relationType + relationProperties + "]->(b)";
+        String request = matchA + " " + matchB + " CREATE (a)-[r:"
+                + relationType + "]->(b) SET r += $relationshipProps RETURN ID(r)";
         LOGGER.info(request);
-        return launchCreationRequest(request, false);
+        Map<String, Object> params = new HashMap<>();
+        params.put("relationshipProps", buildRelationProperties(linkType, attributes));
+        return launchCreationRequest(request, params, true);
     }
 
 	@Override
@@ -116,8 +127,12 @@ public class CypherConnector extends IConnectorDb {
 	 * @return ID or -1
 	 */
 	private int launchCreationRequest(String request, boolean resultAttempted) {
+		return launchCreationRequest(request, new HashMap<>(), resultAttempted);
+	}
+
+	private int launchCreationRequest(String request, Map<String, Object> params, boolean resultAttempted) {
 		// Launch request
-		Result result = session.run(request);
+		Result result = session.run(request, params);
 		if (!resultAttempted) {
 			return -1;
 		}
@@ -159,27 +174,23 @@ public class CypherConnector extends IConnectorDb {
 		return result;
 	}
 
-    private String buildRelationProperties(String linkType) {
-        boolean hasModel = modelKey != null && !modelKey.isBlank();
-        boolean hasLinkType = linkType != null && !linkType.isBlank();
-        if (!hasModel && !hasLinkType) {
-            return "";
+    private Map<String, Object> buildRelationProperties(String linkType, List<ATTRIBUTE> attributes) {
+        Map<String, Object> props = new HashMap<>();
+        if (modelKey != null && !modelKey.isBlank()) {
+            props.put("modelKey", modelKey);
         }
-        StringBuilder builder = new StringBuilder();
-        builder.append(" {");
-        boolean first = true;
-        if (hasModel) {
-            builder.append("modelKey:'").append(modelKey).append("'");
-            first = false;
+        if (linkType != null && !linkType.isBlank()) {
+            props.put("linkType", linkType);
         }
-        if (hasLinkType) {
-            if (!first) {
-                builder.append(",");
+        if (attributes != null) {
+            for (ATTRIBUTE attribute : attributes) {
+                if (attribute == null || attribute.getKEY() == null || attribute.getKEY().isBlank()) {
+                    continue;
+                }
+                props.put(attribute.getKEY(), attribute.getVALUE() == null ? "" : attribute.getVALUE());
             }
-            builder.append("linkType:'").append(linkType).append("'");
         }
-        builder.append("}");
-        return builder.toString();
+        return props;
     }
 
     private String normalizeRelationshipType(String linkType) {
