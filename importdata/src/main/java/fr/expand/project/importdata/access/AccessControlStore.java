@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Connection;
@@ -14,11 +15,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 
 /**
  * Store for users, permissions and auth sessions persisted in SQLite.
@@ -28,6 +32,14 @@ public class AccessControlStore implements AutoCloseable {
     private static final String ADMIN_USERNAME = "admin";
     private static final String ADMIN_DEFAULT_PASSWORD = "admin";
     private static final long SESSION_TTL_SECONDS = 12 * 60 * 60;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String PASSWORD_RECORD_DELIMITER = "$";
+    private static final String CURRENT_PASSWORD_VERSION = "v2";
+    private static final String CURRENT_PASSWORD_ALGORITHM = "pbkdf2-sha256";
+    private static final String CURRENT_PBKDF2_FACTORY = "PBKDF2WithHmacSHA256";
+    private static final int CURRENT_PBKDF2_ITERATIONS = 210_000;
+    private static final int CURRENT_PBKDF2_KEY_LENGTH_BITS = 256;
+    private static final int PASSWORD_SALT_BYTES = 16;
 
     private final String sqlitePath;
     private final String jdbcUrl;
@@ -85,20 +97,34 @@ public class AccessControlStore implements AutoCloseable {
         }
         ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
-            Map<String, Object> user = loadUserInternal(connection, username.trim());
-            if (user == null) {
-                return null;
+            connection.setAutoCommit(false);
+            try {
+                Map<String, Object> user = loadUserInternal(connection, username.trim());
+                if (user == null) {
+                    connection.rollback();
+                    return null;
+                }
+                PasswordVerificationResult verification = verifyPassword(
+                    password,
+                    getString(user.get("passwordHash")),
+                    getString(user.get("passwordSalt"))
+                );
+                if (!verification.verified()) {
+                    connection.rollback();
+                    return null;
+                }
+                if (verification.upgradeRequired()) {
+                    PasswordCredentials upgraded = createPasswordCredentials(password);
+                    updatePasswordInternal(connection, username.trim(), upgraded);
+                }
+                connection.commit();
+                return sanitizeUser(user);
+            } catch (Exception e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
             }
-            String storedHash = getString(user.get("passwordHash"));
-            String storedSalt = getString(user.get("passwordSalt"));
-            if (storedHash == null || storedSalt == null || storedHash.isBlank() || storedSalt.isBlank()) {
-                return null;
-            }
-            String computedHash = hashPassword(password, storedSalt);
-            if (!storedHash.equals(computedHash)) {
-                return null;
-            }
-            return sanitizeUser(user);
         } catch (Exception e) {
             throw new RuntimeException("Unable to authenticate user", e);
         }
@@ -579,16 +605,18 @@ public class AccessControlStore implements AutoCloseable {
         String finalHash;
 
         if (plainPassword != null && !plainPassword.isBlank()) {
-            finalSalt = generateSalt();
-            finalHash = hashPassword(plainPassword, finalSalt);
+            PasswordCredentials credentials = createPasswordCredentials(plainPassword);
+            finalSalt = credentials.passwordSalt();
+            finalHash = credentials.passwordHash();
         } else if (current != null && getString(current.get("passwordHash")) != null
             && !getString(current.get("passwordHash")).isBlank()) {
             finalSalt = getString(current.get("passwordSalt"));
             finalHash = getString(current.get("passwordHash"));
         } else {
             String defaultPassword = username;
-            finalSalt = generateSalt();
-            finalHash = hashPassword(defaultPassword, finalSalt);
+            PasswordCredentials credentials = createPasswordCredentials(defaultPassword);
+            finalSalt = credentials.passwordSalt();
+            finalHash = credentials.passwordHash();
         }
 
         long now = Instant.now().getEpochSecond();
@@ -613,6 +641,19 @@ public class AccessControlStore implements AutoCloseable {
             statement.setInt(6, portalModelAdmin ? 1 : 0);
             statement.setInt(7, platformAdmin ? 1 : 0);
             statement.setLong(8, now);
+            statement.executeUpdate();
+        }
+    }
+
+    private void updatePasswordInternal(Connection connection, String username, PasswordCredentials credentials)
+        throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "UPDATE users SET password_hash = ?, password_salt = ?, updated_at = ? WHERE username = ?"
+        )) {
+            statement.setString(1, credentials.passwordHash());
+            statement.setString(2, credentials.passwordSalt());
+            statement.setLong(3, Instant.now().getEpochSecond());
+            statement.setString(4, username);
             statement.executeUpdate();
         }
     }
@@ -654,17 +695,131 @@ public class AccessControlStore implements AutoCloseable {
     }
 
     private static String generateSalt() {
-        byte[] salt = new byte[16];
-        new SecureRandom().nextBytes(salt);
+        byte[] salt = new byte[PASSWORD_SALT_BYTES];
+        SECURE_RANDOM.nextBytes(salt);
         return Base64.getEncoder().encodeToString(salt);
     }
 
-    private static String hashPassword(String password, String saltBase64) throws Exception {
+    private static PasswordCredentials createPasswordCredentials(String password) throws GeneralSecurityException {
+        String saltBase64 = generateSalt();
+        String hashBase64 = hashPasswordPbkdf2(
+            password,
+            saltBase64,
+            CURRENT_PBKDF2_ITERATIONS,
+            CURRENT_PBKDF2_KEY_LENGTH_BITS
+        );
+        String record = String.join(
+            PASSWORD_RECORD_DELIMITER,
+            CURRENT_PASSWORD_VERSION,
+            CURRENT_PASSWORD_ALGORITHM,
+            Integer.toString(CURRENT_PBKDF2_ITERATIONS),
+            Integer.toString(CURRENT_PBKDF2_KEY_LENGTH_BITS),
+            saltBase64,
+            hashBase64
+        );
+        return new PasswordCredentials(record, "");
+    }
+
+    private static PasswordVerificationResult verifyPassword(String password, String storedHash, String storedSalt)
+        throws GeneralSecurityException {
+        if (storedHash == null || storedHash.isBlank()) {
+            return PasswordVerificationResult.failed();
+        }
+        try {
+            ParsedPasswordRecord record = parsePasswordRecord(storedHash);
+            if (record != null) {
+                return verifyVersionedPassword(password, record);
+            }
+            return verifyLegacyPassword(password, storedHash, storedSalt);
+        } catch (IllegalStateException e) {
+            return PasswordVerificationResult.failed();
+        }
+    }
+
+    private static PasswordVerificationResult verifyVersionedPassword(String password, ParsedPasswordRecord record)
+        throws GeneralSecurityException {
+        if (!CURRENT_PASSWORD_ALGORITHM.equals(record.algorithm())) {
+            return PasswordVerificationResult.failed();
+        }
+        byte[] computedHash = decodeBase64(
+            hashPasswordPbkdf2(password, record.saltBase64(), record.iterations(), record.keyLengthBits())
+        );
+        byte[] storedHash = decodeBase64(record.hashBase64());
+        boolean matches = MessageDigest.isEqual(storedHash, computedHash);
+        return matches
+            ? new PasswordVerificationResult(true, requiresUpgrade(record))
+            : PasswordVerificationResult.failed();
+    }
+
+    private static PasswordVerificationResult verifyLegacyPassword(String password, String storedHash, String storedSalt)
+        throws GeneralSecurityException {
+        if (storedSalt == null || storedSalt.isBlank()) {
+            return PasswordVerificationResult.failed();
+        }
+        byte[] computedHash = decodeBase64(hashPasswordLegacy(password, storedSalt));
+        byte[] storedHashBytes = decodeBase64(storedHash);
+        boolean matches = MessageDigest.isEqual(storedHashBytes, computedHash);
+        return matches
+            ? new PasswordVerificationResult(true, true)
+            : PasswordVerificationResult.failed();
+    }
+
+    private static boolean requiresUpgrade(ParsedPasswordRecord record) {
+        return !CURRENT_PASSWORD_VERSION.equals(record.version())
+            || !CURRENT_PASSWORD_ALGORITHM.equals(record.algorithm())
+            || record.iterations() != CURRENT_PBKDF2_ITERATIONS
+            || record.keyLengthBits() != CURRENT_PBKDF2_KEY_LENGTH_BITS;
+    }
+
+    private static ParsedPasswordRecord parsePasswordRecord(String storedHash) {
+        String[] parts = storedHash.split("\\$", -1);
+        if (parts.length != 6 || parts[0].isBlank() || !parts[0].startsWith("v")) {
+            return null;
+        }
+        Integer iterations = parsePositiveInteger(parts[2]);
+        Integer keyLengthBits = parsePositiveInteger(parts[3]);
+        if (iterations == null || keyLengthBits == null || parts[1].isBlank() || parts[4].isBlank() || parts[5].isBlank()) {
+            return null;
+        }
+        return new ParsedPasswordRecord(parts[0], parts[1], iterations, keyLengthBits, parts[4], parts[5]);
+    }
+
+    private static Integer parsePositiveInteger(String rawValue) {
+        try {
+            int value = Integer.parseInt(rawValue);
+            return value > 0 ? value : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String hashPasswordPbkdf2(String password, String saltBase64, int iterations, int keyLengthBits)
+        throws GeneralSecurityException {
+        char[] passwordChars = password.toCharArray();
+        PBEKeySpec spec = new PBEKeySpec(passwordChars, decodeBase64(saltBase64), iterations, keyLengthBits);
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(CURRENT_PBKDF2_FACTORY);
+            return Base64.getEncoder().encodeToString(factory.generateSecret(spec).getEncoded());
+        } finally {
+            spec.clearPassword();
+            Arrays.fill(passwordChars, '\0');
+        }
+    }
+
+    private static String hashPasswordLegacy(String password, String saltBase64) throws GeneralSecurityException {
         byte[] salt = Base64.getDecoder().decode(saltBase64);
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         digest.update(salt);
         byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
         return Base64.getEncoder().encodeToString(hash);
+    }
+
+    private static byte[] decodeBase64(String encoded) {
+        try {
+            return Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Invalid Base64 value in stored password record", e);
+        }
     }
 
     private static String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
@@ -699,5 +854,18 @@ public class AccessControlStore implements AutoCloseable {
             return numberValue.intValue() != 0;
         }
         return Boolean.parseBoolean(value.toString());
+    }
+
+    private record PasswordCredentials(String passwordHash, String passwordSalt) {
+    }
+
+    private record ParsedPasswordRecord(String version, String algorithm, int iterations, int keyLengthBits,
+                                        String saltBase64, String hashBase64) {
+    }
+
+    private record PasswordVerificationResult(boolean verified, boolean upgradeRequired) {
+        private static PasswordVerificationResult failed() {
+            return new PasswordVerificationResult(false, false);
+        }
     }
 }

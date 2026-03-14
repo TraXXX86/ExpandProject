@@ -60,6 +60,14 @@ java -jar importdata/target/expandproject-importdata.jar --api 8080
 
 Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
 
+### Authentification locale de l'API
+
+- L'API utilise une base SQLite locale pour stocker les comptes dans `~/.expandproject/access.sqlite`.
+- Vous pouvez surcharger ce chemin avec la propriété JVM ou la variable d'environnement `ACCESS_DB_PATH`.
+- Le compte administrateur bootstrapé par défaut reste `admin` / `admin`.
+- Les nouveaux mots de passe sont stockés avec un hash PBKDF2 versionné.
+- Les anciens comptes stockés avec l'ancien hash SHA-256 salé restent valides et sont migrés automatiquement après une connexion réussie.
+
 ## 🐳 Docker Compose
 
 Pour lancer Neo4j + API + IHM sans installer Java localement :
