@@ -1,6 +1,8 @@
 package fr.expand.project.importdata.api.impl;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
@@ -11,7 +13,9 @@ import org.apache.logging.log4j.Logger;
 
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
+import fr.expand.project.importdata.dto.DataPackAttribute;
 import fr.expand.project.importdata.dto.DataPackObject;
+import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.dto.generated.DATAS;
 import fr.expand.project.importdata.dto.generated.LINK;
 import fr.expand.project.importdata.dto.generated.OBJECT;
@@ -169,7 +173,7 @@ public class ModelBasedImportAPI {
                         }
                     }
                     
-                    connector.writeLink(objA, objB, isDirected, link.getTYPE(), link.getATTRIBUTE());
+                    connector.writeLink(objA, objB, isDirected, link.getTYPE(), toDataPackAttributes(link.getATTRIBUTE()));
                     linkCount++;
                 }
                 LOGGER.info("Imported " + linkCount + " links");
@@ -208,5 +212,19 @@ public class ModelBasedImportAPI {
      */
     public void setConnector(IConnectorDb connector) {
         this.connector = connector;
+    }
+
+    private List<DataPackAttribute> toDataPackAttributes(List<ATTRIBUTE> attributes) {
+        List<DataPackAttribute> rows = new ArrayList<>();
+        if (attributes == null) {
+            return rows;
+        }
+        for (ATTRIBUTE attribute : attributes) {
+            if (attribute == null || attribute.getKEY() == null) {
+                continue;
+            }
+            rows.add(new DataPackAttribute(attribute.getKEY(), attribute.getVALUE()));
+        }
+        return rows;
     }
 }
