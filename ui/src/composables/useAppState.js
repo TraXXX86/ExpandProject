@@ -74,6 +74,13 @@ export function useAppState() {
   const isLoadingModels = ref(false);
   const isLoadingModel = ref(false);
   const isLoadingData = ref(false);
+  const fullTextResults = ref([]);
+  const fullTextStatus = ref(null);
+  const isSearchingFullText = ref(false);
+
+  let fullTextSearchTimer = null;
+  let fullTextSearchController = null;
+  let fullTextSearchRequestId = 0;
 
   const authToken = ref(storedToken || '');
   const isAuthenticated = ref(Boolean(authToken.value));
@@ -863,21 +870,7 @@ export function useAppState() {
   const representativeAttributesByType = computed(() => {
     const map = new Map();
     modelDetails.value.objectTypes.forEach((type) => {
-      const refs = Array.isArray(type.representativeAttributes)
-        ? type.representativeAttributes
-        : [];
-      const sorted = [...refs].sort((a, b) => {
-        const orderA = a.order ?? a.index ?? 0;
-        const orderB = b.order ?? b.index ?? 0;
-        if (orderA === orderB) {
-          return String(a.name || '').localeCompare(String(b.name || ''));
-        }
-        return orderA - orderB;
-      });
-      map.set(
-        type.name,
-        sorted.map((ref) => ref.name).filter(Boolean)
-      );
+      map.set(type.name, getRepresentativeAttributeKeysForType(type.name));
     });
     return map;
   });
@@ -885,71 +878,25 @@ export function useAppState() {
   const searchableAttributesByType = computed(() => {
     const map = new Map();
     modelDetails.value.objectTypes.forEach((type) => {
-      const searchable = new Set();
-      if (Array.isArray(type.attributes)) {
-        type.attributes.forEach((attr) => {
-          if (attr.searchable) {
-            searchable.add(attr.name);
-          }
-        });
-      }
+      const searchable = new Set(
+        getMergedTypeAttributes(type.name)
+          .filter((attr) => attr.searchable)
+          .map((attr) => attr.name)
+      );
       map.set(type.name, searchable);
     });
     return map;
   });
 
-  const fullTextTypeOptions = computed(() => tableTypeOptions.value);
-
-  const fullTextResults = computed(() => {
-    const query = fullTextQuery.value.trim().toLowerCase();
-    if (!query) {
-      return [];
-    }
-
-    const typeFilter = Array.isArray(fullTextTypeFilter.value)
-      ? fullTextTypeFilter.value.map((type) => String(type).toLowerCase())
-      : [];
-
-    return dataObjects.value
-      .filter((object) => {
-        if (typeFilter.length && !typeFilter.includes(object.type.toLowerCase())) {
-          return false;
-        }
-        const searchable = searchableAttributesByType.value.get(object.type);
-        if (!searchable || searchable.size === 0) {
-          return false;
-        }
-        const attributes = Array.isArray(object.attributes) ? object.attributes : [];
-        return attributes.some((attr) => {
-          if (!searchable.has(attr.key)) {
-            return false;
-          }
-          const value = String(attr.value || '').toLowerCase();
-          return value.includes(query);
-        });
-      })
-      .map((object) => {
-        const searchable = searchableAttributesByType.value.get(object.type) || new Set();
-        const attributes = Array.isArray(object.attributes) ? object.attributes : [];
-        const matches = attributes
-          .filter((attr) => searchable.has(attr.key))
-          .filter((attr) => String(attr.value || '').toLowerCase().includes(query))
-          .map((attr) => ({
-            key: attr.key,
-            label: getAttributeLabel(object.type, attr.key),
-            value: attr.value
-          }));
-
-        return {
-          key: object.key,
-          id: object.id ?? 'N/A',
-          idKey: object.idKey,
-          type: object.type,
-          primaryLabel: getObjectPrimaryLabel(object),
-          matches
-        };
-      });
-  });
+  const fullTextTypeOptions = computed(() =>
+    modelDetails.value.objectTypes
+      .filter((type) => (searchableAttributesByType.value.get(type.name)?.size || 0) > 0)
+      .map((type) => ({
+        title: type.name,
+        value: type.name
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title))
+  );
 
   const objectIndex = computed(() => {
     const map = new Map();
@@ -1166,7 +1113,20 @@ export function useAppState() {
       if (key !== previousKey) {
         resetCreateState();
         resetModelEditorState();
+        fullTextTypeFilter.value = [];
       }
+      scheduleFullTextSearch();
+    }
+  );
+
+  watch(
+    () => JSON.stringify({
+      modelKey: selectedModelKey.value,
+      query: fullTextQuery.value.trim(),
+      types: [...(Array.isArray(fullTextTypeFilter.value) ? fullTextTypeFilter.value : [])].sort()
+    }),
+    () => {
+      scheduleFullTextSearch();
     }
   );
 
@@ -1969,6 +1929,7 @@ export function useAppState() {
       treeLinkSelections.value = {};
       treeExpandedNodes.value = {};
       objectFilter.value = '';
+      scheduleFullTextSearch();
     } catch (error) {
       resetDataState();
       status.value = { type: 'error', message: error.message };
@@ -2337,6 +2298,7 @@ export function useAppState() {
   }
 
   function resetDataState() {
+    clearFullTextSearchState();
     dataSummary.value = null;
     dataObjects.value = [];
     dataLinks.value = [];
@@ -2364,6 +2326,106 @@ export function useAppState() {
     modelXmlStatus.value = null;
     isLoadingModelXml.value = false;
     isSavingModelXml.value = false;
+  }
+
+  function cancelPendingFullTextSearch() {
+    if (fullTextSearchTimer) {
+      clearTimeout(fullTextSearchTimer);
+      fullTextSearchTimer = null;
+    }
+    if (fullTextSearchController) {
+      fullTextSearchController.abort();
+      fullTextSearchController = null;
+    }
+  }
+
+  function clearFullTextSearchState() {
+    cancelPendingFullTextSearch();
+    fullTextResults.value = [];
+    fullTextStatus.value = null;
+    isSearchingFullText.value = false;
+  }
+
+  function scheduleFullTextSearch() {
+    if (!selectedModelKey.value || !canReadModelData(selectedModelKey.value) || !fullTextQuery.value.trim()) {
+      clearFullTextSearchState();
+      return;
+    }
+
+    if (fullTextSearchTimer) {
+      clearTimeout(fullTextSearchTimer);
+    }
+    fullTextSearchTimer = setTimeout(() => {
+      fullTextSearchTimer = null;
+      refreshFullTextSearch();
+    }, 250);
+  }
+
+  async function refreshFullTextSearch() {
+    const query = fullTextQuery.value.trim();
+    if (!selectedModelKey.value || !canReadModelData(selectedModelKey.value) || !query) {
+      clearFullTextSearchState();
+      return;
+    }
+
+    if (fullTextSearchController) {
+      fullTextSearchController.abort();
+    }
+    const controller = new AbortController();
+    const requestId = ++fullTextSearchRequestId;
+    fullTextSearchController = controller;
+    isSearchingFullText.value = true;
+    fullTextStatus.value = null;
+
+    try {
+      const params = new URLSearchParams({
+        modelKey: selectedModelKey.value,
+        query
+      });
+      const selectedTypes = Array.isArray(fullTextTypeFilter.value) ? fullTextTypeFilter.value : [];
+      selectedTypes.forEach((type) => {
+        if (type) {
+          params.append('types', type);
+        }
+      });
+
+      const response = await apiFetch(`/api/search?${params.toString()}`, {
+        signal: controller.signal
+      });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        if (response.status === 401) {
+          resetAuthState('Session expirée, reconnectez-vous.');
+          return;
+        }
+        throw new Error(payload?.error || 'Erreur lors de la recherche');
+      }
+
+      if (requestId !== fullTextSearchRequestId) {
+        return;
+      }
+
+      fullTextResults.value = normalizeSearchResults(payload?.results || []);
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
+      if (requestId !== fullTextSearchRequestId) {
+        return;
+      }
+      fullTextResults.value = [];
+      fullTextStatus.value = {
+        type: 'error',
+        message: error.message || 'Erreur lors de la recherche'
+      };
+    } finally {
+      if (requestId === fullTextSearchRequestId) {
+        isSearchingFullText.value = false;
+        if (fullTextSearchController === controller) {
+          fullTextSearchController = null;
+        }
+      }
+    }
   }
 
   function selectObject(object) {
@@ -2965,6 +3027,28 @@ export function useAppState() {
     });
   }
 
+  function normalizeSearchResults(results) {
+    return results.map((result, index) => {
+      const id = result.id ?? null;
+      const idKey = id !== null && id !== undefined ? String(id) : `search-${index}`;
+      return {
+        key: `search-${idKey}-${index}`,
+        id: id ?? 'N/A',
+        idKey,
+        type: result.type || 'Objet',
+        primaryLabel: result.primaryLabel || '',
+        matches: Array.isArray(result.matches)
+          ? result.matches
+            .filter((match) => match?.key)
+            .map((match) => ({
+              key: match.key,
+              value: match.value ?? ''
+            }))
+          : []
+      };
+    });
+  }
+
   function getFirstFile(value) {
     if (!value) {
       return null;
@@ -3016,15 +3100,65 @@ export function useAppState() {
     return iconName || 'category';
   }
 
+  function sortRepresentativeRefs(refs) {
+    if (!Array.isArray(refs)) {
+      return [];
+    }
+    return [...refs].sort((a, b) => {
+      const orderA = a.order ?? a.index ?? 0;
+      const orderB = b.order ?? b.index ?? 0;
+      if (orderA === orderB) {
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      }
+      return orderA - orderB;
+    });
+  }
+
+  function getTypeHierarchy(typeName) {
+    if (!typeName) {
+      return [];
+    }
+
+    const chain = [];
+    const visited = new Set();
+    let current = modelTypeIndex.value.get(typeName);
+    while (current && current.name && !visited.has(current.name)) {
+      visited.add(current.name);
+      chain.push(current);
+      current = current.parent ? modelTypeIndex.value.get(current.parent) : null;
+    }
+    return chain.reverse();
+  }
+
+  function getMergedTypeAttributes(typeName) {
+    const merged = new Map();
+    getTypeHierarchy(typeName).forEach((type) => {
+      const attributes = Array.isArray(type.attributes) ? type.attributes : [];
+      attributes.forEach((attr) => {
+        if (attr?.name) {
+          merged.set(attr.name, attr);
+        }
+      });
+    });
+    return Array.from(merged.values());
+  }
+
+  function getRepresentativeAttributeKeysForType(typeName) {
+    let resolved = [];
+    getTypeHierarchy(typeName).forEach((type) => {
+      const refs = sortRepresentativeRefs(type.representativeAttributes);
+      if (refs.length) {
+        resolved = refs.map((ref) => ref.name).filter(Boolean);
+      }
+    });
+    return resolved;
+  }
+
   function getAttributeDefinition(typeName, attributeName) {
     if (!typeName || !attributeName) {
       return null;
     }
-    const typeDef = modelDetails.value.objectTypes.find((type) => type.name === typeName);
-    if (!typeDef || !Array.isArray(typeDef.attributes)) {
-      return null;
-    }
-    return typeDef.attributes.find((attr) => attr.name === attributeName) || null;
+    return getMergedTypeAttributes(typeName).find((attr) => attr.name === attributeName) || null;
   }
 
   function getAttributeLabel(typeName, attributeName) {
@@ -3341,6 +3475,8 @@ export function useAppState() {
     tableHasDetails,
     fullTextQuery,
     fullTextTypeFilter,
+    fullTextStatus,
+    isSearchingFullText,
     searchableAttributesByType,
     fullTextTypeOptions,
     fullTextResults,

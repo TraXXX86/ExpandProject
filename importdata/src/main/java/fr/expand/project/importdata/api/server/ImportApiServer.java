@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,6 +46,7 @@ import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
 import fr.expand.project.importdata.model.generated.OBJECTTYPE;
 import fr.expand.project.importdata.model.generated.TYPEREF;
+import fr.expand.project.importdata.search.ModelSearchMetadata;
 import fr.expand.project.importdata.validation.DataValidator;
 import fr.expand.project.importdata.validation.ValidationResult;
 
@@ -661,6 +663,88 @@ public class ImportApiServer {
             }
         });
 
+        get("/api/search", (request, response) -> {
+            response.type("application/json");
+            AccessContext context = resolveAccessContext(request, response);
+            if (context == null) {
+                return error(response, 401, "Utilisateur inconnu");
+            }
+            if (!context.isPortalUser()) {
+                return error(response, 403, "Accès portail métier refusé");
+            }
+
+            String modelKey = request.queryParams("modelKey");
+            String query = request.queryParams("query");
+            if (modelKey == null || modelKey.isBlank()) {
+                return error(response, 400, "modelKey manquant");
+            }
+            if (query == null || query.isBlank()) {
+                return error(response, 400, "query manquant");
+            }
+            if (!context.canReadData(modelKey)) {
+                return error(response, 403, "Droit READ refusé pour ce modèle");
+            }
+
+            Integer requestedLimit = getInt(request.queryParams("limit"));
+            int limit = requestedLimit == null ? 100 : Math.max(1, Math.min(200, requestedLimit));
+            List<String> requestedTypes = readQueryParamList(request, "types");
+
+            try (Neo4jModelStore modelStore = new Neo4jModelStore();
+                Neo4jDataStore dataStore = new Neo4jDataStore()) {
+                String modelXml = modelStore.loadModelXmlByKey(modelKey);
+                if (modelXml == null || modelXml.isBlank()) {
+                    return error(response, 404, "Modèle introuvable pour la clé fournie");
+                }
+
+                ModelManager modelManager = ModelManager.getInstance();
+                modelManager.loadModelFromXml(modelXml);
+                ModelSearchMetadata searchMetadata = ModelSearchMetadata.from(modelManager);
+
+                Map<String, List<String>> searchableAttributesByType = filterSearchMetadata(
+                    searchMetadata.getSearchableAttributesByType(),
+                    requestedTypes
+                );
+                Map<String, List<String>> representativeAttributesByType = filterSearchMetadata(
+                    searchMetadata.getRepresentativeAttributesByType(),
+                    requestedTypes
+                );
+
+                String trimmedQuery = query.trim();
+                List<Map<String, Object>> rows = dataStore.searchObjects(
+                    modelKey,
+                    trimmedQuery,
+                    requestedTypes,
+                    searchableAttributesByType,
+                    representativeAttributesByType,
+                    limit
+                );
+
+                List<Map<String, Object>> results = new ArrayList<>();
+                for (Map<String, Object> row : rows) {
+                    List<Map<String, Object>> matches = normalizeSearchAttributes(row.get("matches"));
+                    Map<String, Object> searchRow = new HashMap<>();
+                    searchRow.put("id", row.get("id"));
+                    searchRow.put("type", getString(row.get("type")));
+                    searchRow.put("matches", matches);
+                    searchRow.put(
+                        "primaryLabel",
+                        buildPrimaryLabel(normalizeSearchAttributes(row.get("primaryAttributes")))
+                    );
+                    results.add(searchRow);
+                }
+
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("modelKey", modelKey);
+                payload.put("query", trimmedQuery);
+                payload.put("resultCount", results.size());
+                payload.put("limit", limit);
+                payload.put("results", results);
+                return GSON.toJson(payload);
+            } catch (Exception e) {
+                return error(response, 500, "Erreur lors de la recherche: " + e.getMessage());
+            }
+        });
+
         post("/api/objects", (request, response) -> {
             response.type("application/json");
             AccessContext context = resolveAccessContext(request, response);
@@ -1182,6 +1266,94 @@ public class ImportApiServer {
             rows.add(row);
         }
         return rows;
+    }
+
+    private static List<String> readQueryParamList(spark.Request request, String name) {
+        Set<String> values = new LinkedHashSet<>();
+        if (request == null || name == null || name.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        String[] rawValues = request.queryMap(name).values();
+        if (rawValues == null) {
+            return new ArrayList<>();
+        }
+
+        for (String rawValue : rawValues) {
+            if (rawValue == null || rawValue.isBlank()) {
+                continue;
+            }
+            String[] tokens = rawValue.split(",");
+            for (String token : tokens) {
+                if (token == null) {
+                    continue;
+                }
+                String normalized = token.trim();
+                if (!normalized.isBlank()) {
+                    values.add(normalized);
+                }
+            }
+        }
+        return new ArrayList<>(values);
+    }
+
+    private static Map<String, List<String>> filterSearchMetadata(
+        Map<String, List<String>> source,
+        List<String> requestedTypes
+    ) {
+        Map<String, List<String>> filtered = new HashMap<>();
+        if (source == null || source.isEmpty()) {
+            return filtered;
+        }
+        if (requestedTypes == null || requestedTypes.isEmpty()) {
+            filtered.putAll(source);
+            return filtered;
+        }
+
+        for (String typeName : requestedTypes) {
+            if (!source.containsKey(typeName)) {
+                continue;
+            }
+            filtered.put(typeName, source.get(typeName));
+        }
+        return filtered;
+    }
+
+    private static List<Map<String, Object>> normalizeSearchAttributes(Object value) {
+        List<Map<String, Object>> attributes = new ArrayList<>();
+        if (!(value instanceof List<?> list)) {
+            return attributes;
+        }
+
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            String key = getString(map.get("key"));
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            Map<String, Object> attribute = new HashMap<>();
+            attribute.put("key", key);
+            attribute.put("value", getString(map.get("value")));
+            attributes.add(attribute);
+        }
+        return attributes;
+    }
+
+    private static String buildPrimaryLabel(List<Map<String, Object>> attributes) {
+        if (attributes == null || attributes.isEmpty()) {
+            return "";
+        }
+
+        List<String> values = new ArrayList<>();
+        for (Map<String, Object> attribute : attributes) {
+            String value = getString(attribute.get("value"));
+            if (value != null && !value.isBlank()) {
+                values.add(value.trim());
+            }
+        }
+        return String.join(" ", values);
     }
 
     private static String sanitizeUsername(String username) {

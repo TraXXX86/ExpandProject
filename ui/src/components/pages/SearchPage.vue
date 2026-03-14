@@ -27,6 +27,8 @@
                 variant="outlined"
                 density="comfortable"
                 clearable
+                hint="La recherche interroge uniquement les attributs marqués SEARCHABLE côté modèle."
+                persistent-hint
               />
             </v-col>
             <v-col cols="12" md="6">
@@ -44,6 +46,15 @@
             </v-col>
           </v-row>
 
+          <v-alert
+            v-if="state.fullTextStatus"
+            :type="state.fullTextStatus.type"
+            variant="tonal"
+            class="mt-2"
+          >
+            {{ state.fullTextStatus.message }}
+          </v-alert>
+
           <v-data-table
             :headers="state.fullTextHeaders"
             :items="state.fullTextResults"
@@ -51,6 +62,7 @@
             density="comfortable"
             class="mt-4"
             :items-per-page="10"
+            :loading="state.isSearchingFullText"
           >
             <template #item.type="{ item }">
               <v-chip color="primary" variant="tonal" size="small">
@@ -63,7 +75,7 @@
             <template #item.matches="{ item }">
               <div class="table-attributes">
                 <span v-for="(attr, index) in item.matches" :key="attr.key">
-                  {{ attr.label || attr.key }}: {{ attr.value }}<span v-if="index < item.matches.length - 1"> • </span>
+                  {{ state.getAttributeLabel(item.type, attr.key) || attr.key }}: {{ attr.value }}<span v-if="index < item.matches.length - 1"> • </span>
                 </span>
               </div>
             </template>
@@ -86,7 +98,15 @@
             </template>
             <template #no-data>
               <div class="text-medium-emphasis py-6">
-                Saisissez une recherche pour afficher les résultats.
+                <template v-if="state.isSearchingFullText">
+                  Recherche en cours...
+                </template>
+                <template v-else-if="state.fullTextQuery">
+                  Aucun objet ne correspond à cette recherche.
+                </template>
+                <template v-else>
+                  Saisissez une recherche pour afficher les résultats.
+                </template>
               </div>
             </template>
           </v-data-table>

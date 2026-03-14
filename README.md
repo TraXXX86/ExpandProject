@@ -60,6 +60,21 @@ java -jar importdata/target/expandproject-importdata.jar --api 8080
 
 Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
 
+### Recherche plein texte backend
+
+L'écran de recherche appelle désormais `GET /api/search` au lieu de filtrer les objets déjà chargés dans le navigateur.
+
+- Paramètres : `modelKey`, `query`, `types` (répétable ou séparé par des virgules), `limit`
+- Portée : seuls les attributs déclarés `SEARCHABLE="true"` dans le modèle sont interrogés
+- Implémentation : la recherche est exécutée côté Neo4j via Cypher, ce qui permet d'introduire plus tard un vrai index full-text sans changer le contrat de l'API
+
+Exemple :
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8080/api/search?modelKey=SocialNetworkModel&query=paris&types=EMPLOYE"
+```
+
 ## 🐳 Docker Compose
 
 Pour lancer Neo4j + API + IHM sans installer Java localement :

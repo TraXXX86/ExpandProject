@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 import org.neo4j.driver.AuthToken;
 import org.neo4j.driver.AuthTokens;
@@ -154,6 +155,85 @@ public class Neo4jDataStore implements AutoCloseable {
         }
     }
 
+    public List<Map<String, Object>> searchObjects(
+        String modelKey,
+        String query,
+        List<String> typeFilters,
+        Map<String, List<String>> searchableAttributesByType,
+        Map<String, List<String>> representativeAttributesByType,
+        int limit
+    ) {
+        if (modelKey == null || modelKey.isBlank() || query == null || query.isBlank()) {
+            return List.of();
+        }
+        if (searchableAttributesByType == null || searchableAttributesByType.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> requestedTypes = typeFilters == null ? List.of() : typeFilters;
+        int safeLimit = limit <= 0 ? 100 : limit;
+
+        try (Session session = driver.session()) {
+            return session.executeRead(tx -> {
+                Map<String, Object> params = new HashMap<>();
+                params.put("modelKey", modelKey);
+                params.put("query", query.toLowerCase(Locale.ROOT));
+                params.put("typeFilters", requestedTypes);
+                params.put("searchableAttributesByType", searchableAttributesByType);
+                params.put("limit", safeLimit);
+
+                Result result = tx.run(
+                    "WITH $searchableAttributesByType AS searchableAttributesByType, "
+                        + "$typeFilters AS typeFilters, "
+                        + "$query AS searchQuery "
+                        + "MATCH (n:DataObject {modelKey:$modelKey}) "
+                        + "WITH n, searchQuery, searchableAttributesByType, typeFilters, "
+                        + "[label IN labels(n) WHERE label <> 'DataObject'][0] AS objectType "
+                        + "WHERE (size(typeFilters) = 0 OR objectType IN typeFilters) "
+                        + "AND any(attributeName IN coalesce(searchableAttributesByType[objectType], []) "
+                        + "WHERE toLower(toString(coalesce(n[attributeName], ''))) CONTAINS searchQuery) "
+                        + "RETURN id(n) AS id, objectType AS type, properties(n) AS props "
+                        + "ORDER BY id(n) "
+                        + "LIMIT $limit",
+                    params
+                );
+
+                List<Map<String, Object>> results = new ArrayList<>();
+                while (result.hasNext()) {
+                    Record record = result.next();
+                    long id = record.get("id").asLong();
+                    String type = record.get("type").isNull() ? "Object" : record.get("type").asString();
+                    Map<String, Object> props = new HashMap<>(record.get("props").asMap());
+                    props.remove("modelKey");
+
+                    List<Map<String, Object>> matches = extractMatches(
+                        type,
+                        props,
+                        query,
+                        searchableAttributesByType
+                    );
+                    if (matches.isEmpty()) {
+                        continue;
+                    }
+
+                    List<Map<String, Object>> primaryAttributes = extractAttributes(
+                        type,
+                        props,
+                        representativeAttributesByType
+                    );
+
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("id", id);
+                    row.put("type", type);
+                    row.put("matches", matches);
+                    row.put("primaryAttributes", primaryAttributes);
+                    results.add(row);
+                }
+                return results;
+            });
+        }
+    }
+
     public boolean updateObject(String modelKey, long objectId, Map<String, Object> attributes) {
         if (modelKey == null || modelKey.isBlank() || objectId <= 0) {
             return false;
@@ -232,6 +312,68 @@ public class Neo4jDataStore implements AutoCloseable {
             }
         }
         return "Object";
+    }
+
+    private List<Map<String, Object>> extractMatches(
+        String type,
+        Map<String, Object> props,
+        String query,
+        Map<String, List<String>> searchableAttributesByType
+    ) {
+        List<Map<String, Object>> matches = new ArrayList<>();
+        if (props == null || props.isEmpty() || searchableAttributesByType == null) {
+            return matches;
+        }
+        List<String> searchableAttributes = searchableAttributesByType.get(type);
+        if (searchableAttributes == null || searchableAttributes.isEmpty()) {
+            return matches;
+        }
+
+        String normalizedQuery = query == null ? "" : query.toLowerCase(Locale.ROOT);
+        for (String attributeName : searchableAttributes) {
+            if (attributeName == null || attributeName.isBlank() || !props.containsKey(attributeName)) {
+                continue;
+            }
+            String value = props.get(attributeName) == null ? "" : props.get(attributeName).toString();
+            if (!value.toLowerCase(Locale.ROOT).contains(normalizedQuery)) {
+                continue;
+            }
+            Map<String, Object> attribute = new HashMap<>();
+            attribute.put("key", attributeName);
+            attribute.put("value", value);
+            matches.add(attribute);
+        }
+        return matches;
+    }
+
+    private List<Map<String, Object>> extractAttributes(
+        String type,
+        Map<String, Object> props,
+        Map<String, List<String>> attributesByType
+    ) {
+        List<Map<String, Object>> attributes = new ArrayList<>();
+        if (props == null || props.isEmpty() || attributesByType == null) {
+            return attributes;
+        }
+        List<String> attributeNames = attributesByType.get(type);
+        if (attributeNames == null || attributeNames.isEmpty()) {
+            return attributes;
+        }
+
+        for (String attributeName : attributeNames) {
+            if (attributeName == null || attributeName.isBlank() || !props.containsKey(attributeName)) {
+                continue;
+            }
+            String value = props.get(attributeName) == null ? "" : props.get(attributeName).toString();
+            if (value.isBlank()) {
+                continue;
+            }
+            Map<String, Object> attribute = new HashMap<>();
+            attribute.put("key", attributeName);
+            attribute.put("value", value);
+            attributes.add(attribute);
+        }
+        return attributes;
     }
 
     private AuthToken buildAuthToken() {
