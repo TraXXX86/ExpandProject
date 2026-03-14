@@ -88,6 +88,31 @@ public class DataValidatorTests {
         Assert.assertTrue(containsErrorMessage(result, "Target object not found"));
     }
 
+    @Test
+    public void validate_shouldUseExplicitModelContextAfterGlobalModelChanges() throws Exception {
+        ModelManager manager = ModelManager.getInstance();
+        ModelManager.ModelContext socialContext =
+            manager.loadModelContextFromResource("model/example_social_network_model.xml");
+        manager.loadModelFromResource("model/example_auto_refurb_model.xml");
+
+        DATAS data = new DATAS();
+        data.setOBJECTS(new OBJECTS());
+
+        DataPackObject person = new DataPackObject();
+        person.setID(3);
+        person.setTYPE("PERSONNE");
+        person.getATTRIBUTE().add(new DataPackAttribute("NOM", "Durand"));
+        person.getATTRIBUTE().add(new DataPackAttribute("PRENOM", "Claire"));
+        data.getOBJECTS().getOBJECT().add(person);
+
+        ValidationResult explicitResult = new DataValidator(socialContext).validate(data);
+        Assert.assertTrue(explicitResult.isValid());
+
+        ValidationResult legacyResult = new DataValidator().validate(data);
+        Assert.assertFalse(legacyResult.isValid());
+        Assert.assertTrue(containsErrorMessage(legacyResult, "Unknown object type: PERSONNE"));
+    }
+
     private boolean containsErrorMessage(ValidationResult result, String expectedFragment) {
         for (ValidationError error : result.getErrors()) {
             if (error.getMessage() != null && error.getMessage().contains(expectedFragment)) {

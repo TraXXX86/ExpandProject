@@ -29,18 +29,24 @@ public class DataValidator {
     
     private static final Logger LOGGER = LogManager.getLogger(DataValidator.class);
     
-    private ModelManager modelManager;
-    private List<ValidationError> errors;
-    private List<ValidationWarning> warnings;
+    private final ModelManager modelManager;
+    private final ModelManager.ModelContext modelContext;
+    private final List<ValidationError> errors;
+    private final List<ValidationWarning> warnings;
     
     public DataValidator() {
+        this(null);
+    }
+
+    public DataValidator(ModelManager.ModelContext modelContext) {
         this.modelManager = ModelManager.getInstance();
+        this.modelContext = modelContext;
         this.errors = new ArrayList<>();
         this.warnings = new ArrayList<>();
     }
     
     /**
-     * Validate data against the current model
+     * Validate data against the configured model context.
      * @param data Data to validate
      * @return ValidationResult containing errors and warnings
      */
@@ -48,7 +54,8 @@ public class DataValidator {
         errors.clear();
         warnings.clear();
         
-        DATAMODEL model = modelManager.getCurrentModel();
+        ModelManager.ModelContext activeContext = resolveModelContext();
+        DATAMODEL model = activeContext == null ? null : activeContext.getModel();
         if (model == null) {
             errors.add(new ValidationError("GLOBAL", "No model loaded"));
             return new ValidationResult(errors, warnings);
@@ -58,7 +65,7 @@ public class DataValidator {
         
         // Validate objects
         if (data.getOBJECTS() != null && data.getOBJECTS().getOBJECT() != null) {
-            validateObjects(data.getOBJECTS().getOBJECT());
+            validateObjects(data.getOBJECTS().getOBJECT(), activeContext);
         }
         
         // Validate links
@@ -67,7 +74,7 @@ public class DataValidator {
             if (data.getOBJECTS() != null && data.getOBJECTS().getOBJECT() != null) {
                 objects = data.getOBJECTS().getOBJECT();
             }
-            validateLinks(data.getLINKS().getLINK(), objects);
+            validateLinks(data.getLINKS().getLINK(), objects, activeContext);
         }
         
         LOGGER.info("Validation completed. Errors: " + errors.size() + ", Warnings: " + warnings.size());
@@ -78,7 +85,7 @@ public class DataValidator {
     /**
      * Validate all objects
      */
-    private void validateObjects(List<OBJECT> objects) {
+    private void validateObjects(List<OBJECT> objects, ModelManager.ModelContext activeContext) {
         Set<Integer> objectIds = new HashSet<>();
         
         for (OBJECT obj : objects) {
@@ -90,7 +97,7 @@ public class DataValidator {
             
             // Validate object type exists
             String typeName = obj.getTYPE();
-            OBJECTTYPE objectType = modelManager.getObjectType(typeName);
+            OBJECTTYPE objectType = activeContext.getObjectType(typeName);
             
             if (objectType == null) {
                 errors.add(new ValidationError("OBJECT[" + obj.getID() + "]", 
@@ -99,15 +106,19 @@ public class DataValidator {
             }
             
             // Validate attributes
-            validateObjectAttributes(obj, objectType);
+            validateObjectAttributes(obj, objectType, activeContext);
         }
     }
     
     /**
      * Validate object attributes against type definition
      */
-    private void validateObjectAttributes(OBJECT obj, OBJECTTYPE objectType) {
-        Map<String, ATTRIBUTEDEFINITION> attrDefinitions = modelManager.getAttributeDefinitionMap(objectType);
+    private void validateObjectAttributes(
+        OBJECT obj,
+        OBJECTTYPE objectType,
+        ModelManager.ModelContext activeContext
+    ) {
+        Map<String, ATTRIBUTEDEFINITION> attrDefinitions = activeContext.getAttributeDefinitionMap(objectType);
         if (attrDefinitions.isEmpty()) {
             return;
         }
@@ -193,7 +204,7 @@ public class DataValidator {
     /**
      * Validate all links
      */
-    private void validateLinks(List<LINK> links, List<OBJECT> objects) {
+    private void validateLinks(List<LINK> links, List<OBJECT> objects, ModelManager.ModelContext activeContext) {
         // Build object lookup
         Set<String> objectKeys = new HashSet<>();
         for (OBJECT obj : objects) {
@@ -203,7 +214,7 @@ public class DataValidator {
         for (LINK link : links) {
             // Validate link type exists
             String linkTypeName = link.getTYPE();
-            LINKTYPE linkType = modelManager.getLinkType(linkTypeName);
+            LINKTYPE linkType = activeContext.getLinkType(linkTypeName);
             
             if (linkType == null) {
                 errors.add(new ValidationError("LINK", "Unknown link type: " + linkTypeName));
@@ -225,14 +236,14 @@ public class DataValidator {
             }
             
             // Validate source and target types are allowed
-            validateLinkTypes(link, linkType);
+            validateLinkTypes(link, linkType, activeContext);
         }
     }
     
     /**
      * Validate link source and target types
      */
-    private void validateLinkTypes(LINK link, LINKTYPE linkType) {
+    private void validateLinkTypes(LINK link, LINKTYPE linkType, ModelManager.ModelContext activeContext) {
         String sourceType = link.getOBJLINKA().getTYPE();
         String targetType = link.getOBJLINKB().getTYPE();
         
@@ -240,7 +251,7 @@ public class DataValidator {
         boolean sourceAllowed = false;
         if (linkType.getSOURCETYPES() != null) {
             for (TYPEREF typeRef : linkType.getSOURCETYPES().getTYPEREF()) {
-                if (modelManager.isTypeOrSubtype(sourceType, typeRef.getNAME())) {
+                if (activeContext.isTypeOrSubtype(sourceType, typeRef.getNAME())) {
                     sourceAllowed = true;
                     break;
                 }
@@ -256,7 +267,7 @@ public class DataValidator {
         boolean targetAllowed = false;
         if (linkType.getTARGETTYPES() != null) {
             for (TYPEREF typeRef : linkType.getTARGETTYPES().getTYPEREF()) {
-                if (modelManager.isTypeOrSubtype(targetType, typeRef.getNAME())) {
+                if (activeContext.isTypeOrSubtype(targetType, typeRef.getNAME())) {
                     targetAllowed = true;
                     break;
                 }
@@ -267,5 +278,12 @@ public class DataValidator {
             errors.add(new ValidationError("LINK[" + link.getTYPE() + "]", 
                 "Target type '" + targetType + "' not allowed for this link type"));
         }
+    }
+
+    private ModelManager.ModelContext resolveModelContext() {
+        if (modelContext != null) {
+            return modelContext;
+        }
+        return modelManager.getCurrentContext();
     }
 }

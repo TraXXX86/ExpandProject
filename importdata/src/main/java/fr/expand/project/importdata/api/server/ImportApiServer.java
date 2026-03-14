@@ -497,8 +497,8 @@ public class ImportApiServer {
             }
 
             try {
-                ModelManager modelManager = ModelManager.getInstance();
-                DATAMODEL model = modelManager.loadModelFromXml(xml);
+                ModelManager.ModelContext modelContext = ModelManager.getInstance().loadModelContextFromXml(xml);
+                DATAMODEL model = modelContext.getModel();
                 try (Neo4jModelStore store = new Neo4jModelStore()) {
                     String newKey = store.storeModel(model, xml);
                     Map<String, Object> payload = new HashMap<>();
@@ -529,8 +529,8 @@ public class ImportApiServer {
                     return error(response, 400, "Fichier modèle manquant");
                 }
 
-                ModelManager modelManager = ModelManager.getInstance();
-                DATAMODEL model = modelManager.loadModelFromXml(xml);
+                ModelManager.ModelContext modelContext = ModelManager.getInstance().loadModelContextFromXml(xml);
+                DATAMODEL model = modelContext.getModel();
                 try (Neo4jModelStore store = new Neo4jModelStore()) {
                     String modelKey = store.storeModel(model, xml);
                     return GSON.toJson(buildModelDetails(modelKey, model));
@@ -594,16 +594,17 @@ public class ImportApiServer {
                     return error(response, 400, "Fichier de données manquant");
                 }
 
+                ModelManager.ModelContext modelContext;
                 try (Neo4jModelStore store = new Neo4jModelStore()) {
                     String modelXml = store.loadModelXmlByKey(modelKey);
                     if (modelXml == null || modelXml.isBlank()) {
                         return error(response, 404, "Modèle introuvable pour la clé fournie");
                     }
-                    ModelManager.getInstance().loadModelFromXml(modelXml);
+                    modelContext = ModelManager.getInstance().loadModelContextFromXml(modelXml);
                 }
 
                 DATAS data = loadDataFromXml(xml);
-                ModelBasedImportAPI importAPI = new ModelBasedImportAPI();
+                ModelBasedImportAPI importAPI = new ModelBasedImportAPI(modelContext);
                 ValidationResult result = importAPI.importData(data, validateOnly, modelKey);
 
                 Map<String, Object> payload = new HashMap<>();
@@ -690,12 +691,13 @@ public class ImportApiServer {
 
             List<DataPackAttribute> attributes = readAttributes(payload.get("attributes"));
 
+            ModelManager.ModelContext modelContext;
             try (Neo4jModelStore store = new Neo4jModelStore()) {
                 String modelXml = store.loadModelXmlByKey(modelKey);
                 if (modelXml == null || modelXml.isBlank()) {
                     return error(response, 404, "Modèle introuvable pour la clé fournie");
                 }
-                ModelManager.getInstance().loadModelFromXml(modelXml);
+                modelContext = ModelManager.getInstance().loadModelContextFromXml(modelXml);
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors du chargement du modèle: " + e.getMessage());
             }
@@ -709,7 +711,7 @@ public class ImportApiServer {
             obj.getATTRIBUTE().addAll(attributes);
             objects.getOBJECT().add(obj);
 
-            DataValidator validator = new DataValidator();
+            DataValidator validator = new DataValidator(modelContext);
             ValidationResult result = validator.validate(data);
             if (!result.isValid()) {
                 response.status(400);
@@ -803,7 +805,7 @@ public class ImportApiServer {
                 if (modelXml == null || modelXml.isBlank()) {
                     return error(response, 404, "Modèle introuvable pour la clé fournie");
                 }
-                ModelManager.getInstance().loadModelFromXml(modelXml);
+                ModelManager.ModelContext modelContext = ModelManager.getInstance().loadModelContextFromXml(modelXml);
 
                 DATAS data = new DATAS();
                 OBJECTS objects = new OBJECTS();
@@ -814,7 +816,7 @@ public class ImportApiServer {
                 obj.getATTRIBUTE().addAll(readAttributesFromMap(mergedAttributes));
                 objects.getOBJECT().add(obj);
 
-                DataValidator validator = new DataValidator();
+                DataValidator validator = new DataValidator(modelContext);
                 ValidationResult validationResult = validator.validate(data);
                 if (!validationResult.isValid()) {
                     response.status(400);
@@ -910,19 +912,19 @@ public class ImportApiServer {
                 return error(response, 400, "fromId/toId invalides");
             }
 
+            ModelManager.ModelContext modelContext;
             LINKTYPE linkType;
             try (Neo4jModelStore store = new Neo4jModelStore()) {
                 String modelXml = store.loadModelXmlByKey(modelKey);
                 if (modelXml == null || modelXml.isBlank()) {
                     return error(response, 404, "Modèle introuvable pour la clé fournie");
                 }
-                ModelManager.getInstance().loadModelFromXml(modelXml);
+                modelContext = ModelManager.getInstance().loadModelContextFromXml(modelXml);
             } catch (Exception e) {
                 return error(response, 500, "Erreur lors du chargement du modèle: " + e.getMessage());
             }
 
-            ModelManager modelManager = ModelManager.getInstance();
-            linkType = modelManager.getLinkType(linkTypeName);
+            linkType = modelContext.getLinkType(linkTypeName);
             if (linkType == null) {
                 return error(response, 400, "Type de lien inconnu: " + linkTypeName);
             }
@@ -943,10 +945,10 @@ public class ImportApiServer {
             String sourceType = source.get("type") == null ? "" : source.get("type").toString();
             String targetType = target.get("type") == null ? "" : target.get("type").toString();
 
-            if (!isLinkTypeAllowed(modelManager, linkType, sourceType, true)) {
+            if (!isLinkTypeAllowed(modelContext, linkType, sourceType, true)) {
                 return error(response, 400, "Type source non autorisé pour ce lien");
             }
-            if (!isLinkTypeAllowed(modelManager, linkType, targetType, false)) {
+            if (!isLinkTypeAllowed(modelContext, linkType, targetType, false)) {
                 return error(response, 400, "Type cible non autorisé pour ce lien");
             }
 
@@ -1270,7 +1272,12 @@ public class ImportApiServer {
         return meta;
     }
 
-    private static boolean isLinkTypeAllowed(ModelManager modelManager, LINKTYPE linkType, String candidateType, boolean source) {
+    private static boolean isLinkTypeAllowed(
+        ModelManager.ModelContext modelContext,
+        LINKTYPE linkType,
+        String candidateType,
+        boolean source
+    ) {
         if (candidateType == null || candidateType.isBlank() || linkType == null) {
             return false;
         }
@@ -1291,7 +1298,7 @@ public class ImportApiServer {
             if (ref == null || ref.getNAME() == null) {
                 continue;
             }
-            if (modelManager.isTypeOrSubtype(candidateType, ref.getNAME())) {
+            if (modelContext != null && modelContext.isTypeOrSubtype(candidateType, ref.getNAME())) {
                 return true;
             }
         }

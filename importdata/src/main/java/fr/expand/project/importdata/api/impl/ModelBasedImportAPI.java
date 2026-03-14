@@ -27,13 +27,19 @@ public class ModelBasedImportAPI {
     
     private static final Logger LOGGER = LogManager.getLogger(ModelBasedImportAPI.class);
     
-    private ModelManager modelManager;
-    private DataValidator validator;
+    private final ModelManager modelManager;
+    private final ModelManager.ModelContext modelContext;
+    private final DataValidator validator;
     private IConnectorDb connector;
     
     public ModelBasedImportAPI() {
+        this(null);
+    }
+
+    public ModelBasedImportAPI(ModelManager.ModelContext modelContext) {
         this.modelManager = ModelManager.getInstance();
-        this.validator = new DataValidator();
+        this.modelContext = modelContext;
+        this.validator = modelContext == null ? new DataValidator() : new DataValidator(modelContext);
         this.connector = new CypherConnector();
     }
     
@@ -65,6 +71,8 @@ public class ModelBasedImportAPI {
      * Validate and import a data pack with an optional model key.
      */
     public ValidationResult importData(DATAS data, boolean validateOnly, String modelKey) {
+        ModelManager.ModelContext activeContext = resolveModelContext();
+
         // Validate against current model
         LOGGER.info("Validating data against model...");
         ValidationResult result = validator.validate(data);
@@ -85,10 +93,10 @@ public class ModelBasedImportAPI {
         // Import data if validation passed
         LOGGER.info("Validation successful. Starting import...");
         if (modelKey == null || modelKey.isBlank()) {
-            modelKey = storeModelToNeo4j();
+            modelKey = storeModelToNeo4j(activeContext);
         }
         connector.setModelKey(modelKey);
-        importToNeo4j(data);
+        importToNeo4j(data, activeContext);
 
         return result;
     }
@@ -115,7 +123,7 @@ public class ModelBasedImportAPI {
     /**
      * Import validated data to Neo4j
      */
-    private void importToNeo4j(DATAS data) {
+    private void importToNeo4j(DATAS data, ModelManager.ModelContext activeContext) {
         // Note: connector connects automatically in constructor
         
         try {
@@ -156,8 +164,8 @@ public class ModelBasedImportAPI {
                     
                     // Determine if link is directed (default: true)
                     boolean isDirected = true;
-                    if (modelManager.getCurrentModel() != null) {
-                        var linkType = modelManager.getLinkType(link.getTYPE());
+                    if (activeContext != null) {
+                        var linkType = activeContext.getLinkType(link.getTYPE());
                         if (linkType != null) {
                             Boolean directed = linkType.isDIRECTED();
                             if (directed != null) {
@@ -181,17 +189,17 @@ public class ModelBasedImportAPI {
     }
 
     /**
-     * Store the current model in Neo4j as a separate subgraph.
+     * Store the active model in Neo4j as a separate subgraph.
      */
-    private String storeModelToNeo4j() {
-        var model = modelManager.getCurrentModel();
+    private String storeModelToNeo4j(ModelManager.ModelContext activeContext) {
+        var model = activeContext == null ? null : activeContext.getModel();
         if (model == null) {
             LOGGER.warn("No model loaded, skipping model persistence");
             return null;
         }
 
         try (Neo4jModelStore store = new Neo4jModelStore()) {
-            String modelKey = store.storeModel(model, modelManager.getCurrentModelXml());
+            String modelKey = store.storeModel(model, activeContext.getModelXml());
             LOGGER.info("Model stored in Neo4j: " + model.getNAME());
             return modelKey;
         } catch (Exception e) {
@@ -205,5 +213,12 @@ public class ModelBasedImportAPI {
      */
     public void setConnector(IConnectorDb connector) {
         this.connector = connector;
+    }
+
+    private ModelManager.ModelContext resolveModelContext() {
+        if (modelContext != null) {
+            return modelContext;
+        }
+        return modelManager.getCurrentContext();
     }
 }

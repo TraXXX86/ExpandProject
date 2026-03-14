@@ -111,11 +111,11 @@ public class Launcher {
                 System.exit(1);
             }
             
-            modelManager.loadModel(modelFile);
+            ModelManager.ModelContext modelContext = modelManager.loadModelContext(modelFile);
             LOGGER.info("");
             
             // Load and validate data
-            ModelBasedImportAPI importAPI = new ModelBasedImportAPI();
+            ModelBasedImportAPI importAPI = new ModelBasedImportAPI(modelContext);
             File dataFile = new File(dataPath);
             
             if (!dataFile.exists()) {
@@ -154,11 +154,12 @@ public class Launcher {
             
             // Load example model from resources
             ModelManager modelManager = ModelManager.getInstance();
-            modelManager.loadModelFromResource("model/example_social_network_model.xml");
+            ModelManager.ModelContext modelContext =
+                modelManager.loadModelContextFromResource("model/example_social_network_model.xml");
             LOGGER.info("");
             
             // Validate example data
-            ModelBasedImportAPI importAPI = new ModelBasedImportAPI();
+            ModelBasedImportAPI importAPI = new ModelBasedImportAPI(modelContext);
             
             LOGGER.info("Loading example data from resources...");
             jakarta.xml.bind.JAXBContext jaxbContext = 
@@ -172,8 +173,8 @@ public class Launcher {
             
             LOGGER.info("");
             LOGGER.info("Validating example data...");
-            fr.expand.project.importdata.validation.DataValidator validator = 
-                new fr.expand.project.importdata.validation.DataValidator();
+            fr.expand.project.importdata.validation.DataValidator validator =
+                new fr.expand.project.importdata.validation.DataValidator(modelContext);
             ValidationResult result = validator.validate(data);
             
             LOGGER.info("");
