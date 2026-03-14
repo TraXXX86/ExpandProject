@@ -46,6 +46,7 @@ Une interface locale Vue 3 + Vuetify est disponible dans le dossier `ui/`.
 ```bash
 cd ui
 npm install
+npm test
 npm run dev
 ```
 
@@ -342,6 +343,15 @@ ExpandProject/
 ```bash
 mvn test
 ```
+
+### Lancer les tests frontend
+
+```bash
+cd ui
+npm test
+```
+
+La CI exécute désormais les tests frontend Vitest avant le build Vite.
 
 ### Tester avec des données personnalisées
 
