@@ -16,6 +16,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import fr.expand.project.commons.ObjectTypeEnum;
+import fr.expand.project.importdata.config.Neo4jConfig;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.dto.DataPackAttribute;
@@ -24,10 +25,18 @@ import fr.expand.project.importdata.util.CypherUtils;
 
 public class Neo4jConnector extends IConnectorDb {
 
+	private final Neo4jConfig neo4jConfig;
 	private Connection conn = null;
-	private static final String DEFAULT_HTTP_URI = "jdbc:neo4j:http://localhost:7474";
-	private static final String DEFAULT_USER = "neo4j";
-	private static final String DEFAULT_PASSWORD = "expand";
+
+	public Neo4jConnector() {
+		this(Neo4jConfig.fromSystem());
+	}
+
+	public Neo4jConnector(Neo4jConfig neo4jConfig) {
+		super(false);
+		this.neo4jConfig = neo4jConfig == null ? Neo4jConfig.fromSystem() : neo4jConfig;
+		connectToDb();
+	}
 
 	// ############################# Start/Close Connection to DB methods
 
@@ -35,25 +44,7 @@ public class Neo4jConnector extends IConnectorDb {
 	protected void connectToDb() {
 		if (conn == null) {
 			try {
-				String uri = readSetting("NEO4J_HTTP_URI", "NEO4J_JDBC_URI", DEFAULT_HTTP_URI);
-				String auth = readSetting("NEO4J_AUTH", null, null);
-				if (auth != null && !auth.isBlank()) {
-					if ("none".equalsIgnoreCase(auth.trim())) {
-						conn = DriverManager.getConnection(uri);
-					} else {
-						int separatorIndex = auth.indexOf('/');
-						if (separatorIndex > 0 && separatorIndex < auth.length() - 1) {
-							String user = auth.substring(0, separatorIndex);
-							String password = auth.substring(separatorIndex + 1);
-							conn = DriverManager.getConnection(uri, user, password);
-						}
-					}
-				}
-				if (conn == null) {
-					String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
-					String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
-					conn = DriverManager.getConnection(uri, user, password);
-				}
+				conn = neo4jConfig.createJdbcConnection();
 			} catch (SQLException e) {
 				throw new RuntimeException(e);
 			}
@@ -67,6 +58,7 @@ public class Neo4jConnector extends IConnectorDb {
 				if (!conn.isClosed()) {
 					conn.close();
 				}
+				conn = null;
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
@@ -341,17 +333,4 @@ public class Neo4jConnector extends IConnectorDb {
 		return sanitized.toUpperCase();
 	}
 
-	private String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
-		String value = System.getProperty(envKey);
-		if (value == null || value.isBlank()) {
-			value = System.getenv(envKey);
-		}
-		if ((value == null || value.isBlank()) && fallbackEnvKey != null) {
-			value = System.getProperty(fallbackEnvKey);
-			if (value == null || value.isBlank()) {
-				value = System.getenv(fallbackEnvKey);
-			}
-		}
-		return (value == null || value.isBlank()) ? defaultValue : value;
-	}
 }

@@ -15,8 +15,14 @@ public abstract class IConnectorDb implements AutoCloseable {
 	 * Constructor
 	 */
 	public IConnectorDb() {
+		this(true);
+	}
+
+	protected IConnectorDb(boolean autoConnect) {
 		super();
-		this.connectToDb();
+		if (autoConnect) {
+			this.connectToDb();
+		}
 	}
 
 	/**

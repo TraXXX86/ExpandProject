@@ -2,10 +2,7 @@ package fr.expand.project.importdata.dao.connectors.impl;
 
 import java.util.Map.Entry;
 
-import org.neo4j.driver.AuthToken;
-import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
 import org.neo4j.driver.Session;
@@ -13,6 +10,7 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.types.Node;
 
 import fr.expand.project.commons.ObjectTypeEnum;
+import fr.expand.project.importdata.config.Neo4jConfig;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dto.DataPackAttribute;
 import fr.expand.project.importdata.dto.DataPackObject;
@@ -26,19 +24,25 @@ import fr.expand.project.importdata.util.CypherUtils;
  */
 public class CypherConnector extends IConnectorDb {
 
+	private final Neo4jConfig neo4jConfig;
 	private Driver driver;
 	private Session session;
-	private static final String DEFAULT_BOLT_URI = "bolt://localhost:7687";
-	private static final String DEFAULT_USER = "neo4j";
-	private static final String DEFAULT_PASSWORD = "expand";
+
+	public CypherConnector() {
+		this(Neo4jConfig.fromSystem());
+	}
+
+	public CypherConnector(Neo4jConfig neo4jConfig) {
+		super(false);
+		this.neo4jConfig = neo4jConfig == null ? Neo4jConfig.fromSystem() : neo4jConfig;
+		connectToDb();
+	}
 
 	// ############################# Start/Close Connection to DB methods
 
 	@Override
 	protected void connectToDb() {
-		String uri = readSetting("NEO4J_BOLT_URI", "NEO4J_URI", DEFAULT_BOLT_URI);
-		AuthToken authToken = buildAuthToken();
-		driver = GraphDatabase.driver(uri, authToken);
+		driver = neo4jConfig.createDriver();
 		session = driver.session();
 	}
 
@@ -46,9 +50,11 @@ public class CypherConnector extends IConnectorDb {
 	public void closeConnection() {
 		if (session != null) {
 			session.close();
+			session = null;
 		}
 		if (driver != null) {
 			driver.close();
+			driver = null;
 		}
 	}
 
@@ -217,38 +223,5 @@ public class CypherConnector extends IConnectorDb {
 
         return builder.toString();
     }
-
-	private AuthToken buildAuthToken() {
-		String auth = readSetting("NEO4J_AUTH", null, null);
-		if (auth != null && !auth.isBlank()) {
-			if ("none".equalsIgnoreCase(auth.trim())) {
-				return AuthTokens.none();
-			}
-			int separatorIndex = auth.indexOf('/');
-			if (separatorIndex > 0 && separatorIndex < auth.length() - 1) {
-				String user = auth.substring(0, separatorIndex);
-				String password = auth.substring(separatorIndex + 1);
-				return AuthTokens.basic(user, password);
-			}
-		}
-
-		String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
-		String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
-		return AuthTokens.basic(user, password);
-	}
-
-	private String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
-		String value = System.getProperty(envKey);
-		if (value == null || value.isBlank()) {
-			value = System.getenv(envKey);
-		}
-		if ((value == null || value.isBlank()) && fallbackEnvKey != null) {
-			value = System.getProperty(fallbackEnvKey);
-			if (value == null || value.isBlank()) {
-				value = System.getenv(fallbackEnvKey);
-			}
-		}
-		return (value == null || value.isBlank()) ? defaultValue : value;
-	}
 
 }

@@ -243,7 +243,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 # 1. Démarrer Neo4j (Docker)
 docker run -d --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/expand123456 \
   neo4j:5.17.0
 
 # 2. Importer les données
@@ -252,7 +252,7 @@ docker run -d --name neo4j-expand \
   importdata/src/main/resources/datapack/example_social_network_data.xml
 
 # 3. Visualiser
-# Ouvrir http://localhost:7474 (neo4j/expand)
+# Ouvrir http://localhost:7474 (neo4j/expand123456)
 # Requête: MATCH (n) RETURN n
 ```
 

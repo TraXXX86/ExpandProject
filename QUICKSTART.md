@@ -26,7 +26,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="src/main/resources/model/example_social_network_model.xml src/main/resources/datapack/example_social_network_data.xml"
 
 # 5. Visualiser dans Neo4j Browser
-# Ouvrez http://localhost:7474 (login: neo4j/expand)
+# Ouvrez http://localhost:7474 (login: neo4j/expand123456)
 # Exécutez: MATCH (n) RETURN n
 ```
 
@@ -65,7 +65,7 @@ Option A - Docker (Recommandé):
 ```bash
 docker run -d --name neo4j-expand \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/expand123456 \
   neo4j:5.17.0
 ```
 

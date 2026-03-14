@@ -169,11 +169,11 @@ Modélisez projets, tâches, ressources et leurs relations.
 
 - **URL**: bolt://localhost:7687
 - **Utilisateur**: neo4j
-- **Mot de passe**: expand
+- **Mot de passe**: expand123456
 
 ### Personnalisation
 
-Éditez `CypherConnector.java` ligne 35 pour changer les paramètres de connexion.
+Configuration centralisée dans `importdata/src/main/java/fr/expand/project/importdata/config/Neo4jConfig.java`.
 
 ### Logging
 

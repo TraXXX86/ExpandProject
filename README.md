@@ -109,7 +109,7 @@ brew install neo4j
 docker run -d \
   --name neo4j \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
+  -e NEO4J_AUTH=neo4j/expand123456 \
   neo4j:5.17.0
 ```
 
@@ -131,16 +131,16 @@ neo4j status
 Par défaut, l'application utilise :
 - **URL**: `bolt://localhost:7687`
 - **Utilisateur**: `neo4j`
-- **Mot de passe**: `expand`
+- **Mot de passe**: `expand123456`
 
-Pour modifier ces paramètres, éditez :
-- `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` (ligne 35)
+La configuration Neo4j est centralisée dans :
+- `importdata/src/main/java/fr/expand/project/importdata/config/Neo4jConfig.java`
 
 Vous pouvez aussi surcharger via variables d'environnement ou propriétés JVM :
-- `NEO4J_BOLT_URI` (ex: `bolt://localhost:7687`)
-- `NEO4J_HTTP_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
+- `NEO4J_BOLT_URI` ou `NEO4J_URI` (ex: `bolt://localhost:7687`)
+- `NEO4J_HTTP_URI` ou `NEO4J_JDBC_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
 - `NEO4J_USER` / `NEO4J_PASSWORD`
-- `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`)
+- `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`, prioritaire sur user/password)
 
 ## 📖 Utilisation
 
@@ -360,7 +360,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 Après l'import, visualisez vos données :
 
 1. Ouvrez Neo4j Browser : http://localhost:7474
-2. Connectez-vous (neo4j/expand)
+2. Connectez-vous (neo4j/expand123456 par défaut, ou votre `NEO4J_AUTH`)
 3. Exécutez des requêtes Cypher :
 
 ```cypher
