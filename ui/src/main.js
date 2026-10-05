@@ -1,15 +1,16 @@
 import { createApp } from 'vue';
 import { createVuetify } from 'vuetify';
-import * as components from 'vuetify/components';
-import * as directives from 'vuetify/directives';
+import { VAlert, VApp, VAppBar, VAutocomplete, VAvatar, VBtn, VCard, VCardText, VCardTitle, VCheckbox, VChip, VChipGroup, VCol, VContainer, VDataTable, VDivider, VFileInput, VIcon, VList, VListItem, VMain, VMenu, VRow, VSelect, VSwitch, VTab, VTable, VTabs, VTextField, VTextarea, VTooltip, VWindow, VWindowItem } from 'vuetify/components';
+import { iconConfig } from './icons';
+import { Ripple } from 'vuetify/directives';
 import 'vuetify/styles';
-import '@mdi/font/css/materialdesignicons.css';
 import './styles/main.css';
 import App from './App.vue';
 
 const vuetify = createVuetify({
-  components,
-  directives,
+  components: { VAlert, VApp, VAppBar, VAutocomplete, VAvatar, VBtn, VCard, VCardText, VCardTitle, VCheckbox, VChip, VChipGroup, VCol, VContainer, VDataTable, VDivider, VFileInput, VIcon, VList, VListItem, VMain, VMenu, VRow, VSelect, VSwitch, VTab, VTable, VTabs, VTextField, VTextarea, VTooltip, VWindow, VWindowItem },
+  directives: { Ripple },
+  icons: iconConfig,
   theme: {
     defaultTheme: 'expandLight',
     themes: {

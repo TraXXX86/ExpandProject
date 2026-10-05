@@ -20,7 +20,9 @@
             size="x-small"
             variant="text"
             class="explorer-expand-btn"
-            :disabled="!hasChildren"
+            :loading="neighborState.loading"
+            :disabled="neighborState.loading"
+            :aria-label="isExpanded ? 'Réduire la branche' : 'Charger et ouvrir la branche'"
             @click.stop="toggleExpand"
           >
             <v-icon :icon="isExpanded ? 'mdi-chevron-down' : 'mdi-chevron-right'" />
@@ -47,6 +49,11 @@
       </v-card-text>
     </v-card>
 
+    <div v-if="neighborState.hasMore" class="text-caption text-warning ml-4">Voisinage partiel : la limite de voisins ou de liens a été atteinte.</div>
+    <div v-if="neighborState.error" role="alert" class="text-caption text-error ml-4">
+      {{ neighborState.error }}
+      <v-btn size="x-small" variant="text" @click="state.loadNeighbors(node.object.idKey)">Réessayer</v-btn>
+    </div>
     <teleport to="body">
       <div
         v-if="contextMenuVisible"
@@ -100,7 +107,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 defineOptions({ name: 'ExplorerRecursiveNode' });
 
@@ -115,7 +122,8 @@ const props = defineProps({
   }
 });
 
-const node = props.node;
+const node = computed(() => props.node);
+const neighborState = computed(() => props.state.neighborStatus[node.value.object.idKey] || {});
 const state = props.state;
 
 const nodeRef = ref(null);
@@ -124,9 +132,9 @@ const contextMenuVisible = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
 
-const primaryAttributes = computed(() => state.getObjectPrimaryAttributes(node.object));
+const primaryAttributes = computed(() => state.getObjectPrimaryAttributes(node.value.object));
 const relationTypeItems = computed(() =>
-  Array.from(new Set(node.relations.map((relation) => relation.type).filter(Boolean)))
+  Array.from(new Set(node.value.relations.map((relation) => relation.type).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b))
     .map((code) => ({
       code,
@@ -134,25 +142,25 @@ const relationTypeItems = computed(() =>
     }))
 );
 const selectedRelations = computed(() =>
-  node.relations.filter((relation) =>
-    state.isNodeRelationSelected(node.nodePath, relation.type, node.object.idKey)
+  node.value.relations.filter((relation) =>
+    state.isNodeRelationSelected(node.value.nodePath, relation.type, node.value.object.idKey)
   )
 );
 const renderedChildren = computed(() => {
-  if (node.children.length) {
-    return node.children;
+  if (node.value.children.length) {
+    return node.value.children;
   }
   if (!selectedRelations.value.length || !state.getExplorerSubtree) {
     return [];
   }
 
-  const baseVisited = Array.isArray(node.visitedKeys) && node.visitedKeys.length
-    ? node.visitedKeys
-    : [node.object.idKey];
+  const baseVisited = Array.isArray(node.value.visitedKeys) && node.value.visitedKeys.length
+    ? node.value.visitedKeys
+    : [node.value.object.idKey];
 
   return selectedRelations.value
     .map((relation) => {
-      const childPath = `${node.nodePath}>${relation.key}`;
+      const childPath = `${node.value.nodePath}>${relation.key}`;
       if (baseVisited.includes(relation.targetKey)) {
         return {
           key: childPath,
@@ -165,7 +173,7 @@ const renderedChildren = computed(() => {
       const subtree = state.getExplorerSubtree(
         relation.targetKey,
         childPath,
-        Number(node.depth || 0) + 1,
+        Number(node.value.depth || 0) + 1,
         [...baseVisited, relation.targetKey]
       );
       return {
@@ -200,8 +208,8 @@ const groupedChildren = computed(() => {
   return Array.from(groups.values());
 });
 const hasChildren = computed(() => visibleChildren.value.length > 0);
-const hasExpandableRelations = computed(() => node.relations.length > 0);
-const isExpanded = computed(() => state.isNodeExpanded(node.nodePath));
+const hasExpandableRelations = computed(() => !neighborState.value.loaded || node.value.relations.length > 0);
+const isExpanded = computed(() => state.isNodeExpanded(node.value.nodePath));
 
 const contextMenuStyle = computed(() => ({
   left: `${contextMenuX.value}px`,
@@ -209,10 +217,12 @@ const contextMenuStyle = computed(() => ({
 }));
 
 function selectNode() {
-  state.selectObjectByKey(node.object.idKey);
+  state.selectObjectByKey(node.value.object.idKey);
 }
 
-function toggleExpand() {
+async function toggleExpand() {
+  if (!state.isNodeExpanded(node.value.nodePath)) await state.loadNeighbors(node.value.object.idKey);
+  await nextTick();
   if (!hasExpandableRelations.value) {
     return;
   }
@@ -220,10 +230,12 @@ function toggleExpand() {
     openContextMenuFromNode();
     return;
   }
-  state.toggleNodeExpanded(node.nodePath);
+  state.toggleNodeExpanded(node.value.nodePath);
 }
 
-function openContextMenu(event) {
+async function openContextMenu(event) {
+  await state.loadNeighbors(node.value.object.idKey);
+  await nextTick();
   event?.preventDefault?.();
   if (!relationTypeItems.value.length) {
     return;
@@ -249,9 +261,9 @@ function openContextMenuFromNode() {
 
 function toggleRelationSelection(relationType, event) {
   const checked = Boolean(event?.target?.checked);
-  state.toggleNodeRelation(node.nodePath, relationType, checked, node.object.idKey);
-  if (checked && !state.isNodeExpanded(node.nodePath) && state.toggleNodeExpanded) {
-    state.toggleNodeExpanded(node.nodePath);
+  state.toggleNodeRelation(node.value.nodePath, relationType, checked, node.value.object.idKey);
+  if (checked && !state.isNodeExpanded(node.value.nodePath) && state.toggleNodeExpanded) {
+    state.toggleNodeExpanded(node.value.nodePath);
   }
 }
 

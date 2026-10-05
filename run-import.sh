@@ -36,6 +36,8 @@ if [ ! -f "$DATA_FILE" ]; then
     echo "❌ Erreur: Fichier données non trouvé: $DATA_FILE"
     exit 1
 fi
+MODEL_FILE="$(cd "$(dirname "$MODEL_FILE")" && pwd)/$(basename "$MODEL_FILE")"
+DATA_FILE="$(cd "$(dirname "$DATA_FILE")" && pwd)/$(basename "$DATA_FILE")"
 
 # Vérifier que Neo4j est accessible (si pas en mode validation seule)
 if [ "$VALIDATE_ONLY" != "--validate-only" ]; then
@@ -72,7 +74,7 @@ echo ""
 # Compilation rapide si nécessaire
 if [ ! -d "importdata/target" ]; then
     echo "📦 Compilation du projet..."
-    mvn clean install -DskipTests -q
+    ./mvnw clean install -DskipTests -q
     if [ $? -ne 0 ]; then
         echo "❌ Erreur lors de la compilation"
         exit 1
@@ -84,7 +86,7 @@ echo "🚀 Lancement de l'import..."
 echo ""
 
 cd importdata
-mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
+../mvnw exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="$MODEL_FILE $DATA_FILE $VALIDATE_ONLY"
 
 EXIT_CODE=$?
@@ -97,7 +99,7 @@ if [ $EXIT_CODE -eq 0 ]; then
         echo ""
         echo "📊 Pour visualiser les données:"
         echo "   1. Ouvrez http://localhost:7474"
-        echo "   2. Connectez-vous (neo4j/expand)"
+        echo "   2. Connectez-vous avec les identifiants configurés dans NEO4J_AUTH"
         echo "   3. Exécutez: MATCH (n) RETURN n"
     fi
 else

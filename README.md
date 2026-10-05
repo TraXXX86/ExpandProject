@@ -14,9 +14,10 @@ ExpandProject est un outil d'import de données dans Neo4j avec support de modè
 ## 📋 Prérequis
 
 - **Java 17+** (OpenJDK 17 ou supérieur)
-- **Maven 3.8+** (pour la compilation)
+- **Maven 3.9.9** via le wrapper `./mvnw` (Java 17 requis)
+- **Node.js 24** (pour l'IHM)
 - **Neo4j** (pour l'import de données)
-  - Version recommandée: 5.x
+  - Version de référence: 5.26.31
   - Mode serveur accessible via Bolt (bolt://localhost:7687)
 
 ## 🚀 Installation
@@ -31,11 +32,11 @@ cd ExpandProject
 ### 2. Compiler le projet
 
 ```bash
-mvn clean install
+./mvnw clean package
 ```
 
 Cette commande va :
-- Compiler tous les modules (commons, importdata, model)
+- Compiler les modules `commons` et `importdata`
 - Générer les DTOs à partir des schémas XSD
 - Créer les JARs dans les dossiers `target/`
 
@@ -45,7 +46,7 @@ Une interface locale Vue 3 + Vuetify est disponible dans le dossier `ui/`.
 
 ```bash
 cd ui
-npm install
+npm ci
 npm run dev
 ```
 
@@ -54,17 +55,23 @@ L'interface consomme l'API d'import pour charger les modèles et données dans N
 Pour démarrer l'API :
 
 ```bash
-mvn -pl importdata -am package
+export NEO4J_BOLT_URI=bolt://localhost:7687
+export NEO4J_AUTH='neo4j/<your-neo4j-password>'
+export EXPAND_ADMIN_PASSWORD='<your-admin-password>'
+export ACCESS_DB_PATH="$PWD/access.sqlite"
+./mvnw -pl importdata -am package
 java -jar importdata/target/expandproject-importdata.jar --api 8080
 ```
 
-Par défaut l'IHM cible `http://localhost:8080`. Vous pouvez surcharger via `VITE_API_BASE`.
+En développement, le proxy Vite relaie les appels `/api` vers `http://localhost:8080` (ou vers `API_PROXY_TARGET`). En Compose, nginx relaie `/api` vers l'API sur le réseau interne; le navigateur utilise donc la même origine pour l'interface et l'API.
 
 ## 🐳 Docker Compose
 
 Pour lancer Neo4j + API + IHM sans installer Java localement :
 
 ```bash
+cp .env.example .env
+# Edit .env and set unique values for both required passwords.
 docker compose up --build
 ```
 
@@ -73,18 +80,29 @@ Accès :
 - API : http://localhost:8080
 - Neo4j : http://localhost:7474 (bolt 7687)
 
-Le mot de passe par défaut est `neo4j/expand123456`. Vous pouvez modifier cette valeur dans `docker-compose.yml`.
+Compose refuses to start until both `NEO4J_AUTH` and `EXPAND_ADMIN_PASSWORD` are set in `.env`. There are no default passwords. Neo4j data and the SQLite access database persist in separate Docker volumes. The published service ports bind to localhost.
+
+The Dockerfiles can import a custom proxy CA from a BuildKit secret without baking it into an image. To use one, build both service images with the same secret file, then start Compose without `--build`:
+
+```bash
+export PROXY_CA_FILE=/path/to/proxy-ca.pem
+docker build --secret id=proxy_ca,src="$PROXY_CA_FILE" -f importdata/Dockerfile -t expandproject-api:local .
+docker build --secret id=proxy_ca,src="$PROXY_CA_FILE" -f ui/Dockerfile -t expandproject-ui:local .
+docker compose up
+```
+
+If Maven needs a private mirror or credentials, pass its settings file only to the backend build with `--secret id=maven_settings,src="$MAVEN_SETTINGS_FILE"`.
 
 ### Vérifier rapidement l'import du modèle
 
 ```bash
-./scripts/smoke-api.sh
+EXPAND_ADMIN_PASSWORD='<your-admin-password>' ./scripts/smoke-api.sh
 ```
 
 Vous pouvez surcharger l'URL de l'API et le fichier modèle :
 
 ```bash
-API_BASE=http://localhost:8080 MODEL_FILE=chemin/vers/model.xml ./scripts/smoke-api.sh
+EXPAND_ADMIN_PASSWORD='<your-admin-password>' API_BASE=http://localhost:8080 MODEL_FILE=chemin/vers/model.xml ./scripts/smoke-api.sh
 ```
 
 ### 3. Configurer Neo4j
@@ -108,9 +126,9 @@ brew install neo4j
 ```bash
 docker run -d \
   --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/expand \
-  neo4j:5.17.0
+  -p 127.0.0.1:7474:7474 -p 127.0.0.1:7687:7687 \
+  -e NEO4J_AUTH='neo4j/<your-password>' \
+  neo4j:5.26.31
 ```
 
 #### Démarrer Neo4j
@@ -128,19 +146,31 @@ neo4j status
 
 #### Configuration
 
-Par défaut, l'application utilise :
-- **URL**: `bolt://localhost:7687`
-- **Utilisateur**: `neo4j`
-- **Mot de passe**: `expand`
+The API requires an explicit Neo4j password and admin bootstrap password. Configure them through environment variables:
 
-Pour modifier ces paramètres, éditez :
-- `importdata/src/main/java/fr/expand/project/importdata/dao/connectors/impl/CypherConnector.java` (ligne 35)
-
-Vous pouvez aussi surcharger via variables d'environnement ou propriétés JVM :
 - `NEO4J_BOLT_URI` (ex: `bolt://localhost:7687`)
-- `NEO4J_HTTP_URI` (ex: `jdbc:neo4j:http://localhost:7474`)
-- `NEO4J_USER` / `NEO4J_PASSWORD`
-- `NEO4J_AUTH` (format `utilisateur/motdepasse`, ou `none`)
+- `NEO4J_AUTH` (required, `username/password` format)
+- `EXPAND_ADMIN_PASSWORD` (required when initializing an empty access database; creates the `admin` account)
+- `ACCESS_DB_PATH` (SQLite database path; defaults to the user's `.expandproject/access.sqlite` location)
+- `EXPAND_ALLOWED_ORIGINS` (comma-separated CORS allowlist; configure your UI origin explicitly for deployments)
+- `EXPAND_COOKIE_SECURE` (`true` when serving the API over HTTPS; keep `false` for local HTTP development)
+
+## Migration depuis une version précédente
+
+Cette version change les mots de passe et sessions du portail, la pagination de l'API et les identifiants de démarrage. Prévoyez une interruption pendant la migration et gardez les anciennes versions de sauvegarde jusqu'à validation.
+
+1. Arrêtez l'ancienne application et sauvegardez Neo4j avec `neo4j-admin database dump neo4j --to-path=/chemin/de/sauvegarde`. Copiez également le fichier SQLite existant (souvent `~/.expandproject/access.sqlite`) et son éventuel fichier `-wal`.
+2. Choisissez des valeurs uniques pour `NEO4J_AUTH` et `EXPAND_ADMIN_PASSWORD`. Les anciennes valeurs d'exemple `expand123456`, `expand` et `admin/admin` ne sont plus configurées par défaut. L'admin est créé avec `EXPAND_ADMIN_PASSWORD` uniquement si la base d'accès est vide; les comptes et rôles existants restent ceux de SQLite. Réinitialisez les anciens comptes qui utilisent encore un mot de passe d’exemple avant toute exposition réseau.
+3. Pointez `ACCESS_DB_PATH` vers la base SQLite sauvegardée si vous souhaitez conserver utilisateurs et rôles, ou vers `/data/access.sqlite` dans Compose. Le nouveau conteneur monte un volume persistant pour cette base.
+4. Invalidez les sessions portail après la migration en supprimant les lignes de la table `sessions` dans SQLite; les utilisateurs devront se reconnecter. Lors d'une authentification réussie, les anciens mots de passe hachés sont progressivement convertis au format PBKDF2 actuel.
+5. Les grandes tables récupèrent maintenant leurs pages et leurs filtres depuis l'API. Les intégrations clientes doivent consommer les métadonnées de pagination renvoyées par le serveur et demander les pages suivantes au lieu de supposer que toute la table tient dans une réponse.
+6. Avant de reconstruire une ancienne copie de travail, supprimez les anciennes classes JAXB générées dans `importdata/src/main/java/fr/expand/project/importdata/dto/generated` et `importdata/src/main/java/fr/expand/project/importdata/model/generated`. La génération se fait maintenant dans `target/generated-sources/jaxb`.
+
+7. Les nouvelles contraintes Neo4j exigent l’unicité des clés de modèles et des triplets `(modelKey, type, dataId)`. Si des doublons historiques existent, le démarrage échoue explicitement : réconciliez ces doublons après sauvegarde, puis redémarrez.
+8. La recherche `searchMode=fulltext` utilise un index Neo4j alimenté uniquement par les champs déclarés recherchables, y compris ceux hérités. Le premier accès indexé d’un ancien modèle reconstruit ses valeurs de recherche. Le mode `contains` reste disponible.
+9. Les liens exposent un UUID stable pour leur modification et leur suppression; les identifiants numériques restent acceptés pour les anciens clients. Une mise à jour de modèle ne peut plus changer sa clé : créez un nouveau modèle pour un changement de nom/version.
+
+Cette migration modifie les variables obligatoires, les sessions de connexion et le contrat de pagination côté client. Vérifiez vos scripts et intégrations avant de remettre l'interface en service.
 
 ## 📖 Utilisation
 
@@ -150,7 +180,7 @@ Testez rapidement avec les données d'exemple incluses :
 
 ```bash
 cd importdata
-mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" -Dexec.args="--example"
+../mvnw exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" -Dexec.args="--example"
 ```
 
 Ceci va :
@@ -162,7 +192,7 @@ Ceci va :
 
 ```bash
 cd importdata
-mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
+../mvnw exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="src/main/resources/model/example_social_network_model.xml src/main/resources/datapack/example_social_network_data.xml"
 ```
 
@@ -175,7 +205,7 @@ Ceci va :
 
 ```bash
 cd importdata
-mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
+../mvnw exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="path/to/model.xml path/to/data.xml --validate-only"
 ```
 
@@ -184,7 +214,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 ```bash
 # Compiler le JAR exécutable
 cd importdata
-mvn package
+../mvnw package
 
 # Exécuter
 java -jar target/importpackage-0.0.1-SNAPSHOT.jar --example
@@ -331,7 +361,6 @@ ExpandProject/
 │           ├── data.xsd           # Schéma XSD des données
 │           └── example_social_network_data.xml
 │
-├── model/                # Module modèle (vide pour l'instant)
 └── pom.xml              # Configuration Maven parent
 ```
 
@@ -340,7 +369,7 @@ ExpandProject/
 ### Lancer les tests unitaires
 
 ```bash
-mvn test
+./mvnw test
 ```
 
 ### Tester avec des données personnalisées
@@ -351,7 +380,7 @@ mvn test
 
 ```bash
 cd importdata
-mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
+../mvnw exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
   -Dexec.args="src/main/resources/model/my_model.xml src/main/resources/datapack/my_data.xml --validate-only"
 ```
 
@@ -360,7 +389,7 @@ mvn exec:java -Dexec.mainClass="fr.expand.project.importdata.Launcher" \
 Après l'import, visualisez vos données :
 
 1. Ouvrez Neo4j Browser : http://localhost:7474
-2. Connectez-vous (neo4j/expand)
+2. Connectez-vous avec les valeurs définies dans `NEO4J_AUTH`.
 3. Exécutez des requêtes Cypher :
 
 ```cypher
@@ -396,16 +425,16 @@ neo4j start                 # macOS
 
 ### Erreur : Problème d'authentification Neo4j
 
-**Solution** : Modifiez le mot de passe dans le code ou réinitialisez Neo4j :
+**Solution** : Configurez un nouveau mot de passe Neo4j puis gardez `NEO4J_AUTH` cohérent avec ce compte :
 ```bash
-neo4j-admin set-initial-password expand
+neo4j-admin dbms set-initial-password '<new-password>'
 ```
 
 ### Erreur de compilation : "package jakarta.xml.bind does not exist"
 
 **Solution** : Assurez-vous d'utiliser Java 17+ et que Maven a bien téléchargé les dépendances :
 ```bash
-mvn clean install -U
+./mvnw clean install -U
 ```
 
 ### Les classes générées (DATAS, OBJECT, etc.) n'existent pas
@@ -413,7 +442,7 @@ mvn clean install -U
 **Solution** : Lancez la génération JAXB :
 ```bash
 cd importdata
-mvn generate-sources
+../mvnw generate-sources
 ```
 
 ## 📚 Documentation Additionnelle
@@ -452,3 +481,12 @@ Ce projet est sous licence MIT - voir le fichier LICENSE pour plus de détails.
 Pour toute question ou problème :
 - Ouvrez une [Issue](https://github.com/TraXXX86/ExpandProject/issues)
 - Consultez la [documentation](https://www.gitbook.com/book/traxxx86/expandproject/welcome)
+
+## Vérification des changements
+
+- `./mvnw test` : tests unitaires Java 17.
+- `./mvnw verify` : tests unitaires et d’intégration sur une instance Neo4j de test configurée par `NEO4J_BOLT_URI` et `NEO4J_AUTH`.
+- `cd ui && npm ci && npm test && npm audit --audit-level=high && npm run build` : interface et dépendances.
+- `cd ui && npx playwright install chromium && E2E_ADMIN_PASSWORD='<mot-de-passe-de-test>' npm run test:e2e` : parcours navigateur sur une API de test au port 18080 (`E2E_API_URL` permet de changer cette adresse). Le test crée puis supprime son propre modèle.
+
+La CI exécute ces contrôles, y compris le parcours navigateur réel avec Neo4j. Dependabot regroupe les mises à jour Maven, npm et GitHub Actions.

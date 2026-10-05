@@ -11,7 +11,7 @@ Bienvenue dans ExpandProject! Ce fichier vous guide vers la bonne documentation 
 → **[START_HERE.md](START_HERE.md)** - 3 commandes pour tester
 
 ```bash
-mvn clean install
+./mvnw clean install
 java -jar importdata/target/expandproject-importdata.jar --example
 ```
 
@@ -91,9 +91,9 @@ java -jar importdata/target/expandproject-importdata.jar --example
 - API d'import
 - Connecteurs DB
 
-### Module Model
-→ `model/README.md`
-- Module modèle (vide actuellement)
+### Structure
+- `commons/` contient les types et utilitaires partagés.
+- `importdata/` contient le CLI, l'API, les modèles, la validation et le stockage Neo4j.
 
 ---
 

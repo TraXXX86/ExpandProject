@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5173,
-    host: true
-  }
+    host: true,
+    proxy: { '/api': { target: process.env.API_PROXY_TARGET || 'http://localhost:8080', changeOrigin: true } }
+  },
+  test: { environment: 'jsdom', include: ['src/**/*.test.js'], restoreMocks: true }
 });

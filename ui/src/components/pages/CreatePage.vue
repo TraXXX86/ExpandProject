@@ -245,9 +245,11 @@
       </v-card>
     </v-col>
   </v-row>
+  <LinkManager :state="state" />
 </template>
 
 <script setup>
+import LinkManager from '../LinkManager.vue';
 const props = defineProps({
   state: {
     type: Object,
