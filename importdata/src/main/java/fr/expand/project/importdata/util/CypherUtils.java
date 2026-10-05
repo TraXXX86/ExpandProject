@@ -21,7 +21,13 @@ public final class CypherUtils {
                     "internalid",
                     "searchtext");
     private static final Set<String> RESERVED_TYPES =
-            Set.of("dataobject", "datamodel", "modelobjecttype", "modellinktype", "modelattribute");
+            Set.of(
+                    "dataobject",
+                    "datamodel",
+                    "modelobjecttype",
+                    "modellinktype",
+                    "modelattribute",
+                    "auditdata");
 
     private CypherUtils() {}
 

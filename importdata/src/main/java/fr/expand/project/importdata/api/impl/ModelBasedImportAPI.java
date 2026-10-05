@@ -1,5 +1,6 @@
 package fr.expand.project.importdata.api.impl;
 
+import fr.expand.project.importdata.audit.AuditActor;
 import fr.expand.project.importdata.dao.IConnectorDb;
 import fr.expand.project.importdata.dao.connectors.impl.CypherConnector;
 import fr.expand.project.importdata.dto.generated.DATAS;
@@ -15,6 +16,7 @@ import java.util.Objects;
 /** Request-scoped model validation followed by one atomic data transaction. */
 public class ModelBasedImportAPI implements AutoCloseable {
     private final ModelManager modelManager;
+    private final AuditActor actor;
     private final DataValidator validator;
     private IConnectorDb connector;
 
@@ -23,6 +25,11 @@ public class ModelBasedImportAPI implements AutoCloseable {
     }
 
     public ModelBasedImportAPI(ModelManager manager) {
+        this(manager, AuditActor.system());
+    }
+
+    public ModelBasedImportAPI(ModelManager manager, AuditActor actor) {
+        this.actor = Objects.requireNonNull(actor);
         modelManager = Objects.requireNonNull(manager, "modelManager");
         validator = new DataValidator(manager);
     }
@@ -39,13 +46,13 @@ public class ModelBasedImportAPI implements AutoCloseable {
         ValidationResult result = validator.validate(data);
         if (!result.isValid() || validateOnly) return result;
         if (modelKey == null || modelKey.isBlank()) {
-            try (Neo4jModelStore store = new Neo4jModelStore()) {
+            try (Neo4jModelStore store = new Neo4jModelStore(actor)) {
                 modelKey =
                         store.storeModel(
                                 modelManager.getCurrentModel(), modelManager.getCurrentModelXml());
             }
         }
-        if (connector == null) connector = new CypherConnector();
+        if (connector == null) connector = new CypherConnector(actor);
         connector.setModelKey(modelKey);
         connector.importData(data, modelKey, modelManager);
         return result;

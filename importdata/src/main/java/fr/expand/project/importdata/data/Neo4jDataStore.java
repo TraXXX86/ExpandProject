@@ -1,5 +1,6 @@
 package fr.expand.project.importdata.data;
 
+import fr.expand.project.importdata.audit.*;
 import fr.expand.project.importdata.dao.Neo4jDriverProvider;
 import fr.expand.project.importdata.util.CypherUtils;
 import fr.expand.project.importdata.util.SearchIndex;
@@ -12,18 +13,24 @@ import java.util.*;
 /** Tenant/model-scoped data operations. Query values never become Cypher text. */
 public class Neo4jDataStore implements AutoCloseable {
     private final Driver driver;
+    private final AuditActor actor;
     private final String expectedModelXml;
     private static final String OBJECT_RETURN =
             " RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props ";
     private static final String LINK_RETURN =
             " RETURN id(r) AS id,id(a) AS fromId,id(b) AS toId,type(r) AS relType,properties(r) AS"
-                + " props ";
+                    + " props ";
 
     public Neo4jDataStore() {
         this(null);
     }
 
     public Neo4jDataStore(String expectedModelXml) {
+        this(expectedModelXml, AuditActor.system());
+    }
+
+    public Neo4jDataStore(String expectedModelXml, AuditActor actor) {
+        this.actor = Objects.requireNonNull(actor);
         driver = Neo4jDriverProvider.getDriver();
         this.expectedModelXml = expectedModelXml;
     }
@@ -72,8 +79,8 @@ public class Neo4jDataStore implements AutoCloseable {
                             links(
                                     tx.run(
                                             "MATCH (a:DataObject"
-                                                + " {modelKey:$modelKey})-[r]->(b:DataObject"
-                                                + " {modelKey:$modelKey})"
+                                                    + " {modelKey:$modelKey})-[r]->(b:DataObject"
+                                                    + " {modelKey:$modelKey})"
                                                     + LINK_RETURN
                                                     + "ORDER BY id(r)",
                                             Map.of("modelKey", key))));
@@ -117,10 +124,10 @@ public class Neo4jDataStore implements AutoCloseable {
         } else p.put("searchFields", searchableFields(key, q));
         String filter =
                 "MATCH (n:DataObject {modelKey:$modelKey}) WHERE (size($types)=0 OR any(t IN $types"
-                    + " WHERE t=n.type OR t IN labels(n))) AND ($q='' OR any(owner IN"
-                    + " keys($searchFields) WHERE (owner=n.type OR owner IN labels(n)) AND"
-                    + " any(field IN $searchFields[owner] WHERE toLower(toString(n[field]))"
-                    + " CONTAINS $q))) ";
+                        + " WHERE t=n.type OR t IN labels(n))) AND ($q='' OR any(owner IN"
+                        + " keys($searchFields) WHERE (owner=n.type OR owner IN labels(n)) AND"
+                        + " any(field IN $searchFields[owner] WHERE toLower(toString(n[field]))"
+                        + " CONTAINS $q))) ";
         if (fulltext)
             filter =
                     "CALL db.index.fulltext.queryNodes('data_object_search',$query) YIELD node AS n"
@@ -173,8 +180,8 @@ public class Neo4jDataStore implements AutoCloseable {
                         var typeRows =
                                 tx.run(
                                         "MATCH (n:DataObject {modelKey:$modelKey}) UNWIND labels(n)"
-                                            + " AS label WITH DISTINCT label WHERE label <>"
-                                            + " 'DataObject' RETURN label ORDER BY label",
+                                                + " AS label WITH DISTINCT label WHERE label <>"
+                                                + " 'DataObject' RETURN label ORDER BY label",
                                         p);
                         List<String> objectTypes = new ArrayList<>();
                         while (typeRows.hasNext())
@@ -212,7 +219,7 @@ public class Neo4jDataStore implements AutoCloseable {
                         var schema =
                                 tx.run(
                                         "MATCH (m:DataModel {key:$key}) SET m.key=m.key RETURN"
-                                            + " m.xml AS xml,m.searchRevision AS revision",
+                                                + " m.xml AS xml,m.searchRevision AS revision",
                                         Map.of("key", key));
                         if (!schema.hasNext())
                             throw new IllegalArgumentException("Model no longer exists: " + key);
@@ -226,13 +233,13 @@ public class Neo4jDataStore implements AutoCloseable {
                             p.put("revision", revision);
                             tx.run(
                                             "MATCH (n:DataObject {modelKey:$modelKey}) SET"
-                                                + " n.searchText="
+                                                    + " n.searchText="
                                                     + SearchIndex.EXPRESSION,
                                             p)
                                     .consume();
                             tx.run(
                                             "MATCH (m:DataModel {key:$modelKey}) SET"
-                                                + " m.searchRevision=$revision",
+                                                    + " m.searchRevision=$revision",
                                             p)
                                     .consume();
                         }
@@ -253,7 +260,7 @@ public class Neo4jDataStore implements AutoCloseable {
                                 objects(
                                         tx.run(
                                                 "MATCH (n:DataObject {modelKey:$modelKey}) WHERE"
-                                                    + " id(n)=$id"
+                                                        + " id(n)=$id"
                                                         + OBJECT_RETURN,
                                                 p));
                         if (center.isEmpty()) return null;
@@ -310,7 +317,7 @@ public class Neo4jDataStore implements AutoCloseable {
                                 objects(
                                         tx.run(
                                                 "MATCH (n:DataObject {modelKey:$modelKey}) WHERE"
-                                                    + " id(n)=$id"
+                                                        + " id(n)=$id"
                                                         + OBJECT_RETURN,
                                                 params(key, id)));
                         return rows.isEmpty() ? null : rows.get(0);
@@ -356,8 +363,8 @@ public class Neo4jDataStore implements AutoCloseable {
                                 links(
                                         tx.run(
                                                 "MATCH (a:DataObject {modelKey:$modelKey})-[r"
-                                                    + " {uuid:$uuid}]->(b:DataObject"
-                                                    + " {modelKey:$modelKey})"
+                                                        + " {uuid:$uuid}]->(b:DataObject"
+                                                        + " {modelKey:$modelKey})"
                                                         + LINK_RETURN,
                                                 p));
                         if (rows.size() > 1)
@@ -369,45 +376,51 @@ public class Neo4jDataStore implements AutoCloseable {
     }
 
     public boolean updateLinkByUuid(String key, String uuid, Map<String, Object> attrs) {
+        return changeLinkByUuid(key, uuid, attrs, false);
+    }
+
+    public boolean deleteLinkByUuid(String key, String uuid) {
+        return changeLinkByUuid(key, uuid, Map.of(), true);
+    }
+
+    private boolean changeLinkByUuid(
+            String key, String uuid, Map<String, Object> attrs, boolean delete) {
         Map<String, Object> p = uuidParams(key, uuid);
         p.put("attributes", sanitized(attrs));
         try (Session session = driver.session()) {
             return session.executeWrite(
                     tx -> {
                         lockModel(tx, key);
-                        var result =
+                        var ids =
                                 tx.run(
-                                        "MATCH (a:DataObject {modelKey:$modelKey})-[n"
-                                            + " {uuid:$uuid}]->(b:DataObject {modelKey:$modelKey})"
-                                            + " SET n += $attributes RETURN id(n)",
-                                        p);
-                        if (!result.hasNext()) return false;
-                        result.next();
-                        if (result.hasNext())
+                                                "MATCH (a:DataObject {modelKey:$modelKey})-[r"
+                                                    + " {uuid:$uuid}]->(b:DataObject"
+                                                    + " {modelKey:$modelKey}) RETURN id(r) AS id",
+                                                p)
+                                        .list(r -> r.get("id").asLong());
+                        if (ids.isEmpty()) return false;
+                        if (ids.size() > 1)
                             throw new fr.expand.project.importdata.dao.StorageConflictException(
                                     "Ambiguous relationship UUID");
-                        return true;
-                    });
-        }
-    }
-
-    public boolean deleteLinkByUuid(String key, String uuid) {
-        Map<String, Object> p = uuidParams(key, uuid);
-        try (Session session = driver.session()) {
-            return session.executeWrite(
-                    tx -> {
-                        lockModel(tx, key);
-                        var result =
-                                tx.run(
-                                        "MATCH (a:DataObject {modelKey:$modelKey})-[n"
-                                            + " {uuid:$uuid}]->(b:DataObject {modelKey:$modelKey})"
-                                            + " DELETE n RETURN 1 AS deleted",
-                                        p);
-                        if (!result.hasNext()) return false;
-                        result.next();
-                        if (result.hasNext())
-                            throw new fr.expand.project.importdata.dao.StorageConflictException(
-                                    "Ambiguous relationship UUID");
+                        long id = ids.get(0);
+                        var before = AuditTrail.link(tx, key, id);
+                        p.put("id", id);
+                        tx.run(
+                                        "MATCH (a:DataObject"
+                                                + " {modelKey:$modelKey})-[n]->(b:DataObject"
+                                                + " {modelKey:$modelKey}) WHERE id(n)=$id "
+                                                + (delete ? "DELETE n" : "SET n += $attributes"),
+                                        p)
+                                .consume();
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                delete ? "DELETE" : "UPDATE",
+                                "LINK",
+                                AuditTrail.identity(before),
+                                before,
+                                delete ? null : AuditTrail.link(tx, key, id));
                         return true;
                     });
         }
@@ -439,13 +452,18 @@ public class Neo4jDataStore implements AutoCloseable {
         String query =
                 link
                         ? "MATCH (a:DataObject {modelKey:$modelKey})-[n]->(b:DataObject"
-                              + " {modelKey:$modelKey})"
+                                + " {modelKey:$modelKey})"
                         : "MATCH (n:DataObject {modelKey:$modelKey})";
         try (Session session = driver.session()) {
             return session.executeWrite(
                     tx -> {
                         p.put("searchFields", lockModel(tx, key));
-                        return tx.run(
+                        var before =
+                                link
+                                        ? AuditTrail.link(tx, key, id)
+                                        : AuditTrail.object(tx, key, id);
+                        if (before == null) return false;
+                        tx.run(
                                         query
                                                 + " WHERE id(n)=$id SET n += $attributes "
                                                 + (link
@@ -455,7 +473,19 @@ public class Neo4jDataStore implements AutoCloseable {
                                                                 + " ")
                                                 + "RETURN id(n)",
                                         p)
-                                .hasNext();
+                                .consume();
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                "UPDATE",
+                                link ? "LINK" : "OBJECT",
+                                AuditTrail.identity(before),
+                                before,
+                                link
+                                        ? AuditTrail.link(tx, key, id)
+                                        : AuditTrail.object(tx, key, id));
+                        return true;
                     });
         }
     }
@@ -473,19 +503,35 @@ public class Neo4jDataStore implements AutoCloseable {
         String query =
                 link
                         ? "MATCH (a:DataObject {modelKey:$modelKey})-[n]->(b:DataObject"
-                              + " {modelKey:$modelKey})"
+                                + " {modelKey:$modelKey})"
                         : "MATCH (n:DataObject {modelKey:$modelKey})";
         try (Session session = driver.session()) {
             return session.executeWrite(
                     tx -> {
                         lockModel(tx, key);
-                        return tx.run(
+                        var before =
+                                link
+                                        ? AuditTrail.link(tx, key, id)
+                                        : AuditTrail.object(tx, key, id);
+                        if (before == null) return false;
+                        if (!link) AuditTrail.deletingLinks(tx, key, id, actor);
+                        tx.run(
                                         query
                                                 + " WHERE id(n)=$id WITH n "
                                                 + (link ? "DELETE n" : "DETACH DELETE n")
                                                 + " RETURN 1 AS deleted",
                                         params(key, id))
-                                .hasNext();
+                                .consume();
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                "DELETE",
+                                link ? "LINK" : "OBJECT",
+                                AuditTrail.identity(before),
+                                before,
+                                null);
+                        return true;
                     });
         }
     }
@@ -520,14 +566,26 @@ public class Neo4jDataStore implements AutoCloseable {
                                         .hasNext())
                             throw new fr.expand.project.importdata.dao.StorageConflictException(
                                     "Object already exists: " + type + "/" + externalId);
-                        return tx.run(
-                                        "CREATE (n:DataObject:"
-                                                + label
-                                                + ") SET n=$props RETURN id(n) AS id",
-                                        Map.of("props", props))
-                                .single()
-                                .get("id")
-                                .asLong();
+                        long id =
+                                tx.run(
+                                                "CREATE (n:DataObject:"
+                                                        + label
+                                                        + ") SET n=$props RETURN id(n) AS id",
+                                                Map.of("props", props))
+                                        .single()
+                                        .get("id")
+                                        .asLong();
+                        var after = AuditTrail.object(tx, key, id);
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                "CREATE",
+                                "OBJECT",
+                                AuditTrail.identity(after),
+                                null,
+                                after);
+                        return id;
                     });
         } catch (org.neo4j.driver.exceptions.ClientException e) {
             throw fr.expand.project.importdata.dao.StorageConflictException.translate(e);
@@ -558,14 +616,25 @@ public class Neo4jDataStore implements AutoCloseable {
                         var result =
                                 tx.run(
                                         "MATCH (a:DataObject {modelKey:$modelKey}),(b:DataObject"
-                                            + " {modelKey:$modelKey}) WHERE id(a)=$id AND"
-                                            + " id(b)=$toId CREATE (a)-[r:"
+                                                + " {modelKey:$modelKey}) WHERE id(a)=$id AND"
+                                                + " id(b)=$toId CREATE (a)-[r:"
                                                 + CypherUtils.identifier(type)
                                                 + "]->(b) SET r=$props RETURN id(r) AS id",
                                         p);
                         if (!result.hasNext())
                             throw new IllegalArgumentException("Link endpoint not found");
-                        return result.single().get("id").asLong();
+                        long id = result.single().get("id").asLong();
+                        var after = AuditTrail.link(tx, key, id);
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                "CREATE",
+                                "LINK",
+                                AuditTrail.identity(after),
+                                null,
+                                after);
+                        return id;
                     });
         }
     }

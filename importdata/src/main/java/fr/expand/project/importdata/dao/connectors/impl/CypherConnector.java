@@ -1,6 +1,7 @@
 package fr.expand.project.importdata.dao.connectors.impl;
 
 import fr.expand.project.commons.ObjectTypeEnum;
+import fr.expand.project.importdata.audit.*;
 import fr.expand.project.importdata.dao.*;
 import fr.expand.project.importdata.dto.*;
 import fr.expand.project.importdata.dto.generated.*;
@@ -15,6 +16,15 @@ import java.util.*;
 
 public class CypherConnector extends IConnectorDb {
     private Driver driver;
+    private final AuditActor actor;
+
+    public CypherConnector() {
+        this(AuditActor.system());
+    }
+
+    public CypherConnector(AuditActor actor) {
+        this.actor = Objects.requireNonNull(actor);
+    }
 
     @Override
     protected void connectToDb() {
@@ -83,6 +93,11 @@ public class CypherConnector extends IConnectorDb {
                         .single()
                         .get("id")
                         .asLong();
+        if (key != null && !key.isBlank()) {
+            var after = AuditTrail.object(tx, key, id);
+            AuditTrail.record(
+                    tx, key, actor, "CREATE", "OBJECT", AuditTrail.identity(after), null, after);
+        }
         return Math.toIntExact(id);
     }
 
@@ -135,6 +150,11 @@ public class CypherConnector extends IConnectorDb {
         if (!result.hasNext()) throw new IllegalArgumentException("Link endpoint does not exist");
         int id = Math.toIntExact(result.next().get("id").asLong());
         if (result.hasNext()) throw new IllegalArgumentException("Ambiguous link endpoint");
+        if (key != null && !key.isBlank()) {
+            var after = AuditTrail.link(tx, key, id);
+            AuditTrail.record(
+                    tx, key, actor, "CREATE", "LINK", AuditTrail.identity(after), null, after);
+        }
         return id;
     }
 
@@ -151,7 +171,7 @@ public class CypherConnector extends IConnectorDb {
                         var schema =
                                 tx.run(
                                         "MATCH (m:DataModel {key:$key}) SET m.key=m.key RETURN"
-                                            + " m.xml AS xml",
+                                                + " m.xml AS xml",
                                         Map.of("key", key));
                         if (!schema.hasNext())
                             throw new StorageConflictException("Model no longer exists: " + key);
@@ -204,6 +224,23 @@ public class CypherConnector extends IConnectorDb {
                                         link.getATTRIBUTE(),
                                         key);
                             }
+                        AuditTrail.record(
+                                tx,
+                                key,
+                                actor,
+                                "IMPORT",
+                                "IMPORT",
+                                actor.operationId(),
+                                null,
+                                Map.of(
+                                        "format",
+                                        "XML",
+                                        "objectCount",
+                                        objects.size(),
+                                        "linkCount",
+                                        data.getLINKS() == null
+                                                ? 0
+                                                : data.getLINKS().getLINK().size()));
                         return null;
                     });
         } catch (org.neo4j.driver.exceptions.ClientException e) {

@@ -8,6 +8,7 @@
     </v-col>
   </v-row>
 
+  <SavedViews :state="state" />
   <v-row>
     <v-col cols="12">
       <v-card class="card-animate delay-1" elevation="4" rounded="xl">
@@ -97,6 +98,7 @@
 </template>
 
 <script setup>
+import SavedViews from '../SavedViews.vue';
 const props = defineProps({
   state: {
     type: Object,

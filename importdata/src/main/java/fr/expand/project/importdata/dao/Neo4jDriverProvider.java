@@ -37,20 +37,24 @@ public final class Neo4jDriverProvider {
             try (Session session = candidate.session()) {
                 session.run(
                                 "CREATE CONSTRAINT data_object_identity IF NOT EXISTS FOR"
-                                    + " (n:DataObject) REQUIRE (n.modelKey,n.type,n.dataId) IS"
-                                    + " UNIQUE")
+                                        + " (n:DataObject) REQUIRE (n.modelKey,n.type,n.dataId) IS"
+                                        + " UNIQUE")
                         .consume();
                 session.run(
                                 "CREATE CONSTRAINT data_model_key IF NOT EXISTS FOR (n:DataModel)"
-                                    + " REQUIRE n.key IS UNIQUE")
+                                        + " REQUIRE n.key IS UNIQUE")
                         .consume();
                 session.run(
                                 "CREATE INDEX data_object_model IF NOT EXISTS FOR (n:DataObject) ON"
-                                    + " (n.modelKey)")
+                                        + " (n.modelKey)")
                         .consume();
                 session.run(
                                 "CREATE FULLTEXT INDEX data_object_search IF NOT EXISTS FOR"
-                                    + " (n:DataObject) ON EACH [n.searchText]")
+                                        + " (n:DataObject) ON EACH [n.searchText]")
+                        .consume();
+                session.run(
+                                "CREATE INDEX audit_model_time IF NOT EXISTS FOR (n:AuditData) ON"
+                                    + " (n.modelKey,n.timestamp)")
                         .consume();
                 session.run("CALL db.awaitIndex('data_object_search',30)").consume();
             } catch (RuntimeException e) {

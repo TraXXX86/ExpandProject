@@ -18,7 +18,7 @@ export function useAppState() {
 
   const currentPage = ref('navigate');
   const activePortal = ref('');
-  const userPortalPages = ['navigate', 'table', 'search', 'create', 'import-data'];
+  const userPortalPages = ['navigate', 'table', 'search', 'create', 'import-data', 'paths', 'quality', 'history'];
   const modelAdminPortalPages = ['import-model', 'model', 'admin'];
   const displayLanguage = ref('');
   const validateOnly = ref(false);
@@ -67,6 +67,8 @@ export function useAppState() {
   const selectedModelGroupTab = ref(null);
   const tableTypeFilter = ref([]);
   const tableSearch = ref('');
+  const tableVisibleColumns = ref([]);
+  const tableSortBy = ref([]);
   const tableAttributeKey = ref('');
   const tableAttributeKeyOperator = ref('contains');
   const tableAttributeValue = ref('');
@@ -599,7 +601,7 @@ export function useAppState() {
   }
 
   return {
-    apiBase,
+    apiBase, apiFetch, readJson, tableVisibleColumns, tableSortBy,
     pageObjects, dataOffset, dataLimit, dataHasMore, dataQuery, dataType, searchMode, neighborStatus, isMutatingLink, loadNeighbors, mutateLink,
     authToken,
     isAuthenticated,

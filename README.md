@@ -482,6 +482,38 @@ Pour toute question ou problème :
 - Ouvrez une [Issue](https://github.com/TraXXX86/ExpandProject/issues)
 - Consultez la [documentation](https://www.gitbook.com/book/traxxx86/expandproject/welcome)
 
+## Parcours métier
+
+### Import CSV, Excel et XML avec prévisualisation
+
+Dans **Import données**, sélectionnez un modèle et un fichier. Pour CSV/Excel, analysez le fichier, choisissez le type d’objet, la colonne d’identifiant stable et la correspondance entre colonnes et attributs. Les identifiants sont des entiers positifs ou nuls, uniques pour chaque type dans un modèle.
+
+L’aperçu distingue ajouts, modifications, données inchangées et conflits, avec les valeurs avant/après et les lignes à corriger. Le mode « Ajouter uniquement » refuse les identités existantes; « Ajouter et mettre à jour » modifie uniquement les attributs présents dans le fichier et conserve les autres. Aucun import ne supprime de données. Les valeurs par défaut du modèle sont prises en compte.
+
+La confirmation réévalue l’aperçu dans une transaction. Si le modèle ou les données concernées ont changé, l’import est refusé et un nouvel aperçu est nécessaire. Une erreur annule l’ensemble du lot. La lecture et la création sont requises; les modifications nécessitent aussi le droit de mise à jour.
+
+- CSV UTF-8 avec en-têtes uniques; virgule, point-virgule ou tabulation détectés automatiquement; guillemets et cellules multilignes acceptés.
+- Excel `.xlsx` avec sélection de feuille. Les formules et cellules en erreur sont refusées; les dates Excel sont converties au format ISO. L’ancien format `.xls` n’est pas pris en charge.
+- Limites : 10 Mo par fichier, 5 000 lignes et 200 colonnes; décompression XLSX limitée à 40 Mo. XML conserve son schéma d’objets et de liens; CSV/Excel importent des objets d’un type à la fois.
+
+### Vues enregistrées
+
+Les pages **Recherche avancée** et **Recherche** permettent d’enregistrer une vue privée ou de la partager avec les lecteurs du modèle. La vue mémorise les filtres, les colonnes et le tri. Le tri et les filtres d’attributs s’appliquent à la page chargée. Seul son propriétaire peut modifier ou supprimer une vue; son partage ne donne aucun droit supplémentaire sur les données. Les vues persistent dans SQLite, avec une limite de 100 vues par utilisateur et modèle.
+
+### Historique des modifications
+
+**Historique** présente les créations, modifications, suppressions et imports effectués après activation de cette version. Chaque entrée conserve la date, l’auteur réel, l’utilisateur effectif en cas d’impersonation, l’opération et les valeurs avant/après. L’événement et la modification sont enregistrés dans la même transaction Neo4j. L’historique est filtrable par action, type d’élément et identifiant stable.
+
+L’historique ne restaure pas les données et ne reconstitue pas les modifications anciennes. Les instantanés dépassant 1 Mio sont remplacés par une indication explicite de taille et une empreinte. L’historique d’un modèle supprimé est conservé et reste accessible à l’administrateur par l’API. Aucune purge automatique n’est configurée : son volume doit être inclus dans la politique de sauvegarde et de conservation.
+
+### Chemins et qualité
+
+**Chemins** recherche les plus courts chemins entre deux objets, avec un filtre de types de liens, une profondeur maximale de 1 à 6 et le respect optionnel du sens. La recherche est bornée à 2 000 objets visités, 10 000 liens examinés et 20 chemins retournés. L’interface indique si une limite a interrompu la recherche.
+
+**Qualité** identifie les objets isolés, les doublons potentiels et les écarts au modèle courant. Les doublons sont des suggestions fondées sur des attributs comparables, à vérifier manuellement. L’analyse est limitée à 2 000 objets et 10 000 liens, avec 100 exemples d’anomalies; les résultats précisent lorsqu’ils sont partiels. Aucune correction ni suppression automatique n’est appliquée.
+
+Ces pages utilisent les permissions de lecture du modèle. Un changement de modèle, de session ou d’utilisateur effectif invalide les requêtes en cours et efface les résultats précédents.
+
 ## Vérification des changements
 
 - `./mvnw test` : tests unitaires Java 17.
