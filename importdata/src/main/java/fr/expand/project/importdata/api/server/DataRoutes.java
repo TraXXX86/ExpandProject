@@ -136,7 +136,15 @@ final class DataRoutes {
         try (Neo4jDataStore store =
                 new Neo4jDataStore(null, AuditActor.from(resolveAccessContext(ctx)))) {
             return GSON.toJson(
-                    store.loadDataPage(key, offset, limit, q, ctx.queryParam("type"), searchMode));
+                    store.loadDataPage(
+                            key,
+                            offset,
+                            limit,
+                            q,
+                            ctx.queryParam("type"),
+                            searchMode,
+                            ctx.queryParam("workflowStatus"),
+                            ctx.queryParam("workflowId")));
         }
     }
 

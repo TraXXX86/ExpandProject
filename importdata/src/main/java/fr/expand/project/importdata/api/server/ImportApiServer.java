@@ -159,6 +159,8 @@ public final class ImportApiServer {
                     ImportWorkflowRoutes.register(config.routes);
                     HistoryRoutes.register(config.routes);
                     GraphInsightsRoutes.register(config.routes);
+                    WorkflowAdminRoutes.register(config.routes);
+                    WorkflowObjectRoutes.register(config.routes);
                 });
     }
 

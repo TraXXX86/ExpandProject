@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Replace PERSONNE with the exact object type from your target model. -->
+<WORKFLOW ID="review" VERSION="1" LABEL="Validation" INITIAL_STATE="draft">
+  <OBJECT_TYPES><TYPE_REF NAME="PERSONNE" INCLUDE_SUBTYPES="false"/></OBJECT_TYPES>
+  <STATES>
+    <STATE CODE="draft" LABEL="Brouillon"/>
+    <STATE CODE="review" LABEL="À valider"/>
+    <STATE CODE="approved" LABEL="Validé"/>
+    <STATE CODE="archived" LABEL="Archivé" TERMINAL="true"/>
+  </STATES>
+  <TRANSITIONS>
+    <TRANSITION ID="submit" FROM="draft" TO="review" LABEL="Soumettre"/>
+    <TRANSITION ID="approve" FROM="review" TO="approved" LABEL="Valider"/>
+    <TRANSITION ID="correct" FROM="review" TO="draft" LABEL="Demander une correction"/>
+    <TRANSITION ID="archive" FROM="approved" TO="archived" LABEL="Archiver"/>
+  </TRANSITIONS>
+</WORKFLOW>

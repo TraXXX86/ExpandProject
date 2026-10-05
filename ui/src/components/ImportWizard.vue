@@ -58,7 +58,7 @@
             <tbody>
               <tr v-for="(row, index) in wizard.visibleRows" :key="`${wizard.previewPage}-${index}`">
                 <td>{{ row.row }}</td><td>{{ row.entityType === 'LINK' ? 'Lien' : 'Objet' }} · {{ row.type }}<span v-if="row.dataId != null"> #{{ row.dataId }}</span><div v-if="row.from && row.to" class="text-caption mt-1">{{ row.from.type }} #{{ row.from.dataId }} → {{ row.to.type }} #{{ row.to.dataId }}</div></td>
-                <td>{{ actionLabel(row.action) }}</td><td><pre>{{ valuesLabel(row.before) }}</pre></td><td><pre>{{ valuesLabel(row.after) }}</pre></td>
+                <td>{{ actionLabel(row.action) }}</td><td><pre>{{ valuesLabel(row.before) }}</pre><div v-if="row.workflowBefore" class="text-caption mt-2">Workflow : {{ row.workflowBefore.id }} v{{ row.workflowBefore.version }} · {{ row.workflowBefore.state }}</div></td><td><pre>{{ valuesLabel(row.after) }}</pre><div v-if="row.workflowAfter" class="text-caption mt-2">Workflow : {{ row.workflowAfter.id }} v{{ row.workflowAfter.version }} · {{ row.workflowAfter.state }}</div></td>
                 <td><ul v-if="row.errors?.length"><li v-for="(message, n) in row.errors" :key="n">{{ message }}</li></ul><span v-else>—</span></td>
               </tr>
             </tbody>

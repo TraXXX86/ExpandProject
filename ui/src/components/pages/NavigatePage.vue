@@ -120,6 +120,8 @@
               </v-chip>
             </div>
 
+            <ObjectWorkflow :state="state" :object="state.selectedObject" />
+
             <div v-if="state.getObjectPrimaryAttributes(state.selectedObject).length" class="mt-4">
               <div class="text-subtitle-2 font-weight-bold">Attributs principaux</div>
               <div class="d-flex flex-wrap" style="gap: 8px; margin-top: 6px;">
@@ -256,6 +258,7 @@
 </template>
 
 <script setup>
+import ObjectWorkflow from '../ObjectWorkflow.vue';
 import ExplorerRecursiveNode from './ExplorerRecursiveNode.vue';
 
 const props = defineProps({

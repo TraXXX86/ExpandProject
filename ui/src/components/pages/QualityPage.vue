@@ -27,7 +27,7 @@ import { useScopedApi } from '../../composables/useScopedApi';
 const { state } = defineProps({ state: { type: Object, required: true } });
 const result = ref(null), error = ref(''), loading = ref(false), category = ref(null);
 const { request, allowed, scope } = useScopedApi(state, () => { result.value = null; error.value = ''; loading.value = false; category.value = null; });
-const categories = [{ title: 'Objets isolés', value: 'isolated' }, { title: 'Doublons potentiels', value: 'potential_duplicate' }, { title: 'Écarts au modèle', value: 'schema_drift' }];
+const categories = [{ title: 'Objets isolés', value: 'isolated' }, { title: 'Doublons potentiels', value: 'potential_duplicate' }, { title: 'Écarts au modèle', value: 'schema_drift' }, { title: 'Anomalies de workflow', value: 'workflow_drift' }];
 const headers = [{ title: 'Niveau', key: 'severity' }, { title: 'Catégorie', key: 'category' }, { title: 'Élément', key: 'entity' }, { title: 'Type', key: 'type' }, { title: 'Identifiant', key: 'id' }, { title: 'Observation', key: 'reason', sortable: false }];
 const issues = computed(() => (result.value?.issues || []).filter(issue => !category.value || issue.category === category.value));
 const severityColor = value => ({ info: 'info', warning: 'warning', error: 'error' }[value] || 'info');

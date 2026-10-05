@@ -3,9 +3,9 @@ import { computed } from 'vue';
 /** Derived views of the shared reactive model, without network side effects. */
 export function useDataViews(ctx) {
   const dataRequestQuery = computed(() => {
-    if (ctx.currentPage.value === 'table') return { searchMode: ctx.searchMode.value, q: ctx.tableSearch.value || '', type: (ctx.tableTypeFilter.value || []).join(',') };
-    if (ctx.currentPage.value === 'search') return { searchMode: ctx.searchMode.value, q: ctx.fullTextQuery.value || '', type: (ctx.fullTextTypeFilter.value || []).join(',') };
-    return { searchMode: ctx.searchMode.value, q: ctx.dataQuery.value || '', type: ctx.dataType.value || '' };
+    if (ctx.currentPage.value === 'table') return { workflowId: ctx.workflowId?.value || '', workflowStatus: ctx.workflowStatus?.value || '', searchMode: ctx.searchMode.value, q: ctx.tableSearch.value || '', type: (ctx.tableTypeFilter.value || []).join(',') };
+    if (ctx.currentPage.value === 'search') return { workflowId: ctx.workflowId?.value || '', workflowStatus: ctx.workflowStatus?.value || '', searchMode: ctx.searchMode.value, q: ctx.fullTextQuery.value || '', type: (ctx.fullTextTypeFilter.value || []).join(',') };
+    return { workflowId: ctx.workflowId?.value || '', workflowStatus: ctx.workflowStatus?.value || '', searchMode: ctx.searchMode.value, q: ctx.dataQuery.value || '', type: ctx.dataType.value || '' };
   });
 
   const createObjectTypeOptions = computed(() =>
@@ -125,6 +125,7 @@ export function useDataViews(ctx) {
           id: object.id ?? 'N/A',
           idKey: object.idKey,
           type: object.type,
+          workflowStatus: object.workflow?.stateLabel || object.workflow?.state || 'Sans workflow',
           primaryLabel: ctx.getObjectPrimaryLabel(object),
           attributeCount: attributes.length,
           attributePreview,
@@ -605,6 +606,7 @@ export function useDataViews(ctx) {
           id: object.id ?? 'N/A',
           idKey: object.idKey,
           type: object.type,
+          workflowStatus: object.workflow?.stateLabel || object.workflow?.state || 'Sans workflow',
           primaryLabel: ctx.getObjectPrimaryLabel(object),
           matches
         };

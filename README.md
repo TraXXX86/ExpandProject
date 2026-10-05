@@ -10,6 +10,7 @@ ExpandProject est un outil d'import de données dans Neo4j avec support de modè
 - **Types de données** : Support STRING, INTEGER, DOUBLE, BOOLEAN, DATE
 - **Attributs optionnels/obligatoires** : Contraintes de validation
 - **Liens orientés/non-orientés** : Flexibilité dans la modélisation
+- **Workflows des objets** : XML indépendant, versions, transitions contrôlées et migrations prévisualisées
 
 ## 📋 Prérequis
 
@@ -64,6 +65,66 @@ java -jar importdata/target/expandproject-importdata.jar --api 8080
 ```
 
 En développement, le proxy Vite relaie les appels `/api` vers `http://localhost:8080` (ou vers `API_PROXY_TARGET`). En Compose, nginx relaie `/api` vers l'API sur le réseau interne; le navigateur utilise donc la même origine pour l'interface et l'API.
+
+## Workflows des objets
+
+Un workflow définit les statuts et les transitions autorisées pour un ou plusieurs types d’objets. Il se charge séparément du modèle XML, dans **Administration du modèle → Workflows**. Le modèle doit déjà contenir les types référencés ; son XML reste inchangé.
+
+### Définir et activer un workflow
+
+Le fichier [example-workflow.xml](importdata/src/main/resources/workflow/example-workflow.xml) fournit un cycle de validation complet ; le [schéma XSD](importdata/src/main/resources/workflow/workflow.xsd) décrit le format. Exemple minimal, à adapter au nom exact d’un type de votre modèle :
+
+```xml
+<WORKFLOW ID="validation" VERSION="1" LABEL="Validation" INITIAL_STATE="draft">
+  <OBJECT_TYPES>
+    <TYPE_REF NAME="PERSONNE" INCLUDE_SUBTYPES="true"/>
+  </OBJECT_TYPES>
+  <STATES>
+    <STATE CODE="draft" LABEL="Brouillon"/>
+    <STATE CODE="approved" LABEL="Validé" TERMINAL="true"/>
+  </STATES>
+  <TRANSITIONS>
+    <TRANSITION ID="approve" FROM="draft" TO="approved" LABEL="Valider"/>
+  </TRANSITIONS>
+</WORKFLOW>
+```
+
+1. Chargez le fichier XML. Chaque couple identifiant/version est immuable : une modification nécessite une nouvelle version.
+2. Sélectionnez **Activer pour les nouveaux objets**, prévisualisez les affectations, puis confirmez. Un type concret possède au plus une affectation active. `INCLUDE_SUBTYPES` inclut ses sous-types existants lors de l’activation ; réactivez explicitement le workflow après l’ajout de nouveaux sous-types.
+3. Les objets créés ensuite, y compris par import, reçoivent le statut initial. Dans une fiche objet, le bouton propose les transitions autorisées ; un statut terminal ne propose plus d’action.
+
+### Objets existants et nouvelles versions
+
+L’activation ou le retrait d’une affectation ne modifie jamais les objets existants. Ceux-ci conservent leur version et leur statut. Pour les changer, choisissez **Initialiser des objets sans workflow** ou **Migrer des objets vers cette version**. Pour une migration, définissez la correspondance des statuts source vers les statuts cible, recherchez les objets, sélectionnez-les explicitement, puis prévisualisez et confirmez.
+
+Un lot contient au maximum 1 000 objets. Une modification du statut, de la version ou de l’identité des objets concernés, du catalogue ou du modèle invalide la prévisualisation : il faut la refaire. Les transitions et migrations sont transactionnelles, vérifient l’identité et la révision des objets et produisent un historique. Une version active ou encore utilisée ne peut pas être supprimée.
+
+### Droits et compatibilité
+
+- L’administration des workflows requiert l’accès au portail d’administration du modèle, la visibilité du modèle et les droits de lecture et de modification des données.
+- Le nouveau droit **Faire évoluer le statut** est indépendant de la modification des attributs. Il nécessite également la lecture et l’accès au portail utilisateur. Il est désactivé par défaut pour les permissions existantes ; l’administrateur de plateforme conserve l’accès complet. L’usurpation d’identité applique les droits de l’utilisateur effectif.
+- Les modèles sans workflow et leurs objets continuent de fonctionner. Les éditions et imports ordinaires préservent le statut ; les métadonnées `_workflowId`, `_workflowVersion`, `_workflowState`, `_workflowRevision` et `_workflowUpdatedAt` sont réservées au moteur.
+- Le statut est disponible dans les fiches, les tableaux, les recherches, les filtres et les vues enregistrées. Le filtre **Sans workflow** retrouve les objets non initialisés. Le contrôle qualité signale les incohérences workflow.
+- La migration SQLite ajoute automatiquement `model_permissions.can_transition` à `false`. Neo4j reçoit des contraintes pour le catalogue et les affectations et un index de statut. Une modification du modèle incompatible avec les workflows chargés ou utilisés est refusée.
+
+Les fichiers sont limités à 1 Mio, 1 000 références de types, 500 états et 2 000 transitions. Les références inconnues, états inaccessibles, transitions sortant d’un état terminal et XML avec entités externes sont refusés. Cette première version exécute des transitions manuelles ; elle ne lance pas de scripts, notifications ou tâches planifiées.
+
+### API workflow
+
+Toutes les routes exigent une session et les droits correspondants.
+
+| Route | Usage |
+| --- | --- |
+| `GET /api/workflows?modelKey=…` | Catalogue des versions et affectations |
+| `POST /api/workflows` | Chargement multipart : `modelKey`, `workflowFile` |
+| `POST /api/workflows/activation/preview` puis `/commit` | Affectation : `modelKey`, `id`, `version`, puis `previewHash` |
+| `POST /api/workflows/migration/preview` puis `/commit` | `mode` (`initialize` ou `migrate`), cible, sélection `objectIds`, éventuels `objectTypes`, `sourceId`, `sourceVersion`, `stateMapping`, puis `previewHash` |
+| `POST /api/workflows/deactivate` | Retrait des affectations : `modelKey`, `objectTypes` |
+| `DELETE /api/workflows` | Suppression d’une version inutilisée : `modelKey`, `id`, `version` |
+| `GET /api/objects/{id}/workflow?modelKey=…` | Statut courant et transitions accessibles |
+| `POST /api/objects/{id}/workflow/transitions` | `modelKey`, `transitionId`, `expectedRevision`, `objectUuid` ; conflit concurrent : HTTP 409 |
+
+La liste des données accepte `workflowId` et `workflowStatus` ; la valeur `__unassigned__` désigne les objets sans workflow.
 
 ## 🐳 Docker Compose
 

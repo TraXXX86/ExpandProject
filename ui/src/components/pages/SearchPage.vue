@@ -19,6 +19,7 @@
           </v-chip>
         </v-card-title>
         <v-card-text>
+          <WorkflowFilter :state="state" />
           <v-row>
             <v-col cols="12" md="6">
               <v-text-field
@@ -98,6 +99,7 @@
 </template>
 
 <script setup>
+import WorkflowFilter from '../WorkflowFilter.vue';
 import SavedViews from '../SavedViews.vue';
 const props = defineProps({
   state: {

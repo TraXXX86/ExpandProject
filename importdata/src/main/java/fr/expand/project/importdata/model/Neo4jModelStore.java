@@ -109,6 +109,9 @@ public class Neo4jModelStore implements AutoCloseable {
                                         "Model key collides with another name/version: "
                                                 + modelKey);
                         }
+                        if (exists)
+                            fr.expand.project.importdata.workflow.WorkflowCatalog
+                                    .validateModelUpdate(tx, modelKey, model);
                         // CREATE plus key uniqueness prevents concurrent create from silently
                         // replacing another schema.
                         tx.run(
@@ -439,6 +442,11 @@ public class Neo4jModelStore implements AutoCloseable {
                                 "MATCH (n {modelKey:$modelKey}) WHERE n:ModelObjectType OR"
                                         + " n:ModelLinkType OR n:ModelAttribute DETACH DELETE n",
                                 params);
+                        tx.run(
+                                        "MATCH (w {modelKey:$modelKey}) WHERE w:WorkflowDefinition"
+                                                + " OR w:WorkflowBinding DETACH DELETE w",
+                                        params)
+                                .consume();
                         tx.run("MATCH (m:DataModel {key:$modelKey}) DETACH DELETE m", params);
                         AuditTrail.record(
                                 tx, modelKey, actor, "DELETE", "MODEL", modelKey, before, null);

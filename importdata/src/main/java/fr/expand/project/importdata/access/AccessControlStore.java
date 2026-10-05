@@ -61,7 +61,7 @@ public class AccessControlStore implements AutoCloseable {
                     if (bootstrapPassword == null || bootstrapPassword.isBlank()) {
                         throw new IllegalStateException(
                                 "EXPAND_ADMIN_PASSWORD must be set to bootstrap an empty access"
-                                    + " database");
+                                        + " database");
                     }
                     upsertUserInternal(
                             connection,
@@ -266,7 +266,7 @@ public class AccessControlStore implements AutoCloseable {
                 try (PreparedStatement statement =
                         connection.prepareStatement(
                                 "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE"
-                                    + " token = ?")) {
+                                        + " token = ?")) {
                     statement.setString(1, targetUsername.trim());
                     statement.setLong(2, Instant.now().getEpochSecond() + SESSION_TTL_SECONDS);
                     statement.setString(3, hashSessionToken(token.trim()));
@@ -301,7 +301,7 @@ public class AccessControlStore implements AutoCloseable {
                 try (PreparedStatement statement =
                         connection.prepareStatement(
                                 "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE"
-                                    + " token = ?")) {
+                                        + " token = ?")) {
                     statement.setString(1, actorUsername);
                     statement.setLong(2, Instant.now().getEpochSecond() + SESSION_TTL_SECONDS);
                     statement.setString(3, hashSessionToken(token.trim()));
@@ -325,8 +325,8 @@ public class AccessControlStore implements AutoCloseable {
                 PreparedStatement statement =
                         connection.prepareStatement(
                                 "SELECT username, display_name, portal_user, portal_model_admin,"
-                                    + " platform_admin FROM users ORDER BY lower(display_name),"
-                                    + " lower(username)");
+                                        + " platform_admin FROM users ORDER BY lower(display_name),"
+                                        + " lower(username)");
                 ResultSet rs = statement.executeQuery()) {
             List<Map<String, Object>> users = new ArrayList<>();
             while (rs.next()) {
@@ -369,8 +369,8 @@ public class AccessControlStore implements AutoCloseable {
                 PreparedStatement statement =
                         connection.prepareStatement(
                                 "SELECT model_key, visible, can_read, can_create, can_update,"
-                                    + " can_delete FROM model_permissions WHERE username = ? ORDER"
-                                    + " BY lower(model_key)")) {
+                                    + " can_delete, can_transition FROM model_permissions WHERE"
+                                    + " username = ? ORDER BY lower(model_key)")) {
             statement.setString(1, username.trim());
             try (ResultSet rs = statement.executeQuery()) {
                 List<Map<String, Object>> permissions = new ArrayList<>();
@@ -384,6 +384,7 @@ public class AccessControlStore implements AutoCloseable {
                     row.put("canCreate", rs.getInt("can_create") == 1);
                     row.put("canUpdate", rs.getInt("can_update") == 1);
                     row.put("canDelete", rs.getInt("can_delete") == 1);
+                    row.put("canTransition", rs.getInt("can_transition") == 1);
                     permissions.add(row);
                 }
                 return permissions;
@@ -479,6 +480,7 @@ public class AccessControlStore implements AutoCloseable {
                 row.put("canCreate", getBoolean(entry.get("canCreate")));
                 row.put("canUpdate", getBoolean(entry.get("canUpdate")));
                 row.put("canDelete", getBoolean(entry.get("canDelete")));
+                row.put("canTransition", getBoolean(entry.get("canTransition")));
                 normalized.add(row);
             }
         }
@@ -498,7 +500,8 @@ public class AccessControlStore implements AutoCloseable {
                             connection.prepareStatement(
                                     "INSERT INTO model_permissions(username, model_key, visible,"
                                         + " can_read, can_create, can_update, can_delete,"
-                                        + " updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")) {
+                                        + " can_transition, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?,"
+                                        + " ?, ?)")) {
                         long now = Instant.now().getEpochSecond();
                         for (Map<String, Object> permission : normalized) {
                             insert.setString(1, username.trim());
@@ -508,7 +511,8 @@ public class AccessControlStore implements AutoCloseable {
                             insert.setInt(5, getBoolean(permission.get("canCreate")) ? 1 : 0);
                             insert.setInt(6, getBoolean(permission.get("canUpdate")) ? 1 : 0);
                             insert.setInt(7, getBoolean(permission.get("canDelete")) ? 1 : 0);
-                            insert.setLong(8, now);
+                            insert.setInt(8, getBoolean(permission.get("canTransition")) ? 1 : 0);
+                            insert.setLong(9, now);
                             insert.addBatch();
                         }
                         insert.executeBatch();
@@ -575,13 +579,18 @@ public class AccessControlStore implements AutoCloseable {
                         connection, "users", "password_iterations", "INTEGER NOT NULL DEFAULT 0");
                 addColumnIfMissing(
                         connection, "sessions", "token_version", "INTEGER NOT NULL DEFAULT 0");
+                addColumnIfMissing(
+                        connection,
+                        "model_permissions",
+                        "can_transition",
+                        "INTEGER NOT NULL DEFAULT 0");
                 migrateSessionTokens(connection);
                 statement.execute(
                         "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON"
-                            + " sessions(expires_at)");
+                                + " sessions(expires_at)");
                 statement.execute(
                         "CREATE INDEX IF NOT EXISTS idx_permissions_username ON"
-                            + " model_permissions(username)");
+                                + " model_permissions(username)");
             }
             ensureBootstrapAdmin();
         } catch (IllegalStateException e) {
@@ -608,9 +617,9 @@ public class AccessControlStore implements AutoCloseable {
         try (PreparedStatement statement =
                 connection.prepareStatement(
                         "SELECT username, display_name, password_hash, password_salt,"
-                            + " password_version, password_iterations, portal_user,"
-                            + " portal_model_admin, platform_admin FROM users WHERE username ="
-                            + " ?")) {
+                                + " password_version, password_iterations, portal_user,"
+                                + " portal_model_admin, platform_admin FROM users WHERE username ="
+                                + " ?")) {
             statement.setString(1, username);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -725,7 +734,7 @@ public class AccessControlStore implements AutoCloseable {
             try (PreparedStatement revoke =
                     connection.prepareStatement(
                             "DELETE FROM sessions WHERE actor_username=? OR"
-                                + " effective_username=?")) {
+                                    + " effective_username=?")) {
                 revoke.setString(1, username);
                 revoke.setString(2, username);
                 revoke.executeUpdate();
@@ -812,7 +821,7 @@ public class AccessControlStore implements AutoCloseable {
             try (PreparedStatement update =
                     connection.prepareStatement(
                             "UPDATE sessions SET token=?, token_version=1 WHERE token=? AND"
-                                + " token_version=0")) {
+                                    + " token_version=0")) {
                 for (String token : tokens) {
                     update.setString(1, hashSessionToken(token));
                     update.setString(2, token);
