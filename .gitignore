@@ -1,5 +1,7 @@
 /.settings/
-/target/
+**/target/
+.env
+**/dependency-reduced-pom.xml
 
 # Generated sources (JAXB from XSD)
 **/dto/generated/
@@ -11,6 +13,8 @@
 *.war
 *.ear
 *.log
+*.sqlite
+*.sqlite-*
 *.swp
 *.swo
 *~

@@ -42,6 +42,7 @@
               color="error"
               variant="flat"
               :disabled="!state.adminModelKey || !state.canAccessModelAdminPortal"
+              :loading="state.isDeletingModel"
               @click="state.deleteModel"
             >
               Supprimer via l'API
@@ -136,6 +137,7 @@
             </v-col>
           </v-row>
 
+          <v-text-field v-model="state.newAccessPassword" label="Mot de passe du nouveau compte" type="password" autocomplete="new-password" variant="outlined" density="comfortable" />
           <div class="d-flex flex-wrap align-center" style="gap: 12px;">
             <v-btn
               color="primary"
@@ -188,7 +190,8 @@
                 v-model="state.adminAccessForm.password"
                 label="Nouveau mot de passe"
                 type="password"
-                hint="Laisser vide pour conserver"
+                autocomplete="new-password"
+                hint="Laissez vide pour conserver le mot de passe existant. Requis pour un nouveau compte."
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
@@ -281,10 +284,10 @@
   <v-row class="mt-8" v-if="state.canManageAccess">
     <v-col cols="12">
       <v-card class="card-animate delay-2" elevation="4" rounded="xl">
-        <v-card-title class="section-title">Droits par modèle (CRUD données)</v-card-title>
+        <v-card-title class="section-title">Droits par modèle</v-card-title>
         <v-card-text>
           <div class="text-medium-emphasis mb-3">
-            Définissez les modèles visibles par l'utilisateur et ses droits CRUD sur les données de chaque modèle.
+            Définissez les modèles visibles et les droits CRUD sur leurs données. Les droits U et D autorisent aussi la modification et la suppression du modèle pour les administrateurs de modèles.
           </div>
 
           <v-table density="compact">
@@ -294,8 +297,8 @@
                 <th>Visible</th>
                 <th>R</th>
                 <th>C</th>
-                <th>U</th>
-                <th>D</th>
+                <th>U (données et modèle)</th>
+                <th>D (données et modèle)</th>
               </tr>
             </thead>
             <tbody>
@@ -307,8 +310,8 @@
                 <td><v-checkbox v-model="permission.visible" hide-details density="compact" /></td>
                 <td><v-checkbox v-model="permission.canRead" hide-details density="compact" /></td>
                 <td><v-checkbox v-model="permission.canCreate" hide-details density="compact" /></td>
-                <td><v-checkbox v-model="permission.canUpdate" hide-details density="compact" /></td>
-                <td><v-checkbox v-model="permission.canDelete" hide-details density="compact" /></td>
+                <td><v-checkbox aria-label="Modifier les données et le modèle" v-model="permission.canUpdate" hide-details density="compact" /></td>
+                <td><v-checkbox aria-label="Supprimer les données et le modèle" v-model="permission.canDelete" hide-details density="compact" /></td>
               </tr>
             </tbody>
           </v-table>

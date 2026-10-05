@@ -1,254 +1,269 @@
 package fr.expand.project.importdata.dao.connectors.impl;
 
-import java.util.Map.Entry;
+import fr.expand.project.commons.ObjectTypeEnum;
+import fr.expand.project.importdata.dao.*;
+import fr.expand.project.importdata.dto.*;
+import fr.expand.project.importdata.dto.generated.*;
+import fr.expand.project.importdata.model.ModelManager;
+import fr.expand.project.importdata.util.CypherUtils;
+import fr.expand.project.importdata.util.SearchIndex;
 
-import org.neo4j.driver.AuthToken;
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
-import org.neo4j.driver.Record;
-import org.neo4j.driver.Result;
-import org.neo4j.driver.Session;
-import org.neo4j.driver.Value;
+import org.neo4j.driver.*;
 import org.neo4j.driver.types.Node;
 
-import fr.expand.project.commons.ObjectTypeEnum;
-import fr.expand.project.importdata.dao.IConnectorDb;
-import fr.expand.project.importdata.dto.DataPackAttribute;
-import fr.expand.project.importdata.dto.DataPackObject;
-import fr.expand.project.importdata.util.CypherUtils;
+import java.util.*;
 
-/**
- * Connector use to interact with Neo4J DB
- * 
- * @author Maxime
- *
- */
 public class CypherConnector extends IConnectorDb {
+    private Driver driver;
 
-	private Driver driver;
-	private Session session;
-	private static final String DEFAULT_BOLT_URI = "bolt://localhost:7687";
-	private static final String DEFAULT_USER = "neo4j";
-	private static final String DEFAULT_PASSWORD = "expand";
-
-	// ############################# Start/Close Connection to DB methods
-
-	@Override
-	protected void connectToDb() {
-		String uri = readSetting("NEO4J_BOLT_URI", "NEO4J_URI", DEFAULT_BOLT_URI);
-		AuthToken authToken = buildAuthToken();
-		driver = GraphDatabase.driver(uri, authToken);
-		session = driver.session();
-	}
-
-	@Override
-	public void closeConnection() {
-		if (session != null) {
-			session.close();
-		}
-		if (driver != null) {
-			driver.close();
-		}
-	}
-
-	// ############################# Request methods
-
-	@Override
-	public int writeObject(DataPackObject object) {
-		if (object != null) {
-			// Generate request for DB
-			String request = "CREATE (a:" + CypherUtils.convertObjectForDb(object, modelKey) + ") RETURN ID(a)";
-			LOGGER.info(request);
-			int newId = launchCreationRequest(request, true);
-			if (object.getID() <= 0) {
-				object.setID(newId);
-			}
-			object.setInternalId(newId);
-			return newId;
-		}
-		LOGGER.error("Object is null");
-		return -1;
-	}
-
-	@Override
-    public int writeLink(DataPackObject objectA, DataPackObject objectB, boolean isOriented, String linkType) {
-        String relationType = normalizeRelationshipType(linkType);
-        String relationProperties = buildRelationProperties(linkType);
-        String matchA = buildNodeMatch(objectA, "a");
-        String matchB = buildNodeMatch(objectB, "b");
-        String request = matchA + " " + matchB + " CREATE (a)-[:"
-                + relationType + relationProperties + "]->(b)";
-        LOGGER.info(request);
-        return launchCreationRequest(request, false);
+    @Override
+    protected void connectToDb() {
+        driver = Neo4jDriverProvider.getDriver();
     }
 
-	@Override
-	public DataPackObject getObjectToDbDto(ObjectTypeEnum typeObject, int idObject) {
-		String request = "MATCH (n:" + typeObject.toString() + ") WHERE ID(n)=" + idObject
-				+ " RETURN n AS TAILLE LIMIT 5";
-		LOGGER.info(request);
-		Result result = session.run(request);
-		return convertResultToObjectToDb(typeObject, result.single());
-	}
-
-	@Override
-	public void deleteAll() {
-		closeConnection();
-		connectToDb();
-
-		// Create query
-		String request = "MATCH (n) DETACH DELETE n";
-		LOGGER.info(request);
-
-		// Launch request
-		session.run(request);
-	}
-
-	// ############################# Utils methods
-
-	/**
-	 * Launch Cypher Request
-	 * 
-	 * @param request
-	 * @param resultAttempted
-	 *            : true if we try to get a returned ID
-	 * @return ID or -1
-	 */
-	private int launchCreationRequest(String request, boolean resultAttempted) {
-		// Launch request
-		Result result = session.run(request);
-		if (!resultAttempted) {
-			return -1;
-		}
-		Record record = result.single();
-		Value value = record.values().get(0);
-		int id = value.asInt();
-		return id;
-	}
-
-	/**
-	 * Convert Cypher request result to Java object
-	 * 
-	 * @param typeObject
-	 * 
-	 * @param object
-	 * @return
-	 */
-    private DataPackObject convertResultToObjectToDb(ObjectTypeEnum typeObject, Record record) {
-		DataPackObject result = new DataPackObject();
-		result.setTYPE(typeObject.toString());
-		for (Entry<String, Object> entry : record.asMap().entrySet()) {
-			if (entry.getValue() instanceof Node) {
-				for (Entry<String, Object> entryInternalNode : ((Node) entry.getValue()).asMap().entrySet()) {
-					LOGGER.info(entryInternalNode.getKey() + " " + entryInternalNode.getValue());
-					if (entryInternalNode.getValue() instanceof String) {
-						DataPackAttribute attribute = new DataPackAttribute(entryInternalNode.getKey(),
-								(String) entryInternalNode.getValue());
-						result.getATTRIBUTE().add(attribute);
-					}
-				}
-			} else {
-				LOGGER.info(entry.getKey() + " " + entry.getValue());
-				if (entry.getValue() instanceof String) {
-					DataPackAttribute attribute = new DataPackAttribute(entry.getKey(), (String) entry.getValue());
-					result.getATTRIBUTE().add(attribute);
-				}
-			}
-		}
-		return result;
-	}
-
-    private String buildRelationProperties(String linkType) {
-        boolean hasModel = modelKey != null && !modelKey.isBlank();
-        boolean hasLinkType = linkType != null && !linkType.isBlank();
-        if (!hasModel && !hasLinkType) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        builder.append(" {");
-        boolean first = true;
-        if (hasModel) {
-            builder.append("modelKey:'").append(modelKey).append("'");
-            first = false;
-        }
-        if (hasLinkType) {
-            if (!first) {
-                builder.append(",");
-            }
-            builder.append("linkType:'").append(linkType).append("'");
-        }
-        builder.append("}");
-        return builder.toString();
+    @Override
+    public void closeConnection() {
+        /* Driver lifecycle belongs to application. */
     }
 
-    private String normalizeRelationshipType(String linkType) {
-        if (linkType == null || linkType.isBlank()) {
-            return "KNOWS";
+    @Override
+    public int writeObject(DataPackObject object) {
+        Objects.requireNonNull(object, "object");
+        try (Session session = driver.session()) {
+            int id = session.executeWrite(tx -> createObject(tx, object, modelKey));
+            object.setInternalId(id);
+            return id;
+        } catch (org.neo4j.driver.exceptions.ClientException e) {
+            throw StorageConflictException.translate(e);
         }
-        String sanitized = linkType.trim().replaceAll("[^A-Za-z0-9_]", "_");
-        if (sanitized.isEmpty()) {
-            return "KNOWS";
-        }
-        return sanitized.toUpperCase();
     }
 
-    private String buildNodeMatch(DataPackObject object, String alias) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("MATCH (").append(alias).append(":").append(object.getTYPE()).append(")");
-
-        Integer internalId = object.getInternalId();
-        boolean useInternal = internalId != null && internalId > 0 && object.getID() == internalId;
-        boolean hasDataId = object.getID() > 0 && !useInternal;
-
-        boolean hasWhere = false;
-        if (useInternal) {
-            builder.append(" WHERE ID(").append(alias).append(")=").append(internalId);
-            hasWhere = true;
-        } else if (hasDataId) {
-            builder.append(" WHERE ").append(alias).append(".dataId=").append(object.getID());
-            hasWhere = true;
+    private int createObject(TransactionContext tx, DataPackObject object, String key) {
+        Map<String, List<String>> fields = Map.of();
+        if (key != null && !key.isBlank()) {
+            var model =
+                    tx.run(
+                            "MATCH (m:DataModel {key:$key}) SET m.key=m.key RETURN m.xml AS xml",
+                            Map.of("key", key));
+            if (model.hasNext())
+                fields = SearchIndex.fieldsFromXml(model.single().get("xml").asString(""));
         }
-
-        if (modelKey != null && !modelKey.isBlank()) {
-            builder.append(hasWhere ? " AND " : " WHERE ");
-            builder.append(alias).append(".modelKey='").append(modelKey).append("'");
-        }
-
-        return builder.toString();
+        return createObject(tx, object, key, fields);
     }
 
-	private AuthToken buildAuthToken() {
-		String auth = readSetting("NEO4J_AUTH", null, null);
-		if (auth != null && !auth.isBlank()) {
-			if ("none".equalsIgnoreCase(auth.trim())) {
-				return AuthTokens.none();
-			}
-			int separatorIndex = auth.indexOf('/');
-			if (separatorIndex > 0 && separatorIndex < auth.length() - 1) {
-				String user = auth.substring(0, separatorIndex);
-				String password = auth.substring(separatorIndex + 1);
-				return AuthTokens.basic(user, password);
-			}
-		}
+    private int createObject(
+            TransactionContext tx,
+            DataPackObject object,
+            String key,
+            Map<String, List<String>> fields) {
+        Map<String, Object> properties = CypherUtils.properties(object, key);
+        properties.put("searchText", SearchIndex.text(object.getTYPE(), properties, fields));
+        if (key != null && !key.isBlank()) {
+            boolean exists =
+                    tx.run(
+                                    "MATCH (n:DataObject {modelKey:$key}) WHERE n.dataId=$id AND"
+                                        + " (n.type=$type OR $type IN labels(n)) RETURN n LIMIT 1",
+                                    Map.of(
+                                            "key",
+                                            key,
+                                            "id",
+                                            object.getID(),
+                                            "type",
+                                            object.getTYPE()))
+                            .hasNext();
+            if (exists)
+                throw new StorageConflictException(
+                        "Object already exists: " + object.getTYPE() + "/" + object.getID());
+        }
+        String labels = CypherUtils.identifier(object.getTYPE()) + ":DataObject";
+        long id =
+                tx.run(
+                                "CREATE (n:" + labels + ") SET n=$properties RETURN id(n) AS id",
+                                Map.of("properties", properties))
+                        .single()
+                        .get("id")
+                        .asLong();
+        return Math.toIntExact(id);
+    }
 
-		String user = readSetting("NEO4J_USER", null, DEFAULT_USER);
-		String password = readSetting("NEO4J_PASSWORD", null, DEFAULT_PASSWORD);
-		return AuthTokens.basic(user, password);
-	}
+    @Override
+    public int writeLink(DataPackObject a, DataPackObject b, boolean directed, String linkType) {
+        try (Session session = driver.session()) {
+            return session.executeWrite(
+                    tx -> createLink(tx, a, b, directed, linkType, List.of(), modelKey));
+        }
+    }
 
-	private String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
-		String value = System.getProperty(envKey);
-		if (value == null || value.isBlank()) {
-			value = System.getenv(envKey);
-		}
-		if ((value == null || value.isBlank()) && fallbackEnvKey != null) {
-			value = System.getProperty(fallbackEnvKey);
-			if (value == null || value.isBlank()) {
-				value = System.getenv(fallbackEnvKey);
-			}
-		}
-		return (value == null || value.isBlank()) ? defaultValue : value;
-	}
+    private int createLink(
+            TransactionContext tx,
+            DataPackObject a,
+            DataPackObject b,
+            boolean directed,
+            String type,
+            List<ATTRIBUTE> attributes,
+            String key) {
+        String relType = type == null || type.isBlank() ? "KNOWS" : type;
+        Map<String, Object> params = new HashMap<>();
+        params.put("key", key);
+        params.put("a", a.getInternalId() == null ? a.getID() : a.getInternalId());
+        params.put("b", b.getInternalId() == null ? b.getID() : b.getInternalId());
+        params.put("aType", a.getTYPE());
+        params.put("bType", b.getTYPE());
+        Map<String, Object> props = CypherUtils.attributes(attributes);
+        props.put("linkType", relType);
+        props.put("directed", directed);
+        props.put("uuid", UUID.randomUUID().toString());
+        if (key != null && !key.isBlank()) props.put("modelKey", key);
+        params.put("properties", props);
+        String matchA = a.getInternalId() == null ? "a.dataId=$a" : "id(a)=$a";
+        String matchB = b.getInternalId() == null ? "b.dataId=$b" : "id(b)=$b";
+        var result =
+                tx.run(
+                        "MATCH (a:"
+                                + CypherUtils.identifier(a.getTYPE())
+                                + "),(b:"
+                                + CypherUtils.identifier(b.getTYPE())
+                                + ") WHERE "
+                                + matchA
+                                + " AND "
+                                + matchB
+                                + " AND ($key IS NULL OR (a.modelKey=$key AND b.modelKey=$key))"
+                                + " CREATE (a)-[r:"
+                                + CypherUtils.identifier(relType)
+                                + "]->(b) SET r=$properties RETURN id(r) AS id",
+                        params);
+        if (!result.hasNext()) throw new IllegalArgumentException("Link endpoint does not exist");
+        int id = Math.toIntExact(result.next().get("id").asLong());
+        if (result.hasNext()) throw new IllegalArgumentException("Ambiguous link endpoint");
+        return id;
+    }
 
+    /** Every object and relationship in one transaction; any failure rolls the entire pack back. */
+    @Override
+    public void importData(DATAS data, String key, ModelManager manager) {
+        if (key == null || key.isBlank())
+            throw new IllegalArgumentException("A model key is required");
+        try (Session session = driver.session()) {
+            session.executeWrite(
+                    tx -> {
+                        // Lock the model for the duration of the import so validation cannot race
+                        // schema replacement.
+                        var schema =
+                                tx.run(
+                                        "MATCH (m:DataModel {key:$key}) SET m.key=m.key RETURN"
+                                            + " m.xml AS xml",
+                                        Map.of("key", key));
+                        if (!schema.hasNext())
+                            throw new StorageConflictException("Model no longer exists: " + key);
+                        var schemaRecord = schema.single();
+                        String storedXml =
+                                schemaRecord.get("xml").isNull()
+                                        ? ""
+                                        : schemaRecord.get("xml").asString();
+                        String validatedXml = manager.getCurrentModelXml();
+                        if (validatedXml != null && !validatedXml.equals(storedXml))
+                            throw new StorageConflictException(
+                                    "Model changed during validation; reload and retry the import");
+                        Map<String, List<String>> searchFields =
+                                SearchIndex.fields(manager.getCurrentModel());
+                        Map<String, DataPackObject> objects = new HashMap<>();
+                        if (data.getOBJECTS() != null)
+                            for (OBJECT input : data.getOBJECTS().getOBJECT()) {
+                                DataPackObject object = new DataPackObject();
+                                object.setID(input.getID());
+                                object.setTYPE(input.getTYPE());
+                                object.getATTRIBUTE().addAll(input.getATTRIBUTE());
+                                object.setInternalId(createObject(tx, object, key, searchFields));
+                                if (objects.put(input.getTYPE() + "/" + input.getID(), object)
+                                        != null)
+                                    throw new IllegalArgumentException("Duplicate object identity");
+                            }
+                        if (data.getLINKS() != null)
+                            for (LINK link : data.getLINKS().getLINK()) {
+                                var a =
+                                        objects.get(
+                                                link.getOBJLINKA().getTYPE()
+                                                        + "/"
+                                                        + link.getOBJLINKA().getID());
+                                var b =
+                                        objects.get(
+                                                link.getOBJLINKB().getTYPE()
+                                                        + "/"
+                                                        + link.getOBJLINKB().getID());
+                                if (a == null || b == null)
+                                    throw new IllegalArgumentException(
+                                            "Link endpoints must be included in the import");
+                                var definition = manager.getLinkType(link.getTYPE());
+                                boolean directed = definition == null || definition.isDIRECTED();
+                                createLink(
+                                        tx,
+                                        a,
+                                        b,
+                                        directed,
+                                        link.getTYPE(),
+                                        link.getATTRIBUTE(),
+                                        key);
+                            }
+                        return null;
+                    });
+        } catch (org.neo4j.driver.exceptions.ClientException e) {
+            throw StorageConflictException.translate(e);
+        }
+    }
+
+    @Override
+    public DataPackObject getObjectToDbDto(ObjectTypeEnum type, int id) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("id", id);
+        params.put("key", modelKey);
+        try (Session session = driver.session()) {
+            return session.executeRead(
+                    tx -> {
+                        var result =
+                                tx.run(
+                                        "MATCH (n:"
+                                                + CypherUtils.identifier(type.toString())
+                                                + ") WHERE id(n)=$id AND ($key IS NULL OR"
+                                                + " n.modelKey=$key) RETURN n",
+                                        params);
+                        if (!result.hasNext()) return null;
+                        Node node = result.single().get("n").asNode();
+                        DataPackObject object = new DataPackObject();
+                        object.setTYPE(type.toString());
+                        object.setID(node.get("dataId").isNull() ? id : node.get("dataId").asInt());
+                        object.setInternalId(id);
+                        node.asMap()
+                                .forEach(
+                                        (k, v) -> {
+                                            if (!CypherUtils.isReservedProperty(k))
+                                                object.getATTRIBUTE()
+                                                        .add(
+                                                                new DataPackAttribute(
+                                                                        k, String.valueOf(v)));
+                                        });
+                        return object;
+                    });
+        }
+    }
+
+    @Override
+    public void deleteAll() {
+        try (Session session = driver.session()) {
+            if (modelKey == null || modelKey.isBlank())
+                session.executeWrite(
+                        tx -> {
+                            tx.run("MATCH (n:DataObject) DETACH DELETE n").consume();
+                            return null;
+                        });
+            else
+                session.executeWrite(
+                        tx -> {
+                            tx.run(
+                                            "MATCH (n:DataObject {modelKey:$key}) DETACH DELETE n",
+                                            Map.of("key", modelKey))
+                                    .consume();
+                            return null;
+                        });
+        }
+    }
 }

@@ -12,7 +12,7 @@ cd "${UI_DIR}"
 
 if [ ! -d node_modules ]; then
   echo "Installing UI dependencies..."
-  npm install
+  npm ci
 fi
 
 echo "Starting UI dev server..."

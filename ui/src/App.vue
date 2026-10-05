@@ -116,11 +116,12 @@
                 <v-card-text>
                   <div class="text-medium-emphasis mb-4">
                     Connectez-vous avec votre compte plateforme.
-                    Le compte initial administrateur est <strong>admin / admin</strong>.
+
                   </div>
                   <v-text-field
                     v-model="state.loginUsername"
                     label="Login"
+                    autocomplete="username"
                     prepend-icon="mdi-account"
                     variant="outlined"
                     density="comfortable"
@@ -128,6 +129,7 @@
                   <v-text-field
                     v-model="state.loginPassword"
                     label="Mot de passe"
+                    autocomplete="current-password"
                     type="password"
                     prepend-icon="mdi-lock-outline"
                     variant="outlined"
@@ -297,37 +299,40 @@
             </v-col>
           </v-row>
 
+          <DataCoverage v-if="state.isUserPortal" :state="state" />
+          <v-alert v-if="state.status && !['import-model', 'import-data'].includes(state.currentPage)" class="mb-4" :type="state.status.type" variant="tonal" role="status">{{ state.status.message }}</v-alert>
+
           <v-window v-if="activeTabs.length" v-model="state.currentPage">
             <v-window-item value="navigate">
-              <NavigatePage :state="state" />
+              <NavigatePage v-if="state.currentPage === 'navigate'" :state="state" />
             </v-window-item>
 
             <v-window-item value="table">
-              <TablePage :state="state" />
+              <TablePage v-if="state.currentPage === 'table'" :state="state" />
             </v-window-item>
 
             <v-window-item value="search">
-              <SearchPage :state="state" />
+              <SearchPage v-if="state.currentPage === 'search'" :state="state" />
             </v-window-item>
 
             <v-window-item value="import-model">
-              <ImportModelPage :state="state" />
+              <ImportModelPage v-if="state.currentPage === 'import-model'" :state="state" />
             </v-window-item>
 
             <v-window-item value="import-data">
-              <ImportDataPage :state="state" />
+              <ImportDataPage v-if="state.currentPage === 'import-data'" :state="state" />
             </v-window-item>
 
             <v-window-item value="create">
-              <CreatePage :state="state" />
+              <CreatePage v-if="state.currentPage === 'create'" :state="state" />
             </v-window-item>
 
             <v-window-item value="model">
-              <ModelPage :state="state" />
+              <ModelPage v-if="state.currentPage === 'model'" :state="state" />
             </v-window-item>
 
             <v-window-item value="admin">
-              <AdminPage :state="state" />
+              <AdminPage v-if="state.currentPage === 'admin'" :state="state" />
             </v-window-item>
           </v-window>
         </template>
@@ -337,18 +342,21 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, defineAsyncComponent, reactive, watch } from 'vue';
 import { useAppState } from './composables/useAppState';
-import AdminPage from './components/pages/AdminPage.vue';
-import ImportDataPage from './components/pages/ImportDataPage.vue';
-import ImportModelPage from './components/pages/ImportModelPage.vue';
-import ModelPage from './components/pages/ModelPage.vue';
-import NavigatePage from './components/pages/NavigatePage.vue';
-import SearchPage from './components/pages/SearchPage.vue';
-import TablePage from './components/pages/TablePage.vue';
-import CreatePage from './components/pages/CreatePage.vue';
+import { useHashNavigation } from './composables/useHashNavigation';
+import DataCoverage from './components/DataCoverage.vue';
+const AdminPage = defineAsyncComponent(() => import('./components/pages/AdminPage.vue'));
+const ImportDataPage = defineAsyncComponent(() => import('./components/pages/ImportDataPage.vue'));
+const ImportModelPage = defineAsyncComponent(() => import('./components/pages/ImportModelPage.vue'));
+const ModelPage = defineAsyncComponent(() => import('./components/pages/ModelPage.vue'));
+const NavigatePage = defineAsyncComponent(() => import('./components/pages/NavigatePage.vue'));
+const SearchPage = defineAsyncComponent(() => import('./components/pages/SearchPage.vue'));
+const TablePage = defineAsyncComponent(() => import('./components/pages/TablePage.vue'));
+const CreatePage = defineAsyncComponent(() => import('./components/pages/CreatePage.vue'));
 
 const state = reactive(useAppState());
+useHashNavigation(state);
 
 const userPortalTabs = [
   {

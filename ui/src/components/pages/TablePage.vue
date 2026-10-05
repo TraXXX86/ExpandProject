@@ -47,7 +47,7 @@
             <v-col cols="12" md="4">
               <v-text-field
                 v-model="state.tableSearch"
-                label="Recherche (type ou ID)"
+                label="Rechercher dans les champs du modèle"
                 prepend-icon="mdi-magnify"
                 variant="outlined"
                 density="comfortable"
@@ -296,9 +296,11 @@
       </v-card>
     </v-col>
   </v-row>
+  <LinkManager v-if="state.canUpdateCurrentModelData || state.canDeleteCurrentModelData" :state="state" />
 </template>
 
 <script setup>
+import LinkManager from '../LinkManager.vue';
 import { computed } from 'vue';
 
 const props = defineProps({

@@ -454,7 +454,7 @@
             <v-btn
               color="primary"
               :loading="state.isSavingModelXml"
-              :disabled="!state.selectedModelKey || !state.modelXml || !state.canAccessModelAdminPortal"
+              :disabled="!state.selectedModelKey || !state.modelXml || !state.canAccessModelAdminPortal || !state.canUpdateCurrentModelData"
               @click="state.saveModelXml"
             >
               Sauvegarder
@@ -471,6 +471,8 @@
 
           <v-textarea
             v-model="state.modelXml"
+            hint="Le nom et la version doivent rester identiques. Importez un nouveau modèle pour créer une version distincte."
+            persistent-hint
             class="mt-4"
             label="XML du modele"
             variant="outlined"

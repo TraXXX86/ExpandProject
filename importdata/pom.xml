@@ -1,195 +1,118 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>importpackage</artifactId>
   <name>ImportPackage</name>
   <parent>
-  	<groupId>fr.expand.project</groupId>
-  	<artifactId>expand</artifactId>
-  	<version>0.0.1-SNAPSHOT</version>
+    <groupId>fr.expand.project</groupId>
+    <artifactId>expand</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
   </parent>
-  
+
   <dependencies>
-  	<dependency>
-        <groupId>fr.expand.project</groupId>
-        <artifactId>commonspackage</artifactId>
-        <version>${project.parent.version}</version>
-    </dependency>
-  
     <dependency>
-        <groupId>org.neo4j.driver</groupId>
-        <artifactId>neo4j-java-driver</artifactId>
-        <version>5.17.0</version>
+      <groupId>fr.expand.project</groupId>
+      <artifactId>commonspackage</artifactId>
+      <version>${project.parent.version}</version>
     </dependency>
-    
     <dependency>
-	    <groupId>org.neo4j</groupId>
-	    <artifactId>neo4j-jdbc-driver</artifactId>
-	    <version>4.0.9</version>
-	</dependency>
-	
-	<!-- Jakarta JAXB API for Java 11+ (JAXB 3.x) -->
-	<dependency>
-	    <groupId>jakarta.xml.bind</groupId>
-	    <artifactId>jakarta.xml.bind-api</artifactId>
-	    <version>3.0.1</version>
-	</dependency>
-	<dependency>
-	    <groupId>com.sun.xml.bind</groupId>
-	    <artifactId>jaxb-impl</artifactId>
-	    <version>3.0.2</version>
-	</dependency>
+      <groupId>org.neo4j.driver</groupId>
+      <artifactId>neo4j-java-driver</artifactId>
+      <version>${neo4j.driver.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+      <version>3.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.sun.xml.bind</groupId>
+      <artifactId>jaxb-impl</artifactId>
+      <version>3.0.2</version>
+    </dependency>
+    <dependency>
+      <groupId>io.javalin</groupId>
+      <artifactId>javalin</artifactId>
+      <version>${javalin.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.14.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
+      <version>2.26.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.53.4.0</version>
+    </dependency>
+  </dependencies>
 
-
-    <!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
-	<dependency>
-	    <groupId>commons-io</groupId>
-	    <artifactId>commons-io</artifactId>
-	    <version>2.15.1</version>
-	</dependency>
-	
-	<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
-	<dependency>
-	    <groupId>org.apache.commons</groupId>
-	    <artifactId>commons-lang3</artifactId>
-	    <version>3.14.0</version>
-	</dependency>
-	
-	<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-collections4 -->
-	<dependency>
-	    <groupId>org.apache.commons</groupId>
-	    <artifactId>commons-collections4</artifactId>
-	    <version>4.4</version>
-	</dependency> 
-	
-	<!-- https://mvnrepository.com/artifact/org.jvnet.jaxb2_commons/jaxb2-value-constructor -->
-	<dependency>
-	    <groupId>org.jvnet.jaxb2_commons</groupId>
-	    <artifactId>jaxb2-value-constructor</artifactId>
-	    <version>3.0</version>
-	</dependency>
-
-	<dependency>
-	    <groupId>com.sparkjava</groupId>
-	    <artifactId>spark-core</artifactId>
-	    <version>2.9.4</version>
-	</dependency>
-
-	<dependency>
-	    <groupId>com.google.code.gson</groupId>
-	    <artifactId>gson</artifactId>
-	    <version>2.10.1</version>
-	</dependency>
-
-	<dependency>
-	    <groupId>org.xerial</groupId>
-	    <artifactId>sqlite-jdbc</artifactId>
-	    <version>3.46.1.3</version>
-	</dependency>
-
-	<dependency>
-	    <groupId>javax.servlet</groupId>
-	    <artifactId>javax.servlet-api</artifactId>
-	    <version>3.1.0</version>
-	</dependency>
-	
- </dependencies>
- <build>
+  <build>
     <plugins>
-    	<!-- Plugin use to generate JAXB DTO from xsd -->
-        <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-	        <artifactId>jaxb2-maven-plugin</artifactId>
-	        <version>3.1.0</version>
-        </plugin>
-        
-        <!-- Maven JAR Plugin to create executable JAR -->
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.3.0</version>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>jaxb2-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>generate-datapack</id>
+            <phase>generate-sources</phase>
+            <goals><goal>xjc</goal></goals>
             <configuration>
-                <archive>
-                    <manifest>
-                        <mainClass>fr.expand.project.importdata.Launcher</mainClass>
-                        <addClasspath>true</addClasspath>
-                    </manifest>
-                </archive>
+              <packageName>fr.expand.project.importdata.dto.generated</packageName>
+              <outputDirectory>${project.build.directory}/generated-sources/jaxb</outputDirectory>
+              <sources><source>src/main/resources/datapack/data.xsd</source></sources>
+              <clearOutputDir>false</clearOutputDir>
             </configuration>
-        </plugin>
-        
-        <!-- Maven Shade Plugin to create fat JAR with dependencies -->
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-shade-plugin</artifactId>
-            <version>3.5.1</version>
-            <executions>
-                <execution>
-                    <phase>package</phase>
-                    <goals>
-                        <goal>shade</goal>
-                    </goals>
-                    <configuration>
-                        <transformers>
-                            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                <mainClass>fr.expand.project.importdata.Launcher</mainClass>
-                            </transformer>
-                        </transformers>
-                        <finalName>expandproject-importdata</finalName>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
+          </execution>
+          <execution>
+            <id>generate-model</id>
+            <phase>generate-sources</phase>
+            <goals><goal>xjc</goal></goals>
+            <configuration>
+              <packageName>fr.expand.project.importdata.model.generated</packageName>
+              <outputDirectory>${project.build.directory}/generated-sources/jaxb</outputDirectory>
+              <sources><source>src/main/resources/model/model.xsd</source></sources>
+              <clearOutputDir>false</clearOutputDir>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <archive>
+            <manifest><mainClass>fr.expand.project.importdata.Launcher</mainClass></manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <finalName>expandproject-importdata</finalName>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>fr.expand.project.importdata.Launcher</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
-    <pluginManagement>
-	    <plugins>
-	    	<!-- Plugin use to generate JAXB DTO from xsd -->
-	        <plugin>
-	            <groupId>org.codehaus.mojo</groupId>
-		        <artifactId>jaxb2-maven-plugin</artifactId>
-		        <version>3.1.0</version>
-		        <dependencies>
-		        	<dependency>
-					    <groupId>org.jvnet.jaxb2_commons</groupId>
-					    <artifactId>jaxb2-value-constructor</artifactId>
-					    <version>3.0</version>
-					</dependency>
-		        </dependencies>
-	            <executions>
-	            	<!-- Generation for DataPack DTOs -->
-	            	<execution>
-	            		<id>generate-datapack</id>
-	            		<phase>generate-sources</phase>
-		            	<goals>
-		            		<goal>xjc</goal>
-		            	</goals>
-		            	<configuration>
-		                	<packageName>fr.expand.project.importdata.dto.generated</packageName>
-		                	<outputDirectory>src/main/java</outputDirectory>
-						    <sources>
-						         <source>src/main/resources/datapack/data.xsd</source>
-						    </sources>
-						    <clearOutputDir>false</clearOutputDir>
-		            	</configuration>
-	            	</execution>
-	            	<!-- Generation for Model DTOs -->
-	            	<execution>
-	            		<id>generate-model</id>
-	            		<phase>generate-sources</phase>
-		            	<goals>
-		            		<goal>xjc</goal>
-		            	</goals>
-		            	<configuration>
-		                	<packageName>fr.expand.project.importdata.model.generated</packageName>
-		                	<outputDirectory>src/main/java</outputDirectory>
-						    <sources>
-						         <source>src/main/resources/model/model.xsd</source>
-						    </sources>
-						    <clearOutputDir>false</clearOutputDir>
-		            	</configuration>
-	            	</execution>
-	            </executions>
-	        </plugin>
-		</plugins>
-    </pluginManagement>
-</build>
+  </build>
 </project>

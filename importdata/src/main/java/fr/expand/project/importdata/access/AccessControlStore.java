@@ -18,89 +18,153 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-/**
- * Store for users, permissions and auth sessions persisted in SQLite.
- */
+/** Store for users, permissions and auth sessions persisted in SQLite. */
 public class AccessControlStore implements AutoCloseable {
 
     private static final String ADMIN_USERNAME = "admin";
-    private static final String ADMIN_DEFAULT_PASSWORD = "admin";
     private static final long SESSION_TTL_SECONDS = 12 * 60 * 60;
 
     private final String sqlitePath;
     private final String jdbcUrl;
+    private final String bootstrapPassword;
 
     public AccessControlStore() {
-        this.sqlitePath = resolveSqlitePath();
+        this(Paths.get(resolveSqlitePath()), readSetting("EXPAND_ADMIN_PASSWORD", null, null));
+    }
+
+    /** Explicit configuration avoids process-wide settings in tests and embedded callers. */
+    public AccessControlStore(Path databasePath, String bootstrapPassword) {
+        this.sqlitePath = databasePath.toString();
         this.jdbcUrl = "jdbc:sqlite:" + sqlitePath;
+        this.bootstrapPassword = bootstrapPassword;
         initialize();
     }
 
+    /** Bootstrap an empty database only; never restore privileges on an existing account. */
     public void ensureBootstrapAdmin() {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                Map<String, Object> admin = loadUserInternal(connection, ADMIN_USERNAME);
-                if (admin == null) {
-                    upsertUserInternal(
-                        connection,
-                        ADMIN_USERNAME,
-                        "Administrateur",
-                        true,
-                        true,
-                        true,
-                        ADMIN_DEFAULT_PASSWORD
-                    );
-                } else {
-                    boolean hasPassword = getString(admin.get("passwordHash")) != null
-                        && !getString(admin.get("passwordHash")).isBlank();
-                    String password = hasPassword ? null : ADMIN_DEFAULT_PASSWORD;
-                    upsertUserInternal(
-                        connection,
-                        ADMIN_USERNAME,
-                        getString(admin.get("displayName")),
-                        true,
-                        true,
-                        true,
-                        password
-                    );
+        try (Connection connection = openConnection();
+                Statement statement = connection.createStatement()) {
+            try (ResultSet rs = statement.executeQuery("SELECT 1 FROM users LIMIT 1")) {
+                if (rs.next()) {
+                    return;
                 }
-                connection.commit();
-            } catch (Exception e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
             }
+            // Acquire the write lock before checking emptiness to serialize first-start races.
+            statement.execute("BEGIN IMMEDIATE");
+            try {
+                boolean empty;
+                try (ResultSet rs = statement.executeQuery("SELECT 1 FROM users LIMIT 1")) {
+                    empty = !rs.next();
+                }
+                if (empty) {
+                    if (bootstrapPassword == null || bootstrapPassword.isBlank()) {
+                        throw new IllegalStateException(
+                                "EXPAND_ADMIN_PASSWORD must be set to bootstrap an empty access"
+                                    + " database");
+                    }
+                    upsertUserInternal(
+                            connection,
+                            ADMIN_USERNAME,
+                            "Administrateur",
+                            true,
+                            true,
+                            true,
+                            bootstrapPassword);
+                }
+                statement.execute("COMMIT");
+            } catch (Exception e) {
+                statement.execute("ROLLBACK");
+                throw e;
+            }
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Unable to bootstrap admin user", e);
         }
     }
 
     public Map<String, Object> authenticate(String username, String password) {
-        if (username == null || username.isBlank() || password == null) {
+        if (username == null
+                || username.isBlank()
+                || username.length() > 128
+                || password == null
+                || password.length() > PasswordHasher.MAX_PASSWORD_LENGTH) {
             return null;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
-            Map<String, Object> user = loadUserInternal(connection, username.trim());
-            if (user == null) {
-                return null;
-            }
-            String storedHash = getString(user.get("passwordHash"));
-            String storedSalt = getString(user.get("passwordSalt"));
-            if (storedHash == null || storedSalt == null || storedHash.isBlank() || storedSalt.isBlank()) {
-                return null;
-            }
-            String computedHash = hashPassword(password, storedSalt);
-            if (!storedHash.equals(computedHash)) {
-                return null;
-            }
-            return sanitizeUser(user);
+            return authenticateInternal(connection, username.trim(), password);
         } catch (Exception e) {
             throw new RuntimeException("Unable to authenticate user", e);
+        }
+    }
+
+    private Map<String, Object> authenticateInternal(
+            Connection connection, String username, String password) throws Exception {
+        Map<String, Object> user = loadUserInternal(connection, username.trim());
+        if (user == null) {
+            return null;
+        }
+        String storedHash = getString(user.get("passwordHash"));
+        String storedSalt = getString(user.get("passwordSalt"));
+        if (storedHash == null
+                || storedSalt == null
+                || storedHash.isBlank()
+                || storedSalt.isBlank()) {
+            return null;
+        }
+        int version = ((Number) user.get("passwordVersion")).intValue();
+        int iterations = ((Number) user.get("passwordIterations")).intValue();
+        if (!PasswordHasher.verify(password, storedSalt, storedHash, version, iterations)) {
+            return null;
+        }
+        if (version != PasswordHasher.CURRENT_VERSION || iterations < PasswordHasher.ITERATIONS) {
+            PasswordHasher.Hash upgraded = PasswordHasher.hash(password);
+            try (PreparedStatement update =
+                    connection.prepareStatement(
+                            "UPDATE users SET password_hash=?, password_salt=?, password_version=?,"
+                                + " password_iterations=? WHERE username=? AND password_hash=? AND"
+                                + " password_salt=?")) {
+                update.setString(1, upgraded.hash());
+                update.setString(2, upgraded.salt());
+                update.setInt(3, upgraded.version());
+                update.setInt(4, upgraded.iterations());
+                update.setString(5, username.trim());
+                update.setString(6, storedHash);
+                update.setString(7, storedSalt);
+                if (update.executeUpdate() == 0) {
+                    return null;
+                }
+            }
+        }
+        return sanitizeUser(user);
+    }
+
+    /** Verification, password migration and session insertion serialize with password resets. */
+    public Map<String, Object> authenticateAndCreateSession(String username, String password) {
+        if (username == null
+                || username.isBlank()
+                || username.length() > 128
+                || password == null
+                || password.length() > PasswordHasher.MAX_PASSWORD_LENGTH) {
+            return null;
+        }
+        try (Connection connection = openConnection();
+                Statement transaction = connection.createStatement()) {
+            transaction.execute("BEGIN IMMEDIATE");
+            try {
+                Map<String, Object> user =
+                        authenticateInternal(connection, username.trim(), password);
+                Map<String, Object> session =
+                        user == null ? null : createSessionInternal(connection, username.trim());
+                transaction.execute("COMMIT");
+                return session;
+            } catch (Exception e) {
+                transaction.execute("ROLLBACK");
+                throw e;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to authenticate and create session", e);
         }
     }
 
@@ -108,57 +172,54 @@ public class AccessControlStore implements AutoCloseable {
         if (username == null || username.isBlank()) {
             return null;
         }
-        ensureBootstrapAdmin();
-        String normalizedUsername = username.trim();
-        long now = Instant.now().getEpochSecond();
-        long expiresAt = now + SESSION_TTL_SECONDS;
-        String token = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();
-
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
+        try (Connection connection = openConnection();
+                Statement transaction = connection.createStatement()) {
+            transaction.execute("BEGIN IMMEDIATE");
             try {
-                if (loadUserInternal(connection, normalizedUsername) == null) {
-                    connection.rollback();
-                    return null;
-                }
-
-                try (PreparedStatement clean = connection.prepareStatement(
-                    "DELETE FROM sessions WHERE expires_at <= ?"
-                )) {
-                    clean.setLong(1, now);
-                    clean.executeUpdate();
-                }
-
-                try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO sessions(token, actor_username, effective_username, created_at, expires_at) "
-                        + "VALUES(?, ?, ?, ?, ?)"
-                )) {
-                    statement.setString(1, token);
-                    statement.setString(2, normalizedUsername);
-                    statement.setString(3, normalizedUsername);
-                    statement.setLong(4, now);
-                    statement.setLong(5, expiresAt);
-                    statement.executeUpdate();
-                }
-
-                connection.commit();
-                return loadSessionInternal(connection, token);
+                Map<String, Object> session = createSessionInternal(connection, username.trim());
+                transaction.execute("COMMIT");
+                return session;
             } catch (Exception e) {
-                connection.rollback();
+                transaction.execute("ROLLBACK");
                 throw e;
-            } finally {
-                connection.setAutoCommit(true);
             }
         } catch (Exception e) {
             throw new RuntimeException("Unable to create session", e);
         }
     }
 
+    private Map<String, Object> createSessionInternal(Connection connection, String username)
+            throws SQLException {
+        if (loadUserInternal(connection, username) == null) {
+            return null;
+        }
+        long now = Instant.now().getEpochSecond();
+        byte[] tokenBytes = new byte[32];
+        new SecureRandom().nextBytes(tokenBytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+        try (PreparedStatement clean =
+                connection.prepareStatement("DELETE FROM sessions WHERE expires_at <= ?")) {
+            clean.setLong(1, now);
+            clean.executeUpdate();
+        }
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "INSERT INTO sessions(token, actor_username, effective_username,"
+                            + " created_at, expires_at, token_version) VALUES(?, ?, ?, ?, ?, 1)")) {
+            statement.setString(1, hashSessionToken(token));
+            statement.setString(2, username);
+            statement.setString(3, username);
+            statement.setLong(4, now);
+            statement.setLong(5, now + SESSION_TTL_SECONDS);
+            statement.executeUpdate();
+        }
+        return loadSessionInternal(connection, token);
+    }
+
     public Map<String, Object> loadSession(String token) {
         if (token == null || token.isBlank()) {
             return null;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
             return loadSessionInternal(connection, token.trim());
         } catch (Exception e) {
@@ -171,8 +232,9 @@ public class AccessControlStore implements AutoCloseable {
             return false;
         }
         try (Connection connection = openConnection();
-            PreparedStatement statement = connection.prepareStatement("DELETE FROM sessions WHERE token = ?")) {
-            statement.setString(1, token.trim());
+                PreparedStatement statement =
+                        connection.prepareStatement("DELETE FROM sessions WHERE token = ?")) {
+            statement.setString(1, hashSessionToken(token.trim()));
             return statement.executeUpdate() > 0;
         } catch (Exception e) {
             throw new RuntimeException("Unable to delete session", e);
@@ -180,10 +242,12 @@ public class AccessControlStore implements AutoCloseable {
     }
 
     public boolean impersonateSession(String token, String targetUsername) {
-        if (token == null || token.isBlank() || targetUsername == null || targetUsername.isBlank()) {
+        if (token == null
+                || token.isBlank()
+                || targetUsername == null
+                || targetUsername.isBlank()) {
             return false;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -199,12 +263,13 @@ public class AccessControlStore implements AutoCloseable {
                     connection.rollback();
                     return false;
                 }
-                try (PreparedStatement statement = connection.prepareStatement(
-                    "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE token = ?"
-                )) {
+                try (PreparedStatement statement =
+                        connection.prepareStatement(
+                                "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE"
+                                    + " token = ?")) {
                     statement.setString(1, targetUsername.trim());
                     statement.setLong(2, Instant.now().getEpochSecond() + SESSION_TTL_SECONDS);
-                    statement.setString(3, token.trim());
+                    statement.setString(3, hashSessionToken(token.trim()));
                     statement.executeUpdate();
                 }
                 connection.commit();
@@ -224,7 +289,6 @@ public class AccessControlStore implements AutoCloseable {
         if (token == null || token.isBlank()) {
             return false;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -234,12 +298,13 @@ public class AccessControlStore implements AutoCloseable {
                     return false;
                 }
                 String actorUsername = getString(session.get("actorUsername"));
-                try (PreparedStatement statement = connection.prepareStatement(
-                    "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE token = ?"
-                )) {
+                try (PreparedStatement statement =
+                        connection.prepareStatement(
+                                "UPDATE sessions SET effective_username = ?, expires_at = ? WHERE"
+                                    + " token = ?")) {
                     statement.setString(1, actorUsername);
                     statement.setLong(2, Instant.now().getEpochSecond() + SESSION_TTL_SECONDS);
-                    statement.setString(3, token.trim());
+                    statement.setString(3, hashSessionToken(token.trim()));
                     statement.executeUpdate();
                 }
                 connection.commit();
@@ -256,13 +321,13 @@ public class AccessControlStore implements AutoCloseable {
     }
 
     public List<Map<String, Object>> listUsers() {
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection();
-            PreparedStatement statement = connection.prepareStatement(
-                "SELECT username, display_name, portal_user, portal_model_admin, platform_admin "
-                    + "FROM users ORDER BY lower(display_name), lower(username)"
-            );
-            ResultSet rs = statement.executeQuery()) {
+                PreparedStatement statement =
+                        connection.prepareStatement(
+                                "SELECT username, display_name, portal_user, portal_model_admin,"
+                                    + " platform_admin FROM users ORDER BY lower(display_name),"
+                                    + " lower(username)");
+                ResultSet rs = statement.executeQuery()) {
             List<Map<String, Object>> users = new ArrayList<>();
             while (rs.next()) {
                 users.add(sanitizeUser(fromUserResultSet(rs, false)));
@@ -277,7 +342,6 @@ public class AccessControlStore implements AutoCloseable {
         if (username == null || username.isBlank()) {
             return null;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
             Map<String, Object> user = loadUserInternal(connection, username.trim());
             return sanitizeUser(user);
@@ -301,12 +365,12 @@ public class AccessControlStore implements AutoCloseable {
         if (username == null || username.isBlank()) {
             return List.of();
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection();
-            PreparedStatement statement = connection.prepareStatement(
-                "SELECT model_key, visible, can_read, can_create, can_update, can_delete "
-                    + "FROM model_permissions WHERE username = ? ORDER BY lower(model_key)"
-            )) {
+                PreparedStatement statement =
+                        connection.prepareStatement(
+                                "SELECT model_key, visible, can_read, can_create, can_update,"
+                                    + " can_delete FROM model_permissions WHERE username = ? ORDER"
+                                    + " BY lower(model_key)")) {
             statement.setString(1, username.trim());
             try (ResultSet rs = statement.executeQuery()) {
                 List<Map<String, Object>> permissions = new ArrayList<>();
@@ -329,58 +393,63 @@ public class AccessControlStore implements AutoCloseable {
         }
     }
 
-    public void upsertUser(String username, String displayName, boolean portalUser, boolean portalModelAdmin,
-        boolean platformAdmin) {
+    public void upsertUser(
+            String username,
+            String displayName,
+            boolean portalUser,
+            boolean portalModelAdmin,
+            boolean platformAdmin) {
         upsertUser(username, displayName, portalUser, portalModelAdmin, platformAdmin, null);
     }
 
-    public void upsertUser(String username, String displayName, boolean portalUser, boolean portalModelAdmin,
-        boolean platformAdmin, String plainPassword) {
+    public void upsertUser(
+            String username,
+            String displayName,
+            boolean portalUser,
+            boolean portalModelAdmin,
+            boolean platformAdmin,
+            String plainPassword) {
         if (username == null || username.isBlank()) {
             return;
         }
         String normalizedUsername = username.trim();
-        boolean normalizedPortalUser = portalUser;
-        boolean normalizedPortalModelAdmin = portalModelAdmin;
-        boolean normalizedPlatformAdmin = platformAdmin;
-        if (ADMIN_USERNAME.equalsIgnoreCase(normalizedUsername)) {
-            normalizedPortalUser = true;
-            normalizedPortalModelAdmin = true;
-            normalizedPlatformAdmin = true;
+        if (normalizedUsername.length() > 128) {
+            throw new IllegalArgumentException("Username must contain at most 128 characters");
         }
-
-        ensureBootstrapAdmin();
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
+        try (Connection connection = openConnection();
+                Statement transaction = connection.createStatement()) {
+            transaction.execute("BEGIN IMMEDIATE");
             try {
                 upsertUserInternal(
-                    connection,
-                    normalizedUsername,
-                    displayName,
-                    normalizedPortalUser,
-                    normalizedPortalModelAdmin,
-                    normalizedPlatformAdmin,
-                    plainPassword
-                );
-                connection.commit();
+                        connection,
+                        normalizedUsername,
+                        displayName,
+                        portalUser,
+                        portalModelAdmin,
+                        platformAdmin,
+                        plainPassword);
+                transaction.execute("COMMIT");
             } catch (Exception e) {
-                connection.rollback();
+                transaction.execute("ROLLBACK");
                 throw e;
-            } finally {
-                connection.setAutoCommit(true);
             }
         } catch (Exception e) {
+            if (e instanceof IllegalArgumentException invalid) {
+                throw invalid;
+            }
             throw new RuntimeException("Unable to upsert user", e);
         }
     }
 
     public boolean deleteUser(String username) {
-        if (username == null || username.isBlank() || ADMIN_USERNAME.equalsIgnoreCase(username.trim())) {
+        if (username == null
+                || username.isBlank()
+                || ADMIN_USERNAME.equalsIgnoreCase(username.trim())) {
             return false;
         }
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection();
-            PreparedStatement statement = connection.prepareStatement("DELETE FROM users WHERE username = ?")) {
+                PreparedStatement statement =
+                        connection.prepareStatement("DELETE FROM users WHERE username = ?")) {
             statement.setString(1, username.trim());
             return statement.executeUpdate() > 0;
         } catch (Exception e) {
@@ -414,23 +483,22 @@ public class AccessControlStore implements AutoCloseable {
             }
         }
 
-        ensureBootstrapAdmin();
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
-                try (PreparedStatement delete = connection.prepareStatement(
-                    "DELETE FROM model_permissions WHERE username = ?"
-                )) {
+                try (PreparedStatement delete =
+                        connection.prepareStatement(
+                                "DELETE FROM model_permissions WHERE username = ?")) {
                     delete.setString(1, username.trim());
                     delete.executeUpdate();
                 }
 
                 if (!normalized.isEmpty()) {
-                    try (PreparedStatement insert = connection.prepareStatement(
-                        "INSERT INTO model_permissions("
-                            + "username, model_key, visible, can_read, can_create, can_update, can_delete, updated_at"
-                            + ") VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
-                    )) {
+                    try (PreparedStatement insert =
+                            connection.prepareStatement(
+                                    "INSERT INTO model_permissions(username, model_key, visible,"
+                                        + " can_read, can_create, can_update, can_delete,"
+                                        + " updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")) {
                         long now = Instant.now().getEpochSecond();
                         for (Map<String, Object> permission : normalized) {
                             insert.setString(1, username.trim());
@@ -472,49 +540,52 @@ public class AccessControlStore implements AutoCloseable {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
-                statement.execute("PRAGMA foreign_keys = ON");
+            try (Connection connection = openConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA journal_mode = WAL");
                 statement.execute(
-                    "CREATE TABLE IF NOT EXISTS users ("
-                        + "username TEXT PRIMARY KEY, "
-                        + "display_name TEXT NOT NULL DEFAULT '', "
-                        + "password_hash TEXT NOT NULL DEFAULT '', "
-                        + "password_salt TEXT NOT NULL DEFAULT '', "
-                        + "portal_user INTEGER NOT NULL DEFAULT 0, "
-                        + "portal_model_admin INTEGER NOT NULL DEFAULT 0, "
-                        + "platform_admin INTEGER NOT NULL DEFAULT 0, "
-                        + "updated_at INTEGER NOT NULL"
-                        + ")"
-                );
+                        "CREATE TABLE IF NOT EXISTS users ("
+                                + "username TEXT PRIMARY KEY, "
+                                + "display_name TEXT NOT NULL DEFAULT '', "
+                                + "password_hash TEXT NOT NULL DEFAULT '', "
+                                + "password_salt TEXT NOT NULL DEFAULT '', "
+                                + "portal_user INTEGER NOT NULL DEFAULT 0, "
+                                + "portal_model_admin INTEGER NOT NULL DEFAULT 0, "
+                                + "platform_admin INTEGER NOT NULL DEFAULT 0, "
+                                + "updated_at INTEGER NOT NULL"
+                                + ")");
                 statement.execute(
-                    "CREATE TABLE IF NOT EXISTS model_permissions ("
-                        + "username TEXT NOT NULL, "
-                        + "model_key TEXT NOT NULL, "
-                        + "visible INTEGER NOT NULL DEFAULT 0, "
-                        + "can_read INTEGER NOT NULL DEFAULT 0, "
-                        + "can_create INTEGER NOT NULL DEFAULT 0, "
-                        + "can_update INTEGER NOT NULL DEFAULT 0, "
-                        + "can_delete INTEGER NOT NULL DEFAULT 0, "
-                        + "updated_at INTEGER NOT NULL, "
-                        + "PRIMARY KEY (username, model_key), "
-                        + "FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE"
-                        + ")"
-                );
+                        "CREATE TABLE IF NOT EXISTS model_permissions (username TEXT NOT NULL,"
+                            + " model_key TEXT NOT NULL, visible INTEGER NOT NULL DEFAULT 0,"
+                            + " can_read INTEGER NOT NULL DEFAULT 0, can_create INTEGER NOT NULL"
+                            + " DEFAULT 0, can_update INTEGER NOT NULL DEFAULT 0, can_delete"
+                            + " INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY"
+                            + " KEY (username, model_key), FOREIGN KEY(username) REFERENCES"
+                            + " users(username) ON DELETE CASCADE)");
                 statement.execute(
-                    "CREATE TABLE IF NOT EXISTS sessions ("
-                        + "token TEXT PRIMARY KEY, "
-                        + "actor_username TEXT NOT NULL, "
-                        + "effective_username TEXT NOT NULL, "
-                        + "created_at INTEGER NOT NULL, "
-                        + "expires_at INTEGER NOT NULL, "
-                        + "FOREIGN KEY(actor_username) REFERENCES users(username) ON DELETE CASCADE, "
-                        + "FOREIGN KEY(effective_username) REFERENCES users(username) ON DELETE CASCADE"
-                        + ")"
-                );
-                statement.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)");
-                statement.execute("CREATE INDEX IF NOT EXISTS idx_permissions_username ON model_permissions(username)");
+                        "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,"
+                            + " actor_username TEXT NOT NULL, effective_username TEXT NOT NULL,"
+                            + " created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, FOREIGN"
+                            + " KEY(actor_username) REFERENCES users(username) ON DELETE CASCADE,"
+                            + " FOREIGN KEY(effective_username) REFERENCES users(username) ON"
+                            + " DELETE CASCADE)");
+                addColumnIfMissing(
+                        connection, "users", "password_version", "INTEGER NOT NULL DEFAULT 0");
+                addColumnIfMissing(
+                        connection, "users", "password_iterations", "INTEGER NOT NULL DEFAULT 0");
+                addColumnIfMissing(
+                        connection, "sessions", "token_version", "INTEGER NOT NULL DEFAULT 0");
+                migrateSessionTokens(connection);
+                statement.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON"
+                            + " sessions(expires_at)");
+                statement.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_permissions_username ON"
+                            + " model_permissions(username)");
             }
             ensureBootstrapAdmin();
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Unable to initialize SQLite access store", e);
         }
@@ -523,16 +594,23 @@ public class AccessControlStore implements AutoCloseable {
     private Connection openConnection() throws SQLException {
         Connection connection = DriverManager.getConnection(jdbcUrl);
         try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA busy_timeout = 5000");
             statement.execute("PRAGMA foreign_keys = ON");
+        } catch (SQLException e) {
+            connection.close();
+            throw e;
         }
         return connection;
     }
 
-    private Map<String, Object> loadUserInternal(Connection connection, String username) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-            "SELECT username, display_name, password_hash, password_salt, portal_user, portal_model_admin, platform_admin "
-                + "FROM users WHERE username = ?"
-        )) {
+    private Map<String, Object> loadUserInternal(Connection connection, String username)
+            throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "SELECT username, display_name, password_hash, password_salt,"
+                            + " password_version, password_iterations, portal_user,"
+                            + " portal_model_admin, platform_admin FROM users WHERE username ="
+                            + " ?")) {
             statement.setString(1, username);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -543,16 +621,25 @@ public class AccessControlStore implements AutoCloseable {
         }
     }
 
-    private Map<String, Object> fromUserResultSet(ResultSet rs, boolean includePassword) throws SQLException {
+    private Map<String, Object> fromUserResultSet(ResultSet rs, boolean includePassword)
+            throws SQLException {
         Map<String, Object> row = new HashMap<>();
         row.put("username", rs.getString("username"));
-        row.put("displayName", rs.getString("display_name") == null ? "" : rs.getString("display_name"));
+        row.put(
+                "displayName",
+                rs.getString("display_name") == null ? "" : rs.getString("display_name"));
         row.put("portalUser", rs.getInt("portal_user") == 1);
         row.put("portalModelAdmin", rs.getInt("portal_model_admin") == 1);
         row.put("platformAdmin", rs.getInt("platform_admin") == 1);
         if (includePassword) {
-            row.put("passwordHash", rs.getString("password_hash") == null ? "" : rs.getString("password_hash"));
-            row.put("passwordSalt", rs.getString("password_salt") == null ? "" : rs.getString("password_salt"));
+            row.put("passwordVersion", rs.getInt("password_version"));
+            row.put("passwordIterations", rs.getInt("password_iterations"));
+            row.put(
+                    "passwordHash",
+                    rs.getString("password_hash") == null ? "" : rs.getString("password_hash"));
+            row.put(
+                    "passwordSalt",
+                    rs.getString("password_salt") == null ? "" : rs.getString("password_salt"));
         }
         return row;
     }
@@ -563,83 +650,112 @@ public class AccessControlStore implements AutoCloseable {
         }
         Map<String, Object> copy = new HashMap<>();
         copy.put("username", getString(user.get("username")));
-        copy.put("displayName", getString(user.get("displayName")) == null ? "" : getString(user.get("displayName")));
+        copy.put(
+                "displayName",
+                getString(user.get("displayName")) == null
+                        ? ""
+                        : getString(user.get("displayName")));
         copy.put("portalUser", getBoolean(user.get("portalUser")));
         copy.put("portalModelAdmin", getBoolean(user.get("portalModelAdmin")));
         copy.put("platformAdmin", getBoolean(user.get("platformAdmin")));
         return copy;
     }
 
-    private void upsertUserInternal(Connection connection, String username, String displayName, boolean portalUser,
-        boolean portalModelAdmin, boolean platformAdmin, String plainPassword) throws Exception {
+    private void upsertUserInternal(
+            Connection connection,
+            String username,
+            String displayName,
+            boolean portalUser,
+            boolean portalModelAdmin,
+            boolean platformAdmin,
+            String plainPassword)
+            throws Exception {
         Map<String, Object> current = loadUserInternal(connection, username);
-        String finalDisplayName = (displayName == null || displayName.isBlank()) ? username : displayName.trim();
+        String finalDisplayName =
+                (displayName == null || displayName.isBlank()) ? username : displayName.trim();
 
-        String finalSalt;
-        String finalHash;
-
-        if (plainPassword != null && !plainPassword.isBlank()) {
-            finalSalt = generateSalt();
-            finalHash = hashPassword(plainPassword, finalSalt);
-        } else if (current != null && getString(current.get("passwordHash")) != null
-            && !getString(current.get("passwordHash")).isBlank()) {
-            finalSalt = getString(current.get("passwordSalt"));
-            finalHash = getString(current.get("passwordHash"));
+        if (plainPassword != null && plainPassword.isBlank()) {
+            throw new IllegalArgumentException("Password must not be blank");
+        }
+        if (current == null && plainPassword == null) {
+            throw new IllegalArgumentException("Password is required for a new user");
+        }
+        PasswordHasher.Hash password;
+        if (plainPassword != null) {
+            password = PasswordHasher.hash(plainPassword);
         } else {
-            String defaultPassword = username;
-            finalSalt = generateSalt();
-            finalHash = hashPassword(defaultPassword, finalSalt);
+            password =
+                    new PasswordHasher.Hash(
+                            getString(current.get("passwordHash")),
+                            getString(current.get("passwordSalt")),
+                            ((Number) current.get("passwordVersion")).intValue(),
+                            ((Number) current.get("passwordIterations")).intValue());
         }
 
         long now = Instant.now().getEpochSecond();
 
-        try (PreparedStatement statement = connection.prepareStatement(
-            "INSERT INTO users(username, display_name, password_hash, password_salt, portal_user, portal_model_admin, platform_admin, updated_at) "
-                + "VALUES(?, ?, ?, ?, ?, ?, ?, ?) "
-                + "ON CONFLICT(username) DO UPDATE SET "
-                + "display_name=excluded.display_name, "
-                + "password_hash=excluded.password_hash, "
-                + "password_salt=excluded.password_salt, "
-                + "portal_user=excluded.portal_user, "
-                + "portal_model_admin=excluded.portal_model_admin, "
-                + "platform_admin=excluded.platform_admin, "
-                + "updated_at=excluded.updated_at"
-        )) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "INSERT INTO users(username, display_name, password_hash, password_salt,"
+                            + " portal_user, portal_model_admin, platform_admin, updated_at,"
+                            + " password_version, password_iterations) VALUES(?, ?, ?, ?, ?, ?, ?,"
+                            + " ?, ?, ?) ON CONFLICT(username) DO UPDATE SET"
+                            + " display_name=excluded.display_name,"
+                            + " password_hash=excluded.password_hash,"
+                            + " password_salt=excluded.password_salt,"
+                            + " password_version=excluded.password_version,"
+                            + " password_iterations=excluded.password_iterations,"
+                            + " portal_user=excluded.portal_user,"
+                            + " portal_model_admin=excluded.portal_model_admin,"
+                            + " platform_admin=excluded.platform_admin, "
+                            + "updated_at=excluded.updated_at")) {
             statement.setString(1, username);
             statement.setString(2, finalDisplayName);
-            statement.setString(3, finalHash);
-            statement.setString(4, finalSalt);
+            statement.setString(3, password.hash());
+            statement.setString(4, password.salt());
             statement.setInt(5, portalUser ? 1 : 0);
             statement.setInt(6, portalModelAdmin ? 1 : 0);
             statement.setInt(7, platformAdmin ? 1 : 0);
             statement.setLong(8, now);
+            statement.setInt(9, password.version());
+            statement.setInt(10, password.iterations());
             statement.executeUpdate();
+        }
+        if (current != null && plainPassword != null) {
+            try (PreparedStatement revoke =
+                    connection.prepareStatement(
+                            "DELETE FROM sessions WHERE actor_username=? OR"
+                                + " effective_username=?")) {
+                revoke.setString(1, username);
+                revoke.setString(2, username);
+                revoke.executeUpdate();
+            }
         }
     }
 
-    private Map<String, Object> loadSessionInternal(Connection connection, String token) throws SQLException {
+    private Map<String, Object> loadSessionInternal(Connection connection, String token)
+            throws SQLException {
         long now = Instant.now().getEpochSecond();
-        try (PreparedStatement expire = connection.prepareStatement("DELETE FROM sessions WHERE expires_at <= ?")) {
-            expire.setLong(1, now);
-            expire.executeUpdate();
-        }
-
-        try (PreparedStatement statement = connection.prepareStatement(
-            "SELECT token, actor_username, effective_username, created_at, expires_at "
-                + "FROM sessions WHERE token = ?"
-        )) {
-            statement.setString(1, token);
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "SELECT token, actor_username, effective_username, created_at, expires_at"
+                            + " FROM sessions WHERE token = ? AND token_version = 1 AND expires_at"
+                            + " > ?")) {
+            statement.setString(1, hashSessionToken(token));
+            statement.setLong(2, now);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
                     return null;
                 }
                 Map<String, Object> row = new HashMap<>();
-                row.put("token", rs.getString("token"));
+                row.put("token", token);
                 row.put("actorUsername", rs.getString("actor_username"));
                 row.put("effectiveUsername", rs.getString("effective_username"));
                 row.put("createdAt", rs.getLong("created_at"));
                 row.put("expiresAt", rs.getLong("expires_at"));
-                row.put("impersonating", !rs.getString("actor_username").equals(rs.getString("effective_username")));
+                row.put(
+                        "impersonating",
+                        !rs.getString("actor_username").equals(rs.getString("effective_username")));
                 return row;
             }
         }
@@ -650,21 +766,67 @@ public class AccessControlStore implements AutoCloseable {
         if (explicit != null && !explicit.isBlank()) {
             return explicit;
         }
-        return Paths.get(System.getProperty("user.home"), ".expandproject", "access.sqlite").toString();
+        return Paths.get(System.getProperty("user.home"), ".expandproject", "access.sqlite")
+                .toString();
     }
 
-    private static String generateSalt() {
-        byte[] salt = new byte[16];
-        new SecureRandom().nextBytes(salt);
-        return Base64.getEncoder().encodeToString(salt);
+    private static String hashSessionToken(String token) {
+        try {
+            return Base64.getEncoder()
+                    .encodeToString(
+                            MessageDigest.getInstance("SHA-256")
+                                    .digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
     }
 
-    private static String hashPassword(String password, String saltBase64) throws Exception {
-        byte[] salt = Base64.getDecoder().decode(saltBase64);
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        digest.update(salt);
-        byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
-        return Base64.getEncoder().encodeToString(hash);
+    private static void addColumnIfMissing(
+            Connection connection, String table, String column, String definition)
+            throws SQLException {
+        try (Statement statement = connection.createStatement();
+                ResultSet rs = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        }
+    }
+
+    private static void migrateSessionTokens(Connection connection) throws SQLException {
+        connection.setAutoCommit(false);
+        try {
+            List<String> tokens = new ArrayList<>();
+            try (Statement statement = connection.createStatement();
+                    ResultSet rs =
+                            statement.executeQuery(
+                                    "SELECT token FROM sessions WHERE token_version=0")) {
+                while (rs.next()) {
+                    tokens.add(rs.getString("token"));
+                }
+            }
+            try (PreparedStatement update =
+                    connection.prepareStatement(
+                            "UPDATE sessions SET token=?, token_version=1 WHERE token=? AND"
+                                + " token_version=0")) {
+                for (String token : tokens) {
+                    update.setString(1, hashSessionToken(token));
+                    update.setString(2, token);
+                    update.addBatch();
+                }
+                update.executeBatch();
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(true);
+        }
     }
 
     private static String readSetting(String envKey, String fallbackEnvKey, String defaultValue) {
