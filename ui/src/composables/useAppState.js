@@ -19,7 +19,7 @@ export function useAppState() {
   const currentPage = ref('navigate');
   const activePortal = ref('');
   const userPortalPages = ['navigate', 'table', 'search', 'create', 'import-data', 'paths', 'quality', 'history'];
-  const modelAdminPortalPages = ['import-model', 'model', 'admin'];
+  const modelAdminPortalPages = ['import-model', 'model', 'admin', 'workflows'];
   const displayLanguage = ref('');
   const validateOnly = ref(false);
   const modelSummary = ref(null);
@@ -44,6 +44,8 @@ export function useAppState() {
   const dataQuery = ref('');
   const dataType = ref('');
   const searchMode = ref('contains');
+  const workflowId = ref('');
+  const workflowStatus = ref('');
   const neighborStatus = ref({});
   const isMutatingLink = ref(false);
   let filterTimer;
@@ -154,6 +156,7 @@ export function useAppState() {
     { title: 'Type', key: 'type' },
     { title: 'ID', key: 'id' },
     { title: 'Aperçu', key: 'preview' },
+    { title: 'Statut', key: 'workflowStatus' },
     { title: 'Attributs', key: 'attributes' },
     { title: 'Actions', key: 'actions', sortable: false }
   ];
@@ -162,6 +165,7 @@ export function useAppState() {
     { title: 'Type', key: 'type' },
     { title: 'ID', key: 'id' },
     { title: 'Aperçu', key: 'preview' },
+    { title: 'Statut', key: 'workflowStatus' },
     { title: 'Correspondances', key: 'matches' },
     { title: 'Actions', key: 'actions', sortable: false }
   ];
@@ -183,6 +187,8 @@ export function useAppState() {
     get newAccessPassword() { return newAccessPassword; },
     get isDeletingModel() { return isDeletingModel; },
     get searchMode() { return searchMode; },
+    get workflowId() { return workflowId; },
+    get workflowStatus() { return workflowStatus; },
     get getLinkTypeLabel() { return getLinkTypeLabel; },
     get formatAttributeLabel() { return formatAttributeLabel; },
     get getModelPermission() { return getModelPermission; },
@@ -333,7 +339,7 @@ export function useAppState() {
   const { getFirstFile, resolveAttributeLabel, formatAttributeLabel, sanitizeMaterialIconName, getTypeIconName, getAttributeDefinition, getAttributeLabel, getLinkTypeDefinition, getLinkTypeLabel, getUserPortalTitle, getRepresentativeAttributeKeys, getObjectPrimaryAttributes, getObjectPrimaryLabel, formatObjectOptionLabel, isTypeOrSubtype, isTypeAllowed, readJson, extractErrorMessage } = usePresentationHelpers(ctx);
 
   const { modelLanguages, defaultLanguage, modelOptions, selectedModel, adminModel, filteredModelObjects, filteredModelLinks, modelGroupTabs, adminCommand } = useModelViews(ctx);
-  const { userOptions, isPlatformAdmin, canAccessUserPortal, canAccessModelAdminPortal, selectedModelPermission, canReadCurrentModelData, canCreateCurrentModelData, canUpdateCurrentModelData, canDeleteCurrentModelData, canManageAccess, isPortalSelected, isUserPortal, isModelAdminPortal, portalLabel, canUploadModel, canUploadData, neo4jChipLabel, neo4jChipColor } = useAccessViews(ctx);
+  const { canTransitionCurrentModelData, canManageCurrentWorkflows, userOptions, isPlatformAdmin, canAccessUserPortal, canAccessModelAdminPortal, selectedModelPermission, canReadCurrentModelData, canCreateCurrentModelData, canUpdateCurrentModelData, canDeleteCurrentModelData, canManageAccess, isPortalSelected, isUserPortal, isModelAdminPortal, portalLabel, canUploadModel, canUploadData, neo4jChipLabel, neo4jChipColor } = useAccessViews(ctx);
   const { dataRequestQuery, createObjectTypeOptions, createLinkTypeOptions, filteredObjects, rootObjectOptions, selectedRootObject, tableTypeOptions, filteredTableRows, selectedObjectType, tableSelectedObjectType, attributeTabs, tableAttributeTabs, objectTypeGroups, modelTypeIndex, createObjectAttributeDefs, createLinkDefinition, createLinkSourceOptions, createLinkTargetOptions, graphNodes, graphEdges, tableHasDetails, representativeAttributesByType, searchableAttributesByType, fullTextTypeOptions, fullTextResults, objectIndex, relationsByObjectKey, explorerTree, linkedObjects, linkedRelationTabs, linkedGroups, tableSelectedLinks } = useDataViews(ctx);
 
   onMounted(async () => {
@@ -372,6 +378,7 @@ export function useAppState() {
   watch(
     () => selectedModelKey.value,
     async (key, previousKey) => {
+      workflowId.value = ''; workflowStatus.value = '';
       requests.cancel('model');
       isLoadingModel.value = false;
       resetDataState();
@@ -601,7 +608,7 @@ export function useAppState() {
   }
 
   return {
-    apiBase, apiFetch, readJson, tableVisibleColumns, tableSortBy,
+    apiBase, apiFetch, readJson, tableVisibleColumns, tableSortBy, workflowId, workflowStatus, canTransitionCurrentModelData, canManageCurrentWorkflows,
     pageObjects, dataOffset, dataLimit, dataHasMore, dataQuery, dataType, searchMode, neighborStatus, isMutatingLink, loadNeighbors, mutateLink,
     authToken,
     isAuthenticated,

@@ -19,7 +19,12 @@ public final class CypherUtils {
                     "directed",
                     "elementid",
                     "internalid",
-                    "searchtext");
+                    "searchtext",
+                    "_workflowid",
+                    "_workflowversion",
+                    "_workflowstate",
+                    "_workflowrevision",
+                    "_workflowupdatedat");
     private static final Set<String> RESERVED_TYPES =
             Set.of(
                     "dataobject",
@@ -27,7 +32,9 @@ public final class CypherUtils {
                     "modelobjecttype",
                     "modellinktype",
                     "modelattribute",
-                    "auditdata");
+                    "auditdata",
+                    "workflowdefinition",
+                    "workflowbinding");
 
     private CypherUtils() {}
 

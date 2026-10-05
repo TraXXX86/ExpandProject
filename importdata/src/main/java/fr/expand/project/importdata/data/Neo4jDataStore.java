@@ -4,6 +4,7 @@ import fr.expand.project.importdata.audit.*;
 import fr.expand.project.importdata.dao.Neo4jDriverProvider;
 import fr.expand.project.importdata.util.CypherUtils;
 import fr.expand.project.importdata.util.SearchIndex;
+import fr.expand.project.importdata.workflow.WorkflowEngine;
 
 import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
@@ -94,6 +95,21 @@ public class Neo4jDataStore implements AutoCloseable {
 
     public Map<String, Object> loadDataPage(
             String key, int offset, int limit, String q, String type, String searchMode) {
+        return loadDataPage(key, offset, limit, q, type, searchMode, null, null);
+    }
+
+    public Map<String, Object> loadDataPage(
+            String key,
+            int offset,
+            int limit,
+            String q,
+            String type,
+            String searchMode,
+            String workflowStatus,
+            String workflowId) {
+        if (workflowStatus != null && workflowStatus.length() > 128
+                || workflowId != null && workflowId.length() > 128)
+            throw new IllegalArgumentException("Workflow filter must be at most 128 characters");
         String mode = searchMode == null || searchMode.isBlank() ? "contains" : searchMode;
         if (!Set.of("contains", "fulltext").contains(mode))
             throw new IllegalArgumentException("searchMode must be contains or fulltext");
@@ -118,6 +134,8 @@ public class Neo4jDataStore implements AutoCloseable {
         p.put("limit", limit);
         p.put("q", q == null ? "" : q.trim().toLowerCase(Locale.ROOT));
         p.put("types", types);
+        p.put("workflowStatus", workflowStatus == null ? "" : workflowStatus);
+        p.put("workflowId", workflowId == null ? "" : workflowId);
         if (fulltext) {
             ensureSearchIndex(key);
             p.put("query", SearchIndex.literalQuery(q));
@@ -133,7 +151,11 @@ public class Neo4jDataStore implements AutoCloseable {
                     "CALL db.index.fulltext.queryNodes('data_object_search',$query) YIELD node AS n"
                         + " WHERE n.modelKey=$modelKey AND (size($types)=0 OR any(t IN $types WHERE"
                         + " t=n.type OR t IN labels(n))) ";
-        final String queryFilter = filter;
+        final String queryFilter =
+                filter
+                        + " AND ($workflowId='' OR n._workflowId=$workflowId) AND"
+                        + " ($workflowStatus='' OR ($workflowStatus='__unassigned__' AND"
+                        + " n._workflowId IS NULL) OR n._workflowState=$workflowStatus) ";
         try (Session session = driver.session()) {
             return session.executeRead(
                     tx -> {
@@ -556,6 +578,7 @@ public class Neo4jDataStore implements AutoCloseable {
             return session.executeWrite(
                     tx -> {
                         var searchFields = lockModel(tx, key);
+                        props.putAll(WorkflowEngine.initialProperties(tx, key, type));
                         props.put("searchText", SearchIndex.text(type, props, searchFields));
                         if (externalId != null
                                 && tx.run(
@@ -654,6 +677,7 @@ public class Neo4jDataStore implements AutoCloseable {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", record.get("id").asLong());
             row.put("type", type);
+            row.put("workflow", WorkflowEngine.objectState(props));
             row.put("attributes", attributeRows(props));
             if (props.containsKey("dataId")) row.put("dataId", props.get("dataId"));
             if (props.containsKey("uuid")) row.put("uuid", props.get("uuid"));

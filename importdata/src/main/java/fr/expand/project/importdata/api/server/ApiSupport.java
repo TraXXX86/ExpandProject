@@ -173,6 +173,7 @@ final class ApiSupport {
             row.put("canCreate", getBoolean(map.get("canCreate")));
             row.put("canUpdate", getBoolean(map.get("canUpdate")));
             row.put("canDelete", getBoolean(map.get("canDelete")));
+            row.put("canTransition", getBoolean(map.get("canTransition")));
             rows.add(row);
         }
         return rows;

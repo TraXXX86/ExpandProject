@@ -35,7 +35,7 @@ public final class SavedViewStore implements AutoCloseable {
                         + " NULL, updated_at TEXT NOT NULL)");
             s.execute(
                     "CREATE INDEX IF NOT EXISTS saved_views_model ON saved_views(model_key,"
-                        + " owner)");
+                            + " owner)");
         } catch (SQLException e) {
             throw failure(e);
         }
@@ -46,7 +46,7 @@ public final class SavedViewStore implements AutoCloseable {
                 PreparedStatement s =
                         c.prepareStatement(
                                 "SELECT * FROM saved_views WHERE model_key=? AND (owner=? OR"
-                                    + " shared=1) ORDER BY name COLLATE NOCASE,id LIMIT 501")) {
+                                        + " shared=1) ORDER BY name COLLATE NOCASE,id LIMIT 501")) {
             s.setString(1, modelKey);
             s.setString(2, user);
             try (ResultSet r = s.executeQuery()) {
@@ -122,7 +122,7 @@ public final class SavedViewStore implements AutoCloseable {
                 PreparedStatement s =
                         c.prepareStatement(
                                 "UPDATE saved_views SET name=?,shared=?,state=?,updated_at=? WHERE"
-                                    + " id=? AND owner=?")) {
+                                        + " id=? AND owner=?")) {
             s.setString(1, cleanName);
             s.setBoolean(2, shared);
             s.setString(3, JSON.toJson(cleanState));
@@ -177,7 +177,13 @@ public final class SavedViewStore implements AutoCloseable {
         if (JSON.toJson(input).length() > 16384)
             throw new IllegalArgumentException("Vue trop volumineuse");
         Set<String> strings =
-                Set.of("tableSearch", "tableAttributeKey", "tableAttributeValue", "fullTextQuery");
+                Set.of(
+                        "tableSearch",
+                        "tableAttributeKey",
+                        "tableAttributeValue",
+                        "fullTextQuery",
+                        "workflowId",
+                        "workflowStatus");
         Set<String> operators =
                 Set.of(
                         "contains",
@@ -217,7 +223,13 @@ public final class SavedViewStore implements AutoCloseable {
                     if (!(item instanceof String text)
                             || text.length() > 128
                             || (key.equals("columns")
-                                    && !Set.of("type", "id", "preview", "attributes", "actions")
+                                    && !Set.of(
+                                                    "type",
+                                                    "id",
+                                                    "preview",
+                                                    "attributes",
+                                                    "actions",
+                                                    "workflowStatus")
                                             .contains(text)))
                         throw new IllegalArgumentException("Colonne ou type invalide");
                 result.put(key, List.copyOf(list));
@@ -228,7 +240,7 @@ public final class SavedViewStore implements AutoCloseable {
                     if (!(item instanceof Map<?, ?> sort)
                             || !(sort.get("key") instanceof String)
                             || !(sort.get("order") instanceof String)
-                            || !Set.of("type", "id", "preview", "attributes")
+                            || !Set.of("type", "id", "preview", "attributes", "workflowStatus")
                                     .contains(sort.get("key"))
                             || !Set.of("asc", "desc").contains(sort.get("order"))
                             || sort.size() != 2) throw new IllegalArgumentException("Tri invalide");

@@ -3,13 +3,15 @@ import { applyView, captureView } from './savedViews';
 
 describe('saved views', () => {
   it('round-trips filters, columns and sort without retaining shared references', () => {
-    const state = { currentPage: 'table', tableSearch: 'Alice', tableTypeFilter: ['Person'], tableAttributeKey: 'age', tableAttributeValue: '30', tableAttributeKeyOperator: 'equals', tableAttributeValueOperator: 'contains', fullTextQuery: '', fullTextTypeFilter: [], searchMode: 'contains', tableVisibleColumns: ['id', 'type'], tableSortBy: [{ key: 'type', order: 'desc' }], tableHeaders: [{ key: 'id' }, { key: 'type' }], setCurrentPage: vi.fn() };
+    const state = { currentPage: 'table', tableSearch: 'Alice', workflowStatus: 'approved', workflowId: 'approval', tableTypeFilter: ['Person'], tableAttributeKey: 'age', tableAttributeValue: '30', tableAttributeKeyOperator: 'equals', tableAttributeValueOperator: 'contains', fullTextQuery: '', fullTextTypeFilter: [], searchMode: 'contains', tableVisibleColumns: ['id', 'type'], tableSortBy: [{ key: 'type', order: 'desc' }], tableHeaders: [{ key: 'id' }, { key: 'type' }], setCurrentPage: vi.fn() };
     const saved = captureView(state);
     state.tableSearch = 'Bob'; state.tableTypeFilter.push('Other'); state.tableVisibleColumns.push('preview');
     expect(saved.tableTypeFilter).toEqual(['Person']);
     expect(saved.columns).toEqual(['id', 'type']);
     applyView(state, saved);
     expect(state.tableSearch).toBe('Alice');
+    expect(state.workflowStatus).toBe('approved');
+    expect(state.workflowId).toBe('approval');
     expect(state.tableTypeFilter).toEqual(['Person']);
     expect(state.tableSortBy).toEqual([{ key: 'type', order: 'desc' }]);
     expect(state.dataOffset).toBe(0);
@@ -23,6 +25,8 @@ describe('saved views', () => {
     expect(state.tableSortBy).toEqual([]);
     expect(state.fullTextQuery).toBe('Ada');
     expect(state.searchMode).toBe('contains');
+    expect(state.workflowStatus).toBe('');
+    expect(state.workflowId).toBe('');
     expect(() => applyView(state, { page: 'admin' })).toThrow('incompatible');
   });
 });

@@ -66,7 +66,23 @@ public class CypherConnector extends IConnectorDb {
             DataPackObject object,
             String key,
             Map<String, List<String>> fields) {
+        return createObject(tx, object, key, fields, new HashMap<>());
+    }
+
+    private int createObject(
+            TransactionContext tx,
+            DataPackObject object,
+            String key,
+            Map<String, List<String>> fields,
+            Map<String, Map<String, Object>> workflowDefaults) {
         Map<String, Object> properties = CypherUtils.properties(object, key);
+        if (key != null && !key.isBlank())
+            properties.putAll(
+                    workflowDefaults.computeIfAbsent(
+                            object.getTYPE(),
+                            type ->
+                                    fr.expand.project.importdata.workflow.WorkflowEngine
+                                            .initialProperties(tx, key, type)));
         properties.put("searchText", SearchIndex.text(object.getTYPE(), properties, fields));
         if (key != null && !key.isBlank()) {
             boolean exists =
@@ -187,13 +203,16 @@ public class CypherConnector extends IConnectorDb {
                         Map<String, List<String>> searchFields =
                                 SearchIndex.fields(manager.getCurrentModel());
                         Map<String, DataPackObject> objects = new HashMap<>();
+                        Map<String, Map<String, Object>> workflowDefaults = new HashMap<>();
                         if (data.getOBJECTS() != null)
                             for (OBJECT input : data.getOBJECTS().getOBJECT()) {
                                 DataPackObject object = new DataPackObject();
                                 object.setID(input.getID());
                                 object.setTYPE(input.getTYPE());
                                 object.getATTRIBUTE().addAll(input.getATTRIBUTE());
-                                object.setInternalId(createObject(tx, object, key, searchFields));
+                                object.setInternalId(
+                                        createObject(
+                                                tx, object, key, searchFields, workflowDefaults));
                                 if (objects.put(input.getTYPE() + "/" + input.getID(), object)
                                         != null)
                                     throw new IllegalArgumentException("Duplicate object identity");

@@ -54,7 +54,21 @@ public final class Neo4jDriverProvider {
                         .consume();
                 session.run(
                                 "CREATE INDEX audit_model_time IF NOT EXISTS FOR (n:AuditData) ON"
-                                    + " (n.modelKey,n.timestamp)")
+                                        + " (n.modelKey,n.timestamp)")
+                        .consume();
+                session.run(
+                                "CREATE CONSTRAINT workflow_definition_identity IF NOT EXISTS FOR"
+                                    + " (w:WorkflowDefinition) REQUIRE (w.modelKey,w.id,w.version)"
+                                    + " IS UNIQUE")
+                        .consume();
+                session.run(
+                                "CREATE CONSTRAINT workflow_binding_identity IF NOT EXISTS FOR"
+                                    + " (w:WorkflowBinding) REQUIRE (w.modelKey,w.objectType) IS"
+                                    + " UNIQUE")
+                        .consume();
+                session.run(
+                                "CREATE INDEX object_workflow_status IF NOT EXISTS FOR"
+                                    + " (n:DataObject) ON (n.modelKey,n._workflowState)")
                         .consume();
                 session.run("CALL db.awaitIndex('data_object_search',30)").consume();
             } catch (RuntimeException e) {

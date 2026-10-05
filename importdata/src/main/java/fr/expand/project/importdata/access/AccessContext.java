@@ -19,8 +19,13 @@ public class AccessContext {
     private final long expiresAt;
     private final Map<String, ModelPermission> permissionsByModelKey;
 
-    public AccessContext(String sessionToken, Map<String, Object> actorUser, Map<String, Object> effectiveUser,
-        List<Map<String, Object>> permissions, boolean impersonating, long expiresAt) {
+    public AccessContext(
+            String sessionToken,
+            Map<String, Object> actorUser,
+            Map<String, Object> effectiveUser,
+            List<Map<String, Object>> permissions,
+            boolean impersonating,
+            long expiresAt) {
         this.sessionToken = sessionToken;
         this.actorUsername = getString(actorUser, "username");
         this.actorDisplayName = getString(actorUser, "displayName");
@@ -45,13 +50,14 @@ public class AccessContext {
                 if (modelKey == null || modelKey.isBlank()) {
                     continue;
                 }
-                ModelPermission permission = new ModelPermission(
-                    getBoolean(permissionRow, "visible"),
-                    getBoolean(permissionRow, "canRead"),
-                    getBoolean(permissionRow, "canCreate"),
-                    getBoolean(permissionRow, "canUpdate"),
-                    getBoolean(permissionRow, "canDelete")
-                );
+                ModelPermission permission =
+                        new ModelPermission(
+                                getBoolean(permissionRow, "visible"),
+                                getBoolean(permissionRow, "canRead"),
+                                getBoolean(permissionRow, "canCreate"),
+                                getBoolean(permissionRow, "canUpdate"),
+                                getBoolean(permissionRow, "canDelete"),
+                                getBoolean(permissionRow, "canTransition"));
                 permissionsByModelKey.put(modelKey, permission);
             }
         }
@@ -141,6 +147,15 @@ public class AccessContext {
         return permission != null && permission.visible && permission.canDelete;
     }
 
+    public boolean canTransition(String modelKey) {
+        if (platformAdmin) return true;
+        ModelPermission permission = permissionsByModelKey.get(modelKey);
+        return permission != null
+                && permission.visible
+                && permission.canRead
+                && permission.canTransition;
+    }
+
     public static String extractBearerToken(String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             return null;
@@ -187,14 +202,21 @@ public class AccessContext {
         private final boolean canCreate;
         private final boolean canUpdate;
         private final boolean canDelete;
+        private final boolean canTransition;
 
-        private ModelPermission(boolean visible, boolean canRead, boolean canCreate, boolean canUpdate,
-            boolean canDelete) {
+        private ModelPermission(
+                boolean visible,
+                boolean canRead,
+                boolean canCreate,
+                boolean canUpdate,
+                boolean canDelete,
+                boolean canTransition) {
             this.visible = visible;
             this.canRead = canRead;
             this.canCreate = canCreate;
             this.canUpdate = canUpdate;
             this.canDelete = canDelete;
+            this.canTransition = canTransition;
         }
     }
 }

@@ -2,7 +2,7 @@ import { nextTick, onBeforeUnmount, watch } from 'vue';
 
 const pages = {
   user: ['navigate', 'table', 'search', 'create', 'import-data', 'paths', 'quality', 'history'],
-  'model-admin': ['model', 'import-model', 'admin']
+  'model-admin': ['model', 'import-model', 'admin', 'workflows']
 };
 
 export function parseRoute(hash) {
@@ -10,7 +10,7 @@ export function parseRoute(hash) {
   const [portal, page] = path.split('/').filter(Boolean);
   const params = new URLSearchParams(query);
   const offset = Number(params.get('offset') || 0);
-  return { portal: pages[portal] ? portal : '', page: pages[portal]?.includes(page) ? page : pages[portal]?.[0] || '', model: params.get('model') || '', object: params.get('object') || '', q: params.get('q') || '', type: params.get('type') || '', offset: Number.isSafeInteger(offset) && offset >= 0 ? offset : 0, searchMode: params.get('mode') === 'fulltext' ? 'fulltext' : 'contains' };
+  return { portal: pages[portal] ? portal : '', page: pages[portal]?.includes(page) ? page : pages[portal]?.[0] || '', model: params.get('model') || '', object: params.get('object') || '', q: params.get('q') || '', type: params.get('type') || '', offset: Number.isSafeInteger(offset) && offset >= 0 ? offset : 0, searchMode: params.get('mode') === 'fulltext' ? 'fulltext' : 'contains', workflowId: params.get('workflow') || '', workflowStatus: params.get('status') || '' };
 }
 
 /** Hash routes also work behind static hosts without a history fallback. */
@@ -36,6 +36,7 @@ export function useHashNavigation(state) {
       if (route.page === 'table') { state.tableSearch = route.q; state.tableTypeFilter = route.type.split(',').filter(Boolean); }
       if (route.page === 'search') { state.fullTextQuery = route.q; state.fullTextTypeFilter = route.type.split(',').filter(Boolean); }
       await nextTick();
+      state.workflowId = route.workflowId; state.workflowStatus = route.workflowStatus;
       if (route.portal && state.selectedModelKey) await state.refreshData(state.selectedModelKey, route.offset);
       if (route.object && state.selectedModelKey) {
         await state.loadNeighbors(route.object);
@@ -44,11 +45,13 @@ export function useHashNavigation(state) {
     } finally { if (epoch === sequence) applying = false; }
   }
   const stopRestore = watch(() => [state.isAuthenticated, state.isLoadingModels, state.hasLoadedModels, state.models], restore, { immediate: true });
-  const stopWrite = watch(() => [state.activePortal, state.currentPage, state.selectedModelKey, state.selectedRootObjectKey, state.dataOffset, state.searchMode, state.dataQuery, state.dataType, state.tableSearch, state.tableTypeFilter, state.fullTextQuery, state.fullTextTypeFilter], () => {
+  const stopWrite = watch(() => [state.activePortal, state.currentPage, state.selectedModelKey, state.selectedRootObjectKey, state.dataOffset, state.searchMode, state.dataQuery, state.dataType, state.tableSearch, state.tableTypeFilter, state.fullTextQuery, state.fullTextTypeFilter, state.workflowId, state.workflowStatus], () => {
     if (applying || pending || !state.isAuthenticated) return;
     const params = new URLSearchParams();
     if (state.selectedModelKey) params.set('model', state.selectedModelKey);
     if (state.dataOffset) params.set('offset', String(state.dataOffset));
+    if (state.workflowId) params.set('workflow', state.workflowId);
+    if (state.workflowStatus) params.set('status', state.workflowStatus);
     if (state.searchMode === 'fulltext') params.set('mode', 'fulltext');
     if (state.currentPage === 'navigate' && state.selectedRootObjectKey) params.set('object', state.selectedRootObjectKey);
     const q = state.currentPage === 'table' ? state.tableSearch : state.currentPage === 'search' ? state.fullTextQuery : state.dataQuery;
