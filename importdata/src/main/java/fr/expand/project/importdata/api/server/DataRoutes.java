@@ -4,6 +4,7 @@ import static fr.expand.project.importdata.api.server.ApiSupport.*;
 
 import fr.expand.project.importdata.access.AccessContext;
 import fr.expand.project.importdata.api.impl.ModelBasedImportAPI;
+import fr.expand.project.importdata.audit.AuditActor;
 import fr.expand.project.importdata.data.Neo4jDataStore;
 import fr.expand.project.importdata.dto.generated.ATTRIBUTE;
 import fr.expand.project.importdata.dto.generated.DATAS;
@@ -95,7 +96,8 @@ final class DataRoutes {
             throw new BadRequestResponse("Fichier de données manquant");
         ModelManager manager = loadModelContext(key);
         DATAS data = XmlSupport.parseData(xml);
-        try (ModelBasedImportAPI importer = new ModelBasedImportAPI(manager)) {
+        try (ModelBasedImportAPI importer =
+                new ModelBasedImportAPI(manager, AuditActor.from(resolveAccessContext(ctx)))) {
             ValidationResult result = importer.importData(data, validateOnly, key);
             if (!result.isValid()) ctx.status(400);
             return GSON.toJson(
@@ -131,7 +133,8 @@ final class DataRoutes {
         if (searchMode == null) searchMode = "contains";
         if (!java.util.Set.of("contains", "fulltext").contains(searchMode))
             throw new BadRequestResponse("searchMode invalide");
-        try (Neo4jDataStore store = new Neo4jDataStore()) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(null, AuditActor.from(resolveAccessContext(ctx)))) {
             return GSON.toJson(
                     store.loadDataPage(key, offset, limit, q, ctx.queryParam("type"), searchMode));
         }
@@ -141,7 +144,8 @@ final class DataRoutes {
         String key = ctx.queryParam("modelKey");
         authorize(ctx, key, "read");
         long id = entityId(ctx);
-        try (Neo4jDataStore store = new Neo4jDataStore()) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(null, AuditActor.from(resolveAccessContext(ctx)))) {
             if (store.loadObjectById(key, id) == null) return error(ctx, 404, "Objet introuvable");
             return GSON.toJson(store.neighbors(key, id, pageArgument(ctx, "limit", 100, 1, 500)));
         }
@@ -162,7 +166,9 @@ final class DataRoutes {
         ModelManager manager = loadModelContext(key);
         ValidationResult validation = new DataValidator(manager).validateObjectAttributes(object);
         if (!validation.isValid()) return validationError(ctx, validation);
-        try (Neo4jDataStore store = new Neo4jDataStore(manager.getCurrentModelXml())) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(
+                        manager.getCurrentModelXml(), AuditActor.from(resolveAccessContext(ctx)))) {
             long id =
                     store.createObject(key, type, attributeMap(object.getATTRIBUTE()), externalId);
             ctx.status(201);
@@ -185,7 +191,9 @@ final class DataRoutes {
         String key = getString(payload.get("modelKey"));
         authorize(ctx, key, "update");
         ModelManager manager = loadModelContext(key);
-        try (Neo4jDataStore store = new Neo4jDataStore(manager.getCurrentModelXml())) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(
+                        manager.getCurrentModelXml(), AuditActor.from(resolveAccessContext(ctx)))) {
             Map<String, Object> current = store.loadObjectById(key, id);
             if (current == null) return error(ctx, 404, "Objet introuvable");
             String type = getString(current.get("type"));
@@ -235,7 +243,9 @@ final class DataRoutes {
         ValidationResult validation = new DataValidator(manager).validateLinkAttributes(link);
         if (!validation.isValid()) return validationError(ctx, validation);
         var definition = manager.getLinkType(type);
-        try (Neo4jDataStore store = new Neo4jDataStore(manager.getCurrentModelXml())) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(
+                        manager.getCurrentModelXml(), AuditActor.from(resolveAccessContext(ctx)))) {
             var source = store.loadObjectById(key, from);
             var target = store.loadObjectById(key, to);
             if (source == null || target == null)
@@ -269,7 +279,9 @@ final class DataRoutes {
         String key = getString(payload.get("modelKey"));
         authorize(ctx, key, "update");
         ModelManager manager = loadModelContext(key);
-        try (Neo4jDataStore store = new Neo4jDataStore(manager.getCurrentModelXml())) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(
+                        manager.getCurrentModelXml(), AuditActor.from(resolveAccessContext(ctx)))) {
             var current =
                     numericId == null
                             ? store.loadLinkByUuid(key, id)
@@ -304,7 +316,8 @@ final class DataRoutes {
         String key = ctx.queryParam("modelKey");
         if (key == null && !ctx.body().isBlank()) key = getString(body(ctx).get("modelKey"));
         authorize(ctx, key, "delete");
-        try (Neo4jDataStore store = new Neo4jDataStore()) {
+        try (Neo4jDataStore store =
+                new Neo4jDataStore(null, AuditActor.from(resolveAccessContext(ctx)))) {
             boolean deleted =
                     link
                             ? (numericId == null

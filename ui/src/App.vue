@@ -299,7 +299,7 @@
             </v-col>
           </v-row>
 
-          <DataCoverage v-if="state.isUserPortal" :state="state" />
+          <DataCoverage v-if="state.isUserPortal && ['navigate', 'table', 'search', 'create'].includes(state.currentPage)" :state="state" />
           <v-alert v-if="state.status && !['import-model', 'import-data'].includes(state.currentPage)" class="mb-4" :type="state.status.type" variant="tonal" role="status">{{ state.status.message }}</v-alert>
 
           <v-window v-if="activeTabs.length" v-model="state.currentPage">
@@ -331,6 +331,9 @@
               <ModelPage v-if="state.currentPage === 'model'" :state="state" />
             </v-window-item>
 
+            <v-window-item value="paths"><PathsPage v-if="state.currentPage === 'paths'" :state="state" /></v-window-item>
+            <v-window-item value="quality"><QualityPage v-if="state.currentPage === 'quality'" :state="state" /></v-window-item>
+            <v-window-item value="history"><HistoryPage v-if="state.currentPage === 'history'" :state="state" /></v-window-item>
             <v-window-item value="admin">
               <AdminPage v-if="state.currentPage === 'admin'" :state="state" />
             </v-window-item>
@@ -355,10 +358,17 @@ const SearchPage = defineAsyncComponent(() => import('./components/pages/SearchP
 const TablePage = defineAsyncComponent(() => import('./components/pages/TablePage.vue'));
 const CreatePage = defineAsyncComponent(() => import('./components/pages/CreatePage.vue'));
 
+const PathsPage = defineAsyncComponent(() => import('./components/pages/PathsPage.vue'));
+const QualityPage = defineAsyncComponent(() => import('./components/pages/QualityPage.vue'));
+const HistoryPage = defineAsyncComponent(() => import('./components/pages/HistoryPage.vue'));
+
 const state = reactive(useAppState());
 useHashNavigation(state);
 
 const userPortalTabs = [
+  { title: 'Chemins', value: 'paths', tooltip: 'Comprendre les relations entre deux objets.' },
+  { title: 'Qualité', value: 'quality', tooltip: 'Identifier les données à vérifier.' },
+  { title: 'Historique', value: 'history', tooltip: 'Consulter les modifications et leurs auteurs.' },
   {
     title: 'Explorer',
     value: 'navigate',
@@ -377,7 +387,7 @@ const userPortalTabs = [
   {
     title: 'Import données',
     value: 'import-data',
-    tooltip: 'Importer ou valider un fichier XML de données pour le modèle sélectionné.'
+    tooltip: 'Prévisualiser puis importer des données CSV, Excel ou XML.'
   },
   {
     title: 'Création',
@@ -442,10 +452,11 @@ const platformAdminEntries = [
 const activeTabs = computed(() => {
   if (state.isUserPortal) {
     return userPortalTabs.filter((tab) => {
-      if (['navigate', 'table', 'search'].includes(tab.value)) {
+      if (['navigate', 'table', 'search', 'paths', 'quality', 'history'].includes(tab.value)) {
         return state.canReadCurrentModelData;
       }
-      if (['import-data', 'create'].includes(tab.value)) {
+      if (tab.value === 'import-data') return state.canCreateCurrentModelData && state.canReadCurrentModelData;
+      if (tab.value === 'create') {
         return state.canCreateCurrentModelData;
       }
       return true;

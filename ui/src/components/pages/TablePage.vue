@@ -8,6 +8,7 @@
     </v-col>
   </v-row>
 
+  <SavedViews :state="state" />
   <v-row>
     <v-col cols="12" :lg="state.tableHasDetails ? 8 : 12">
       <v-card class="card-animate delay-1" elevation="4" rounded="xl">
@@ -99,8 +100,10 @@
             </v-col>
           </v-row>
 
+          <v-select v-model="state.tableVisibleColumns" :items="state.tableHeaders" item-title="title" item-value="key" label="Colonnes affichées (toutes par défaut)" multiple chips clearable />
           <v-data-table
-            :headers="state.tableHeaders"
+            v-model:sort-by="state.tableSortBy"
+            :headers="visibleHeaders"
             :items="state.filteredTableRows"
             item-key="key"
             density="comfortable"
@@ -301,6 +304,7 @@
 
 <script setup>
 import LinkManager from '../LinkManager.vue';
+import SavedViews from '../SavedViews.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -311,5 +315,6 @@ const props = defineProps({
 });
 
 const state = props.state;
+const visibleHeaders = computed(() => state.tableVisibleColumns?.length ? state.tableHeaders.filter(header => state.tableVisibleColumns.includes(header.key)) : state.tableHeaders);
 const primaryAttributes = computed(() => state.getObjectPrimaryAttributes(state.tableSelectedObject));
 </script>

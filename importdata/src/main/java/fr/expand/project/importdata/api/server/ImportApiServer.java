@@ -155,6 +155,10 @@ public final class ImportApiServer {
                     AccessRoutes.register(config.routes);
                     ModelRoutes.register(config.routes);
                     DataRoutes.register(config.routes);
+                    SavedViewRoutes.register(config.routes);
+                    ImportWorkflowRoutes.register(config.routes);
+                    HistoryRoutes.register(config.routes);
+                    GraphInsightsRoutes.register(config.routes);
                 });
     }
 

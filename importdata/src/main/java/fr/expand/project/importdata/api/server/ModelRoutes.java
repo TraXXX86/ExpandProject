@@ -5,6 +5,7 @@ import static fr.expand.project.importdata.api.server.ModelMapper.*;
 
 import fr.expand.project.importdata.access.AccessContext;
 import fr.expand.project.importdata.access.AccessControlStore;
+import fr.expand.project.importdata.audit.AuditActor;
 import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.model.Neo4jModelStore;
 import fr.expand.project.importdata.model.generated.DATAMODEL;
@@ -35,7 +36,7 @@ final class ModelRoutes {
         if (context == null) {
             return error(ctx, 401, "Utilisateur inconnu");
         }
-        try (Neo4jModelStore store = new Neo4jModelStore()) {
+        try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
             List<Map<String, Object>> models = store.listModels();
             if (context.isPlatformAdmin()) {
                 return GSON.toJson(models);
@@ -65,7 +66,7 @@ final class ModelRoutes {
             return error(ctx, 403, "Accès au modèle refusé");
         }
 
-        try (Neo4jModelStore store = new Neo4jModelStore()) {
+        try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
             DATAMODEL model = store.loadModelByKey(modelKey);
             if (model == null) {
                 return error(ctx, 404, "Modèle introuvable");
@@ -94,7 +95,7 @@ final class ModelRoutes {
             return error(ctx, 403, "Accès au modèle refusé");
         }
 
-        try (Neo4jModelStore store = new Neo4jModelStore()) {
+        try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
             String xml = store.loadModelXmlByKey(modelKey);
             if (xml == null || xml.isBlank()) {
                 ctx.contentType("application/json");
@@ -129,7 +130,7 @@ final class ModelRoutes {
         try {
             ModelManager modelManager = new ModelManager();
             DATAMODEL model = modelManager.loadModelFromXml(xml);
-            try (Neo4jModelStore store = new Neo4jModelStore()) {
+            try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
                 String newKey = store.updateModel(modelKey, model, xml);
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("key", newKey);
@@ -161,7 +162,7 @@ final class ModelRoutes {
 
             ModelManager modelManager = new ModelManager();
             DATAMODEL model = modelManager.loadModelFromXml(xml);
-            try (Neo4jModelStore store = new Neo4jModelStore()) {
+            try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
                 String modelKey = store.createModel(model, xml);
                 if (!context.isPlatformAdmin()) {
                     try (AccessControlStore access = new AccessControlStore()) {
@@ -209,7 +210,7 @@ final class ModelRoutes {
         if (!context.canDeleteData(modelKey)) {
             return error(ctx, 403, "Accès au modèle refusé");
         }
-        try (Neo4jModelStore store = new Neo4jModelStore()) {
+        try (Neo4jModelStore store = new Neo4jModelStore(AuditActor.from(context))) {
             store.deleteModelAndDataByKey(modelKey);
         }
         return GSON.toJson(Map.of("status", "deleted", "modelKey", modelKey));

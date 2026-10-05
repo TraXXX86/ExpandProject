@@ -1,7 +1,7 @@
 import { nextTick, onBeforeUnmount, watch } from 'vue';
 
 const pages = {
-  user: ['navigate', 'table', 'search', 'create', 'import-data'],
+  user: ['navigate', 'table', 'search', 'create', 'import-data', 'paths', 'quality', 'history'],
   'model-admin': ['model', 'import-model', 'admin']
 };
 

@@ -1,5 +1,6 @@
 package fr.expand.project.importdata.model;
 
+import fr.expand.project.importdata.audit.*;
 import fr.expand.project.importdata.model.generated.ATTRIBUTEDEFINITION;
 import fr.expand.project.importdata.model.generated.DATAMODEL;
 import fr.expand.project.importdata.model.generated.LINKTYPE;
@@ -18,8 +19,14 @@ import java.util.Set;
 public class Neo4jModelStore implements AutoCloseable {
 
     private final Driver driver;
+    private final AuditActor actor;
 
     public Neo4jModelStore() {
+        this(AuditActor.system());
+    }
+
+    public Neo4jModelStore(AuditActor actor) {
+        this.actor = java.util.Objects.requireNonNull(actor);
         this.driver = fr.expand.project.importdata.dao.Neo4jDriverProvider.getDriver();
     }
 
@@ -70,8 +77,8 @@ public class Neo4jModelStore implements AutoCloseable {
 
                         var existing =
                                 tx.run(
-                                        "MATCH (m:DataModel {key:$modelKey}) RETURN m.name AS"
-                                            + " name,m.version AS version",
+                                        "MATCH (m:DataModel {key:$modelKey}) SET m.key=m.key RETURN"
+                                            + " m.name AS name,m.version AS version,m.xml AS xml",
                                         base);
                         boolean exists = existing.hasNext();
                         if (createOnly && exists)
@@ -79,8 +86,19 @@ public class Neo4jModelStore implements AutoCloseable {
                                     "Model already exists: " + modelKey);
                         if (updateOnly && !exists)
                             throw new IllegalArgumentException("Model not found: " + modelKey);
+                        Map<String, Object> before = null;
                         if (exists) {
                             var stored = existing.next();
+                            before =
+                                    Map.of(
+                                            "key",
+                                            modelKey,
+                                            "name",
+                                            stored.get("name").asString(),
+                                            "version",
+                                            stored.get("version").asString(""),
+                                            "xml",
+                                            stored.get("xml").asString(""));
                             String storedVersion =
                                     stored.get("version").isNull()
                                             ? ""
@@ -103,7 +121,7 @@ public class Neo4jModelStore implements AutoCloseable {
 
                         tx.run(
                                 "MATCH (n {modelKey:$modelKey}) WHERE n:ModelObjectType OR"
-                                    + " n:ModelLinkType OR n:ModelAttribute DETACH DELETE n",
+                                        + " n:ModelLinkType OR n:ModelAttribute DETACH DELETE n",
                                 base);
 
                         Set<String> objectTypeNames = new HashSet<>();
@@ -175,13 +193,13 @@ public class Neo4jModelStore implements AutoCloseable {
 
                                         tx.run(
                                                 "CREATE (a:ModelAttribute {key:$attributeKey,"
-                                                    + " modelKey:$modelKey, scope:'OBJECT',"
-                                                    + " owner:$typeName, name:$attributeName,"
-                                                    + " type:$attributeType,"
-                                                    + " required:$attributeRequired,"
-                                                    + " searchable:$attributeSearchable,"
-                                                    + " defaultValue:$attributeDefault, "
-                                                    + "description:$attributeDescription})",
+                                                        + " modelKey:$modelKey, scope:'OBJECT',"
+                                                        + " owner:$typeName, name:$attributeName,"
+                                                        + " type:$attributeType,"
+                                                        + " required:$attributeRequired,"
+                                                        + " searchable:$attributeSearchable,"
+                                                        + " defaultValue:$attributeDefault, "
+                                                        + "description:$attributeDescription})",
                                                 attrParams);
 
                                         tx.run(
@@ -210,9 +228,9 @@ public class Neo4jModelStore implements AutoCloseable {
                                 params.put("parentName", objectType.getPARENT());
                                 tx.run(
                                         "MATCH (child:ModelObjectType {modelKey:$modelKey,"
-                                            + " name:$childName}) MATCH (parent:ModelObjectType"
-                                            + " {modelKey:$modelKey, name:$parentName}) MERGE"
-                                            + " (child)-[:EXTENDS]->(parent)",
+                                                + " name:$childName}) MATCH (parent:ModelObjectType"
+                                                + " {modelKey:$modelKey, name:$parentName}) MERGE"
+                                                + " (child)-[:EXTENDS]->(parent)",
                                         params);
                             }
                         }
@@ -240,8 +258,8 @@ public class Neo4jModelStore implements AutoCloseable {
 
                                 tx.run(
                                         "MATCH (m:DataModel {key:$modelKey}) MATCH (l:ModelLinkType"
-                                            + " {modelKey:$modelKey, name:$linkName}) MERGE"
-                                            + " (m)-[:HAS_LINK_TYPE]->(l)",
+                                                + " {modelKey:$modelKey, name:$linkName}) MERGE"
+                                                + " (m)-[:HAS_LINK_TYPE]->(l)",
                                         params);
 
                                 if (linkType.getSOURCETYPES() != null
@@ -320,13 +338,13 @@ public class Neo4jModelStore implements AutoCloseable {
 
                                         tx.run(
                                                 "CREATE (a:ModelAttribute {key:$attributeKey,"
-                                                    + " modelKey:$modelKey, scope:'LINK',"
-                                                    + " owner:$linkName, name:$attributeName,"
-                                                    + " type:$attributeType,"
-                                                    + " required:$attributeRequired,"
-                                                    + " searchable:$attributeSearchable,"
-                                                    + " defaultValue:$attributeDefault, "
-                                                    + "description:$attributeDescription})",
+                                                        + " modelKey:$modelKey, scope:'LINK',"
+                                                        + " owner:$linkName, name:$attributeName,"
+                                                        + " type:$attributeType,"
+                                                        + " required:$attributeRequired,"
+                                                        + " searchable:$attributeSearchable,"
+                                                        + " defaultValue:$attributeDefault, "
+                                                        + "description:$attributeDescription})",
                                                 attrParams);
 
                                         tx.run(
@@ -344,16 +362,33 @@ public class Neo4jModelStore implements AutoCloseable {
                         // field changes.
                         tx.run(
                                         "MATCH (n:DataObject {modelKey:$modelKey}) SET"
-                                            + " n.searchText="
+                                                + " n.searchText="
                                                 + fr.expand.project.importdata.util.SearchIndex
                                                         .EXPRESSION,
                                         base)
                                 .consume();
                         tx.run(
                                         "MATCH (m:DataModel {key:$modelKey}) SET"
-                                            + " m.searchRevision=$searchRevision",
+                                                + " m.searchRevision=$searchRevision",
                                         base)
                                 .consume();
+                        AuditTrail.record(
+                                tx,
+                                modelKey,
+                                actor,
+                                exists ? "UPDATE" : "CREATE",
+                                "MODEL",
+                                modelKey,
+                                before,
+                                Map.of(
+                                        "key",
+                                        modelKey,
+                                        "name",
+                                        modelName,
+                                        "version",
+                                        modelVersion,
+                                        "xml",
+                                        modelXml == null ? "" : modelXml));
                         return null;
                     });
         } catch (org.neo4j.driver.exceptions.ClientException e) {
@@ -380,14 +415,33 @@ public class Neo4jModelStore implements AutoCloseable {
                         params.put("modelKey", modelKey);
                         // Acquire the same model lock as imports before inspecting/deleting its
                         // data.
-                        tx.run("MATCH (m:DataModel {key:$modelKey}) SET m.key=m.key", params)
-                                .consume();
-                        tx.run("MATCH (n {modelKey:$modelKey}) DETACH DELETE n", params);
+                        var model =
+                                tx.run(
+                                        "MATCH (m:DataModel {key:$modelKey}) SET m.key=m.key RETURN"
+                                                + " properties(m) AS p",
+                                        params);
+                        if (!model.hasNext()) return null;
+                        Map<String, Object> before = new HashMap<>(model.single().get("p").asMap());
+                        before.remove("searchRevision");
+                        before.remove("updatedAt");
+                        var counts =
+                                tx.run(
+                                                "MATCH (n:DataObject {modelKey:$modelKey}) OPTIONAL"
+                                                    + " MATCH (n)-[r]->(:DataObject"
+                                                    + " {modelKey:$modelKey}) RETURN count(DISTINCT"
+                                                    + " n) AS objects,count(r) AS links",
+                                                params)
+                                        .single();
+                        before.put("deletedObjectCount", counts.get("objects").asLong());
+                        before.put("deletedLinkCount", counts.get("links").asLong());
+                        tx.run("MATCH (n:DataObject {modelKey:$modelKey}) DETACH DELETE n", params);
                         tx.run(
                                 "MATCH (n {modelKey:$modelKey}) WHERE n:ModelObjectType OR"
-                                    + " n:ModelLinkType OR n:ModelAttribute DETACH DELETE n",
+                                        + " n:ModelLinkType OR n:ModelAttribute DETACH DELETE n",
                                 params);
                         tx.run("MATCH (m:DataModel {key:$modelKey}) DETACH DELETE m", params);
+                        AuditTrail.record(
+                                tx, modelKey, actor, "DELETE", "MODEL", modelKey, before, null);
                         return null;
                     });
         }
@@ -434,7 +488,7 @@ public class Neo4jModelStore implements AutoCloseable {
                         var result =
                                 tx.run(
                                         "MATCH (m:DataModel) RETURN m.key AS key, m.name AS name,"
-                                            + " m.version AS version");
+                                                + " m.version AS version");
                         java.util.List<Map<String, Object>> models = new java.util.ArrayList<>();
                         while (result.hasNext()) {
                             var record = result.next();
