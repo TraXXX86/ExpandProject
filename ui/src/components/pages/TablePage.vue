@@ -31,6 +31,7 @@
           </div>
         </v-card-title>
         <v-card-text>
+          <WorkflowFilter :state="state" />
           <v-row>
             <v-col cols="12" md="4">
               <v-select
@@ -206,6 +207,8 @@
                 </v-chip>
               </div>
 
+            <ObjectWorkflow :state="state" :object="state.tableSelectedObject" />
+
               <div v-if="primaryAttributes.length" class="mt-3">
                 <div class="text-subtitle-2 font-weight-bold">Attributs principaux</div>
                 <div class="d-flex flex-wrap" style="gap: 8px; margin-top: 6px;">
@@ -303,6 +306,8 @@
 </template>
 
 <script setup>
+import WorkflowFilter from '../WorkflowFilter.vue';
+import ObjectWorkflow from '../ObjectWorkflow.vue';
 import LinkManager from '../LinkManager.vue';
 import SavedViews from '../SavedViews.vue';
 import { computed } from 'vue';

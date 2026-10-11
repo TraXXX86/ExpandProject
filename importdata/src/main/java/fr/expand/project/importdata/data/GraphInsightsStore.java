@@ -10,6 +10,8 @@ import fr.expand.project.importdata.model.generated.TYPEREF;
 import fr.expand.project.importdata.util.CypherUtils;
 import fr.expand.project.importdata.validation.DataValidator;
 import fr.expand.project.importdata.validation.ValidationResult;
+import fr.expand.project.importdata.workflow.WorkflowCatalog;
+import fr.expand.project.importdata.workflow.WorkflowDefinition;
 
 import org.neo4j.driver.TransactionConfig;
 import org.neo4j.driver.TransactionContext;
@@ -225,11 +227,25 @@ public final class GraphInsightsStore {
         counts.put("isolated", 0);
         counts.put("potential_duplicate", 0);
         counts.put("schema_drift", 0);
+        counts.put("workflow_drift", 0);
+        Map<List<String>, Optional<WorkflowDefinition>> workflows = new HashMap<>();
         Map<List<String>, Long> duplicateKeys = new HashMap<>();
         DataValidator validator = new DataValidator(manager);
         for (var record : nodes.subList(0, Math.min(nodes.size(), MAX_OBJECTS))) {
             Node node = record.get("n").asNode();
             String type = objectType(node);
+            String workflowIssue = workflowIssue(tx, key, node, type, manager, workflows);
+            if (workflowIssue != null)
+                issue(
+                        issues,
+                        counts,
+                        "workflow_drift",
+                        "object",
+                        node.id(),
+                        type,
+                        "error",
+                        workflowIssue,
+                        List.of());
             if (record.get("isolated").asBoolean())
                 issue(
                         issues,
@@ -360,6 +376,54 @@ public final class GraphInsightsStore {
                     + " défaut recherchables. Unicode NFKC, espaces normalisés, casse ignorée. Les"
                     + " doublons restent à confirmer ; comparaison limitée aux objets analysés.");
         return report;
+    }
+
+    private static String workflowIssue(
+            TransactionContext tx,
+            String key,
+            Node node,
+            String type,
+            ModelManager manager,
+            Map<List<String>, Optional<WorkflowDefinition>> cache) {
+        Map<String, Object> props = node.asMap();
+        if (List.of(
+                        "_workflowId",
+                        "_workflowVersion",
+                        "_workflowState",
+                        "_workflowRevision",
+                        "_workflowUpdatedAt")
+                .stream()
+                .noneMatch(props::containsKey)) return null;
+        Object id = props.get("_workflowId"), version = props.get("_workflowVersion");
+        if (!(id instanceof String) || !(version instanceof String))
+            return "Référence de workflow incomplète";
+        var definition =
+                cache.computeIfAbsent(
+                        List.of((String) id, (String) version),
+                        ignored -> {
+                            try {
+                                return Optional.of(
+                                        WorkflowCatalog.load(
+                                                tx, key, (String) id, (String) version));
+                            } catch (NoSuchElementException | IllegalArgumentException e) {
+                                return Optional.empty();
+                            }
+                        });
+        if (definition.isEmpty()) return "Version du workflow absente ou invalide";
+        var workflow = definition.get();
+        if (workflow.state(Objects.toString(props.get("_workflowState"), "")) == null)
+            return "Statut inconnu dans la version du workflow de l’objet";
+        if (!(props.get("_workflowRevision") instanceof Number revision)
+                || revision.longValue() < 0) return "Révision de workflow invalide";
+        boolean compatible =
+                workflow.objectTypes().stream()
+                        .anyMatch(
+                                ref ->
+                                        ref.name().equals(type)
+                                                || ref.includeSubtypes()
+                                                        && manager.isTypeOrSubtype(
+                                                                type, ref.name()));
+        return compatible ? null : "Type d’objet incompatible avec sa version de workflow";
     }
 
     private static boolean allowed(ModelManager manager, String type, List<TYPEREF> references) {
@@ -529,6 +593,9 @@ public final class GraphInsightsStore {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", node.id());
         row.put("type", objectType(node));
+        row.put(
+                "workflow",
+                fr.expand.project.importdata.workflow.WorkflowEngine.objectState(node.asMap()));
         row.put("attributes", attributeRows(node.asMap()));
         for (String field : List.of("dataId", "uuid"))
             if (!node.get(field).isNull()) row.put(field, node.get(field).asObject());

@@ -27,6 +27,9 @@ export function useAccessViews(ctx) {
 
   const canDeleteCurrentModelData = computed(() => ctx.canDeleteModelData(ctx.selectedModelKey.value));
 
+  const canTransitionCurrentModelData = computed(() => canAccessUserPortal.value && canReadCurrentModelData.value && Boolean(selectedModelPermission.value?.canTransition));
+  const canManageCurrentWorkflows = computed(() => Boolean(ctx.selectedModelKey.value) && canAccessModelAdminPortal.value && Boolean(selectedModelPermission.value?.visible) && canReadCurrentModelData.value && canUpdateCurrentModelData.value);
+
   const canManageAccess = computed(() => Boolean(ctx.authMeta.value.actorPlatformAdmin));
 
   const isPortalSelected = computed(() => Boolean(ctx.activePortal.value));
@@ -73,5 +76,5 @@ export function useAccessViews(ctx) {
     return 'secondary';
   });
 
-  return { userOptions, isPlatformAdmin, canAccessUserPortal, canAccessModelAdminPortal, selectedModelPermission, canReadCurrentModelData, canCreateCurrentModelData, canUpdateCurrentModelData, canDeleteCurrentModelData, canManageAccess, isPortalSelected, isUserPortal, isModelAdminPortal, portalLabel, canUploadModel, canUploadData, neo4jChipLabel, neo4jChipColor };
+  return { canTransitionCurrentModelData, canManageCurrentWorkflows, userOptions, isPlatformAdmin, canAccessUserPortal, canAccessModelAdminPortal, selectedModelPermission, canReadCurrentModelData, canCreateCurrentModelData, canUpdateCurrentModelData, canDeleteCurrentModelData, canManageAccess, isPortalSelected, isUserPortal, isModelAdminPortal, portalLabel, canUploadModel, canUploadData, neo4jChipLabel, neo4jChipColor };
 }

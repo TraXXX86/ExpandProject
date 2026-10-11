@@ -140,8 +140,25 @@ public final class AuditTrail {
             throw new IllegalArgumentException("Invalid model key");
         if (offset < 0 || limit < 1 || limit > 100)
             throw new IllegalArgumentException("offset must be nonnegative; limit must be 1..100");
-        entityType = filter(entityType, Set.of("MODEL", "OBJECT", "LINK", "IMPORT"), "entityType");
-        action = filter(action, Set.of("CREATE", "UPDATE", "DELETE", "IMPORT"), "action");
+        entityType =
+                filter(
+                        entityType,
+                        Set.of("MODEL", "OBJECT", "LINK", "IMPORT", "WORKFLOW"),
+                        "entityType");
+        action =
+                filter(
+                        action,
+                        Set.of(
+                                "CREATE",
+                                "UPDATE",
+                                "DELETE",
+                                "IMPORT",
+                                "TRANSITION",
+                                "INITIALIZE",
+                                "MIGRATE",
+                                "ACTIVATE",
+                                "DEACTIVATE"),
+                        "action");
         if (entityId != null && entityId.length() > 512)
             throw new IllegalArgumentException("entityId too long");
         Map<String, Object> params = new HashMap<>();

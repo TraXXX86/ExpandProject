@@ -338,6 +338,8 @@ export function useDataActions(ctx) {
       const idKey = id !== null && id !== undefined ? String(id) : `index-${index}`;
       return {
         id,
+        uuid: object.uuid || '',
+        workflow: object.workflow || null,
         type,
         attributes: Array.isArray(object.attributes) ? object.attributes : [],
         idKey,

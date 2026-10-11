@@ -1,4 +1,4 @@
-const stringFields = ['tableSearch', 'tableAttributeKey', 'tableAttributeValue', 'tableAttributeKeyOperator', 'tableAttributeValueOperator', 'fullTextQuery', 'searchMode'];
+const stringFields = ['tableSearch', 'tableAttributeKey', 'tableAttributeValue', 'tableAttributeKeyOperator', 'tableAttributeValueOperator', 'fullTextQuery', 'searchMode', 'workflowStatus', 'workflowId'];
 const arrayFields = ['tableTypeFilter', 'fullTextTypeFilter'];
 export function captureView(state) {
   const filters = {};

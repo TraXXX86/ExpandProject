@@ -334,6 +334,7 @@
             <v-window-item value="paths"><PathsPage v-if="state.currentPage === 'paths'" :state="state" /></v-window-item>
             <v-window-item value="quality"><QualityPage v-if="state.currentPage === 'quality'" :state="state" /></v-window-item>
             <v-window-item value="history"><HistoryPage v-if="state.currentPage === 'history'" :state="state" /></v-window-item>
+            <v-window-item value="workflows"><WorkflowsPage v-if="state.currentPage === 'workflows'" :state="state" /></v-window-item>
             <v-window-item value="admin">
               <AdminPage v-if="state.currentPage === 'admin'" :state="state" />
             </v-window-item>
@@ -361,6 +362,8 @@ const CreatePage = defineAsyncComponent(() => import('./components/pages/CreateP
 const PathsPage = defineAsyncComponent(() => import('./components/pages/PathsPage.vue'));
 const QualityPage = defineAsyncComponent(() => import('./components/pages/QualityPage.vue'));
 const HistoryPage = defineAsyncComponent(() => import('./components/pages/HistoryPage.vue'));
+
+const WorkflowsPage = defineAsyncComponent(() => import('./components/pages/WorkflowsPage.vue'));
 
 const state = reactive(useAppState());
 useHashNavigation(state);
@@ -397,6 +400,7 @@ const userPortalTabs = [
 ];
 
 const modelAdminTabs = [
+  { title: 'Workflows', value: 'workflows', tooltip: 'Charger, affecter et faire évoluer les workflows indépendamment du modèle.' },
   {
     title: 'Modèle',
     value: 'model',

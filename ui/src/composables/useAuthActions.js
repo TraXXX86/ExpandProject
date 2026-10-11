@@ -253,7 +253,8 @@ export function useAuthActions(ctx) {
         canRead: true,
         canCreate: true,
         canUpdate: true,
-        canDelete: true
+        canDelete: true,
+        canTransition: true
       };
     }
     return ctx.accessPermissions.value.find((permission) => permission.modelKey === modelKey) || null;

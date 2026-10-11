@@ -47,7 +47,8 @@ export function useAccessAdminActions(ctx) {
         canRead: Boolean(existing?.canRead),
         canCreate: Boolean(existing?.canCreate),
         canUpdate: Boolean(existing?.canUpdate),
-        canDelete: Boolean(existing?.canDelete)
+        canDelete: Boolean(existing?.canDelete),
+        canTransition: Boolean(existing?.canTransition)
       };
     });
   }
@@ -91,7 +92,8 @@ export function useAccessAdminActions(ctx) {
           canRead: Boolean(entry?.canRead),
           canCreate: Boolean(entry?.canCreate),
           canUpdate: Boolean(entry?.canUpdate),
-          canDelete: Boolean(entry?.canDelete)
+          canDelete: Boolean(entry?.canDelete),
+          canTransition: Boolean(entry?.canTransition)
         };
       });
     } catch (error) {
@@ -219,7 +221,8 @@ export function useAccessAdminActions(ctx) {
               canRead: Boolean(permission.canRead),
               canCreate: Boolean(permission.canCreate),
               canUpdate: Boolean(permission.canUpdate),
-              canDelete: Boolean(permission.canDelete)
+              canDelete: Boolean(permission.canDelete),
+              canTransition: Boolean(permission.canTransition)
             }))
           })
         }

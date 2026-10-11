@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="Code"><xs:restriction base="xs:string"><xs:pattern value="[A-Za-z_][A-Za-z0-9_.-]*"/><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
+  <xs:simpleType name="Version"><xs:restriction base="xs:string"><xs:pattern value="[A-Za-z0-9][A-Za-z0-9_.-]*"/><xs:maxLength value="64"/></xs:restriction></xs:simpleType>
+  <xs:simpleType name="Label"><xs:restriction base="xs:token"><xs:minLength value="1"/><xs:maxLength value="256"/></xs:restriction></xs:simpleType>
+  <xs:element name="WORKFLOW"><xs:complexType><xs:sequence>
+    <xs:element name="OBJECT_TYPES"><xs:complexType><xs:sequence><xs:element name="TYPE_REF" maxOccurs="1000"><xs:complexType><xs:attribute name="NAME" type="Code" use="required"/><xs:attribute name="INCLUDE_SUBTYPES" type="xs:boolean" default="false"/></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element>
+    <xs:element name="STATES"><xs:complexType><xs:sequence><xs:element name="STATE" maxOccurs="500"><xs:complexType><xs:attribute name="CODE" type="Code" use="required"/><xs:attribute name="LABEL" type="Label" use="required"/><xs:attribute name="TERMINAL" type="xs:boolean" default="false"/></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element>
+    <xs:element name="TRANSITIONS"><xs:complexType><xs:sequence><xs:element name="TRANSITION" minOccurs="0" maxOccurs="2000"><xs:complexType><xs:attribute name="ID" type="Code" use="required"/><xs:attribute name="FROM" type="Code" use="required"/><xs:attribute name="TO" type="Code" use="required"/><xs:attribute name="LABEL" type="Label" use="required"/></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element>
+  </xs:sequence><xs:attribute name="ID" type="Code" use="required"/><xs:attribute name="VERSION" type="Version" use="required"/><xs:attribute name="LABEL" type="Label" use="required"/><xs:attribute name="INITIAL_STATE" type="Code" use="required"/></xs:complexType></xs:element>
+</xs:schema>

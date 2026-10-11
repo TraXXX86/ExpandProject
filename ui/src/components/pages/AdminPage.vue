@@ -299,6 +299,7 @@
                 <th>C</th>
                 <th>U (données et modèle)</th>
                 <th>D (données et modèle)</th>
+                <th>Faire évoluer le statut</th>
               </tr>
             </thead>
             <tbody>
@@ -312,6 +313,7 @@
                 <td><v-checkbox v-model="permission.canCreate" hide-details density="compact" /></td>
                 <td><v-checkbox aria-label="Modifier les données et le modèle" v-model="permission.canUpdate" hide-details density="compact" /></td>
                 <td><v-checkbox aria-label="Supprimer les données et le modèle" v-model="permission.canDelete" hide-details density="compact" /></td>
+                <td><v-checkbox aria-label="Faire évoluer le statut" v-model="permission.canTransition" hide-details density="compact" /></td>
               </tr>
             </tbody>
           </v-table>

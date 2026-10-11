@@ -36,8 +36,8 @@
 import { ref, watch } from 'vue';
 import { useScopedApi } from '../../composables/useScopedApi';
 const { state } = defineProps({ state: { type: Object, required: true } });
-const entityOptions = [{ title: 'Objet', value: 'OBJECT' }, { title: 'Lien', value: 'LINK' }, { title: 'Modèle', value: 'MODEL' }, { title: 'Import', value: 'IMPORT' }];
-const actionOptions = [{ title: 'Création', value: 'CREATE' }, { title: 'Modification', value: 'UPDATE' }, { title: 'Suppression', value: 'DELETE' }, { title: 'Import', value: 'IMPORT' }];
+const entityOptions = [{ title: 'Objet', value: 'OBJECT' }, { title: 'Lien', value: 'LINK' }, { title: 'Modèle', value: 'MODEL' }, { title: 'Import', value: 'IMPORT' }, { title: 'Workflow', value: 'WORKFLOW' }];
+const actionOptions = [{ title: 'Création', value: 'CREATE' }, { title: 'Modification', value: 'UPDATE' }, { title: 'Suppression', value: 'DELETE' }, { title: 'Import', value: 'IMPORT' }, { title: 'Changement de statut', value: 'TRANSITION' }, { title: 'Initialisation du workflow', value: 'INITIALIZE' }, { title: 'Migration du workflow', value: 'MIGRATE' }, { title: 'Activation du workflow', value: 'ACTIVATE' }, { title: 'Désactivation du workflow', value: 'DEACTIVATE' }];
 const items = ref([]), error = ref(''), loading = ref(false), total = ref(0), offset = ref(0), hasMore = ref(false);
 const entityType = ref(null), action = ref(null), entityId = ref(''), limit = 25;
 let activeFilters = {};

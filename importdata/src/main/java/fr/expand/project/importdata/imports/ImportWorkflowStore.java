@@ -11,6 +11,8 @@ import fr.expand.project.importdata.model.ModelManager;
 import fr.expand.project.importdata.util.CypherUtils;
 import fr.expand.project.importdata.util.SearchIndex;
 import fr.expand.project.importdata.validation.DataValidator;
+import fr.expand.project.importdata.workflow.WorkflowCatalog;
+import fr.expand.project.importdata.workflow.WorkflowEngine;
 
 import org.neo4j.driver.*;
 
@@ -32,7 +34,9 @@ public final class ImportWorkflowStore {
             Map<String, Object> after,
             List<String> errors,
             ImportInput.Identity from,
-            ImportInput.Identity to) {}
+            ImportInput.Identity to,
+            Map<String, Object> workflowBefore,
+            Map<String, Object> workflowAfter) {}
 
     public record Preview(
             boolean valid, String previewHash, Map<String, Long> summary, List<Change> rows) {}
@@ -86,6 +90,7 @@ public final class ImportWorkflowStore {
                             throw new io.javalin.http.ForbiddenResponse(
                                     "Droit de création ou modification refusé");
                         var searchFields = SearchIndex.fields(manager.getCurrentModel());
+                        Map<String, Map<String, Object>> workflowDefaults = new HashMap<>();
                         for (int i = 0; i < plan.preview.rows.size(); i++) {
                             Change change = plan.preview.rows.get(i);
                             if (change.action.equals("UNCHANGED")) continue;
@@ -96,6 +101,13 @@ public final class ImportWorkflowStore {
                             if (change.entityType.equals("OBJECT")) {
                                 properties.put("dataId", change.dataId);
                                 properties.put("type", change.type);
+                                if (change.action.equals("CREATE"))
+                                    properties.putAll(
+                                            workflowDefaults.computeIfAbsent(
+                                                    change.type,
+                                                    type ->
+                                                            WorkflowEngine.initialProperties(
+                                                                    tx, key, type)));
                                 properties.put(
                                         "searchText",
                                         SearchIndex.text(change.type, properties, searchFields));
@@ -168,8 +180,12 @@ public final class ImportWorkflowStore {
                                     change.action,
                                     change.entityType,
                                     properties.get("uuid").toString(),
-                                    change.before,
-                                    change.after);
+                                    auditSnapshot(change.before, change.workflowBefore),
+                                    auditSnapshot(
+                                            change.after,
+                                            change.entityType.equals("OBJECT")
+                                                    ? WorkflowEngine.objectState(properties)
+                                                    : null));
                         }
                         AuditTrail.record(
                                 tx,
@@ -196,6 +212,7 @@ public final class ImportWorkflowStore {
         List<Change> changes = new ArrayList<>();
         List<Map<String, Object>> stored = new ArrayList<>();
         List<String> references = new ArrayList<>();
+        Map<String, Map<String, Object>> workflowDefaults = new HashMap<>();
         Set<String> identities = new HashSet<>(), incomingObjects = new HashSet<>();
         for (var entry : input.entries())
             if (entry.entityType().equals("OBJECT") && entry.dataId() != null)
@@ -328,6 +345,17 @@ public final class ImportWorkflowStore {
                             : current.isEmpty()
                                     ? "CREATE"
                                     : before.equals(after) ? "UNCHANGED" : "UPDATE";
+            Map<String, Object> workflowBefore = WorkflowEngine.objectState(current);
+            Map<String, Object> workflowAfter = workflowBefore;
+            if (current.isEmpty() && entry.entityType().equals("OBJECT") && errors.isEmpty()) {
+                current.putAll(
+                        workflowDefaults.computeIfAbsent(
+                                entry.type(),
+                                type -> WorkflowEngine.initialProperties(tx, key, type)));
+                // Initialization time is assigned at commit, not part of a reusable preview digest.
+                current.remove("_workflowUpdatedAt");
+                workflowAfter = WorkflowEngine.objectState(current);
+            }
             changes.add(
                     new Change(
                             entry.row(),
@@ -339,7 +367,9 @@ public final class ImportWorkflowStore {
                             after,
                             errors,
                             entry.from(),
-                            entry.to()));
+                            entry.to(),
+                            workflowBefore,
+                            workflowAfter));
             stored.add(current);
             references.add(reference);
         }
@@ -366,6 +396,7 @@ public final class ImportWorkflowStore {
                                 List.of(
                                         key,
                                         manager.getCurrentModelXml(),
+                                        WorkflowCatalog.fingerprint(tx, key),
                                         mode,
                                         changes,
                                         stored,
@@ -374,6 +405,19 @@ public final class ImportWorkflowStore {
                 new Preview(counts.get("conflicts") == 0, digest, counts, changes),
                 stored,
                 references);
+    }
+
+    private static Map<String, Object> auditSnapshot(
+            Map<String, Object> attrs, Map<String, Object> workflow) {
+        Map<String, Object> result = new LinkedHashMap<>(attrs);
+        if (workflow != null) {
+            result.put(WorkflowEngine.ID, workflow.get("id"));
+            result.put(WorkflowEngine.VERSION, workflow.get("version"));
+            result.put(WorkflowEngine.STATE, workflow.get("state"));
+            result.put(WorkflowEngine.REVISION, workflow.get("revision"));
+            result.put(WorkflowEngine.UPDATED_AT, workflow.get("updatedAt"));
+        }
+        return result;
     }
 
     private static void requireUpdated(Result result) {
