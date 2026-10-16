@@ -8,7 +8,7 @@
   
   <properties>
     <neo4j.server.version>5.26.31</neo4j.server.version>
-    <neo4j.driver.version>5.28.15</neo4j.driver.version>
+    <neo4j.driver.version>6.3.0</neo4j.driver.version>
     <javalin.version>7.2.3</javalin.version>
     <maven.version>3.9.9</maven.version>
     <maven.compiler.release>17</maven.compiler.release>
